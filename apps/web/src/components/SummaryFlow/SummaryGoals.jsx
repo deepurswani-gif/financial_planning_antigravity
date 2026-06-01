@@ -94,8 +94,11 @@ const SummaryGoals = () => {
     const { goals, setGoals, savePlanData } = useFinancialPlan();
     const navigate = useNavigate();
 
-    // Always start at INTRO when entering the Goals step
-    const [screen, setScreen] = useState(INTRO);
+    // Only count goals that have actual user-entered values (years and present cost)
+    const validGoals = goals.filter(g => g.presentValue && g.yearsToGoal);
+
+    // Start at SUMMARY if they already have valid goals (from legacy flow or previous edits), otherwise start at INTRO
+    const [screen, setScreen] = useState(validGoals.length > 0 ? SUMMARY : INTRO);
     const [direction, setDirection] = useState(1);
     const [editingGoalIndex, setEditingGoalIndex] = useState(null);
     const [selectedTemplateId, setSelectedTemplateId] = useState(null);
@@ -148,8 +151,8 @@ const SummaryGoals = () => {
         setGoals(updated);
     };
 
-    const removeGoal = (idx) => {
-        setGoals(goals.filter((_, i) => i !== idx));
+    const removeGoal = (goalId) => {
+        setGoals(goals.filter(g => g.id !== goalId));
     };
 
     const handleSaveGoal = () => {
@@ -223,7 +226,7 @@ const SummaryGoals = () => {
     /* ── Determine which dots to show ── */
     // Only show dots when user is in the add-goal flow (SELECT → YEARS → VALUE)
     const showDots = screen >= SELECT && screen <= SUMMARY;
-    const totalDots = goals.length > 0 ? SCREEN_COUNT : 4; // hide SUMMARY dot until a goal exists
+    const totalDots = validGoals.length > 0 ? SCREEN_COUNT : 4; // hide SUMMARY dot until a goal exists
 
     /* ── Narrative text ── */
     const narrativeText = "Perfect. I now have enough clarity to build your complete financial reality map and identify opportunities to improve your future financial outcomes.";
@@ -448,16 +451,16 @@ const SummaryGoals = () => {
                                     Your Financial Goals
                                 </h2>
 
-                                {goals.length === 0 ? (
+                                {validGoals.length === 0 ? (
                                     <div style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
                                         No goals added yet. Add your first goal to continue.
                                     </div>
                                 ) : (
                                     <div style={{ maxWidth: '500px', margin: '0 auto 1.5rem', textAlign: 'left' }}>
-                                        {goals.map((goal, idx) => {
+                                        {validGoals.map((goal) => {
                                             const Icon = getGoalIcon(goal.name);
                                             return (
-                                                <div key={goal.id || idx} className="goal-summary-card">
+                                                <div key={goal.id} className="goal-summary-card">
                                                     <div className="goal-summary-info">
                                                         <div className="goal-summary-icon"><Icon size={18} /></div>
                                                         <div>
@@ -468,7 +471,7 @@ const SummaryGoals = () => {
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    <button className="goal-remove-btn" onClick={() => removeGoal(idx)} title="Remove goal">
+                                                    <button className="goal-remove-btn" onClick={() => removeGoal(goal.id)} title="Remove goal">
                                                         <Trash2 size={16} />
                                                     </button>
                                                 </div>
@@ -500,7 +503,7 @@ const SummaryGoals = () => {
                 {/* ── Inter-step navigation ── */}
                 <div className="step-nav-bar">
                     <div>
-                        {screen === INTRO && (
+                        {(screen === INTRO || screen === SUMMARY) && (
                             <button className="step-nav-btn" onClick={async () => {
                                 if (savePlanData) {
                                     try { await savePlanData(); } catch (e) { console.error('Save failed on nav', e); }
@@ -514,7 +517,7 @@ const SummaryGoals = () => {
                     <div>
                         {screen === SUMMARY && (
                             <button className="step-nav-btn primary" onClick={handleViewSummary}>
-                                {goals.length > 0 ? 'View Summary' : 'Skip & View Report'} <ArrowRight size={16} />
+                                {validGoals.length > 0 ? 'View Summary' : 'Skip & View Report'} <ArrowRight size={16} />
                             </button>
                         )}
                     </div>
