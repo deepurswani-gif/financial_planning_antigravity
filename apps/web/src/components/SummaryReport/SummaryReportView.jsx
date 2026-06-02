@@ -13,7 +13,7 @@ const SummaryReportView = () => {
         { id: 'money-story', label: 'Your Money Story' },
         { id: 'safety-net', label: 'The Safety Net' },
         { id: 'future-self', label: 'Your Future Self' },
-        { id: 'executive', label: 'Executive Summary' }
+        { id: 'executive', label: 'Useful Insights' }
     ];
 
     return (

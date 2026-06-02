@@ -136,7 +136,7 @@ const ExecutiveSummarySection = () => {
     return (
         <div className="es-container">
             <section className="es-hero">
-                <p className="es-eyebrow">EXECUTIVE SUMMARY</p>
+                <p className="es-eyebrow">USEFUL INSIGHTS</p>
                 <h1 className="es-title">Financial Readiness Score</h1>
                 <div className="es-score-wrap">
                     <div className="es-score-ring" style={{ '--es-score': `${scorePercent}` }}>
@@ -356,7 +356,7 @@ const ExecutiveSummarySection = () => {
             </section>
 
             <section className="es-export">
-                <h3>Downloadable Executive One-Pager</h3>
+                <h3>Downloadable Useful Insights One-Pager</h3>
                 <button className="es-export-btn" onClick={printOnePager}>
                     <Download size={16} /> Export PDF One-Pager
                 </button>
@@ -366,7 +366,7 @@ const ExecutiveSummarySection = () => {
                 <div className="es-print-header">
                     <img src={FALLBACK_LOGO} alt="Finbrella logo" />
                     <div>
-                        <h2>Executive Summary</h2>
+                        <h2>Useful Insights</h2>
                         <p>Advisor: Finbrella</p>
                     </div>
                 </div>
