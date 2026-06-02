@@ -243,3 +243,76 @@ export const subscribeToPlanChanges = (planId, callback) => {
     supabase.removeChannel(channel);
   };
 };
+
+const toSnapshotMonthDate = (value = new Date()) => {
+  const base = new Date(value);
+  const yyyy = base.getFullYear();
+  const mm = String(base.getMonth() + 1).padStart(2, '0');
+  return `${yyyy}-${mm}-01`;
+};
+
+export const upsertMonthlyReadinessSnapshot = async ({
+  planId,
+  snapshotMonth,
+  totalScore,
+  overallCategory,
+  confidencePct,
+  pillars = [],
+  meta = {}
+}) => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+    if (!planId) throw new Error('planId is required');
+
+    const payload = {
+      user_id: user.id,
+      plan_id: planId,
+      snapshot_month: snapshotMonth || toSnapshotMonthDate(),
+      total_score: Math.max(0, Math.min(100, Math.round(totalScore || 0))),
+      overall_category: overallCategory || 'Vulnerable',
+      confidence_pct: confidencePct == null ? null : Math.max(0, Math.min(100, Math.round(confidencePct))),
+      pillars,
+      meta: {
+        schema_version: 1,
+        ...meta
+      }
+    };
+
+    const { data, error } = await supabase
+      .from('financial_readiness_snapshots')
+      .upsert(payload, {
+        onConflict: 'user_id,plan_id,snapshot_month'
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return { data, error: null };
+  } catch (error) {
+    console.error('Error upserting monthly readiness snapshot:', error);
+    return { data: null, error };
+  }
+};
+
+export const getReadinessSnapshotsByPlan = async (planId, limit = 24) => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+    if (!planId) throw new Error('planId is required');
+
+    const { data, error } = await supabase
+      .from('financial_readiness_snapshots')
+      .select('snapshot_month,total_score,overall_category,confidence_pct,pillars,meta')
+      .eq('user_id', user.id)
+      .eq('plan_id', planId)
+      .order('snapshot_month', { ascending: true })
+      .limit(limit);
+
+    if (error) throw error;
+    return { data: data || [], error: null };
+  } catch (error) {
+    console.error('Error fetching readiness snapshots:', error);
+    return { data: [], error };
+  }
+};

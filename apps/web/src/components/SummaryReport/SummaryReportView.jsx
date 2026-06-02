@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import MoneyStorySection from './MoneyStorySection';
 import SafetyNetSection from './SafetyNetSection';
 import FutureSelfSection from './FutureSelfSection';
+import ExecutiveSummarySection from './ExecutiveSummarySection';
 
 const SummaryReportView = () => {
     const navigate = useNavigate();
@@ -16,7 +17,7 @@ const SummaryReportView = () => {
     ];
 
     return (
-        <div className="fade-in" style={{ padding: (activeTab === 'money-story' || activeTab === 'safety-net' || activeTab === 'future-self') ? '0' : '2rem', maxWidth: (activeTab === 'money-story' || activeTab === 'safety-net' || activeTab === 'future-self') ? '100%' : '1200px', margin: '0 auto' }}>
+        <div className="fade-in" style={{ padding: (activeTab === 'money-story' || activeTab === 'safety-net' || activeTab === 'future-self' || activeTab === 'executive') ? '0' : '2rem', maxWidth: (activeTab === 'money-story' || activeTab === 'safety-net' || activeTab === 'future-self' || activeTab === 'executive') ? '100%' : '1200px', margin: '0 auto' }}>
             <div style={{ marginBottom: '1rem' }}>
                 <button 
                     className="btn btn-secondary" 
@@ -57,6 +58,8 @@ const SummaryReportView = () => {
                 <SafetyNetSection />
             ) : activeTab === 'future-self' ? (
                 <FutureSelfSection />
+            ) : activeTab === 'executive' ? (
+                <ExecutiveSummarySection />
             ) : (
                 <div className="card" style={{ minHeight: '400px', padding: '2rem', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
                     <h2 style={{ color: 'var(--text-main)', marginBottom: '1rem' }}>{tabs.find(t => t.id === activeTab)?.label}</h2>
