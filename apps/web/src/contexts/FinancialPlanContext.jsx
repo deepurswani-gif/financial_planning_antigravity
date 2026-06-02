@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from './AuthContext';
-import { createFinancialPlan, getActivePlan, updateFinancialPlan } from '../services/financialPlanService';
+import { createFinancialPlan, getActivePlan, updateFinancialPlan, markSummaryReportGenerated } from '../services/financialPlanService';
 import { generateProjections } from '../components/JourneyModule/ProjectionLogic';
 
 const FinancialPlanContext = createContext();
@@ -63,6 +63,7 @@ export const FinancialPlanProvider = ({ children }) => {
   const [hasHealthInsurance, setHasHealthInsurance] = useState(null);
   const [summaryLifeCover, setSummaryLifeCover] = useState('');
   const [summaryHealthCover, setSummaryHealthCover] = useState('');
+  const [summaryReportGeneratedAt, setSummaryReportGeneratedAt] = useState(null);
 
   const [inflationRates, setInflationRates] = useState({
     incomeIncrement: 10, householdInflation: 6, educationInflation: 8
@@ -138,6 +139,7 @@ export const FinancialPlanProvider = ({ children }) => {
     setHasHealthInsurance(null);
     setSummaryLifeCover('');
     setSummaryHealthCover('');
+    setSummaryReportGeneratedAt(null);
     setInflationRates({ incomeIncrement: 10, householdInflation: 6, educationInflation: 8 });
     setJourneyAdjustments([]);
     setInvestmentAllocations([]);
@@ -285,6 +287,7 @@ export const FinancialPlanProvider = ({ children }) => {
         setHasHealthInsurance(data.has_health_insurance ?? null);
         setSummaryLifeCover(data.summary_life_cover || '');
         setSummaryHealthCover(data.summary_health_cover || '');
+        setSummaryReportGeneratedAt(data.summary_report_generated_at || null);
         setInflationRates(data.inflation_rates || { incomeIncrement: 10, householdInflation: 6, educationInflation: 8 });
         setJourneyAdjustments(data.journey_adjustments || []);
         setInvestmentAllocations(data.investment_allocations || []);
@@ -328,6 +331,7 @@ export const FinancialPlanProvider = ({ children }) => {
         has_health_insurance: hasHealthInsurance,
         summary_life_cover: (summaryLifeCover !== '' && summaryLifeCover !== null && summaryLifeCover !== undefined) ? parseFloat(summaryLifeCover) : null,
         summary_health_cover: (summaryHealthCover !== '' && summaryHealthCover !== null && summaryHealthCover !== undefined) ? parseFloat(summaryHealthCover) : null,
+        summary_report_generated_at: summaryReportGeneratedAt || null,
         inflation_rates: inflationRates,
         journey_adjustments: journeyAdjustments,
         investment_allocations: investmentAllocations,
@@ -369,7 +373,16 @@ export const FinancialPlanProvider = ({ children }) => {
       setLastSaved(new Date());
     }, 1000);
     return () => clearTimeout(timeoutId);
-  }, [planId, loading, currentStep, familyMembers, income, expenseCategories, assetCategories, liabilityCategories, goals, policies, contingencyFund, hasLifeInsurance, hasHealthInsurance, summaryLifeCover, summaryHealthCover, inflationRates, journeyAdjustments, investmentAllocations, loanProposals, allocationPlans, goalMappings, insuranceMode, calculatorInputs, currentYearLedger, planStartMonth]);
+  }, [planId, loading, currentStep, familyMembers, income, expenseCategories, assetCategories, liabilityCategories, goals, policies, contingencyFund, hasLifeInsurance, hasHealthInsurance, summaryLifeCover, summaryHealthCover, summaryReportGeneratedAt, inflationRates, journeyAdjustments, investmentAllocations, loanProposals, allocationPlans, goalMappings, insuranceMode, calculatorInputs, currentYearLedger, planStartMonth]);
+
+  const markReportGenerated = useCallback(async () => {
+    const now = new Date().toISOString();
+    setSummaryReportGeneratedAt(now);
+    if (planId) {
+      const { error } = await markSummaryReportGenerated(planId);
+      if (error) console.error('Failed to persist summary report generated timestamp:', error);
+    }
+  }, [planId]);
 
   const expandedGoals = useMemo(() => {
     let result = [];
@@ -440,6 +453,7 @@ export const FinancialPlanProvider = ({ children }) => {
       hasEMI, setHasEMI, hasSpouseIncome, setHasSpouseIncome,
       hasLifeInsurance, setHasLifeInsurance, hasHealthInsurance, setHasHealthInsurance,
       summaryLifeCover, setSummaryLifeCover, summaryHealthCover, setSummaryHealthCover,
+      summaryReportGeneratedAt, setSummaryReportGeneratedAt, markReportGenerated,
       journeyProjections, proposedSIPs, proposedLumpsums, proposedEquities,
       handleLogoutCleanup, savePlanData
     }}>

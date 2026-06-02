@@ -1189,3 +1189,154 @@ input:focus, select:focus, textarea:focus {
 .question-dot.completed {
   background: var(--positive);
 }
+
+/* --- Summary profile dropdown --- */
+.summary-profile-wrap {
+  position: relative;
+}
+
+.summary-profile-dropdown {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  min-width: 220px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  z-index: 200;
+  overflow: hidden;
+}
+
+.summary-profile-dropdown-email {
+  padding: 0.85rem 1rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  word-break: break-all;
+}
+
+.summary-profile-dropdown-logout {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: none;
+  background: transparent;
+  color: var(--text-main);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.summary-profile-dropdown-logout:hover {
+  background: rgba(23, 45, 157, 0.06);
+  color: var(--primary);
+}
+
+.summary-view-report-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 1rem;
+  border-radius: 50px;
+  border: 1.5px solid var(--primary);
+  background: transparent;
+  color: var(--primary);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.summary-view-report-btn:hover {
+  background: var(--primary);
+  color: white;
+}
+
+/* --- Summary report layout + sticky action bar --- */
+.summary-shell-report .summary-content-area-report {
+  padding: 1.5rem 2rem 7rem;
+  width: 100%;
+  max-width: 100%;
+}
+
+.summary-report-view {
+  width: 100%;
+}
+
+.summary-report-action-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 90;
+  background: var(--bg-card);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
+  padding: 0.75rem 1.5rem;
+}
+
+.summary-report-action-bar-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.summary-report-action-bar-left,
+.summary-report-action-bar-center,
+.summary-report-action-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.summary-report-action-bar-center {
+  flex: 1;
+  justify-content: center;
+}
+
+.summary-report-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+
+.summary-report-cta-primary {
+  border-radius: 50px;
+  padding: 0.65rem 1.5rem;
+  font-weight: 600;
+}
+
+.summary-report-cta-secondary {
+  border-radius: 50px;
+  padding: 0.55rem 1.25rem;
+  background: transparent;
+  border: 1px solid var(--primary);
+  color: var(--primary);
+}
+
+@media (max-width: 900px) {
+  .summary-report-action-bar-inner {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .summary-report-action-bar-left,
+  .summary-report-action-bar-center,
+  .summary-report-action-bar-right {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .summary-view-report-btn {
+    padding: 0.5rem 0.65rem;
+  }
+}

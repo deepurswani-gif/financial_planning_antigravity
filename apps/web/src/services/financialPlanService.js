@@ -150,6 +150,18 @@ export const updateModule = async (planId, moduleName, moduleData) => {
   }
 };
 
+// Mark summary report as generated (first-time or regenerate)
+export const markSummaryReportGenerated = async (planId) => {
+  try {
+    return await updateFinancialPlan(planId, {
+      summary_report_generated_at: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('Error marking summary report generated:', error);
+    return { data: null, error };
+  }
+};
+
 // Update current step
 export const updateCurrentStep = async (planId, step) => {
   try {

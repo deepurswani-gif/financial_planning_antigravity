@@ -91,7 +91,7 @@ const NarrativeOverlay = ({ text, onContinue }) => {
    MAIN COMPONENT
    ═══════════════════════════════════════════════════ */
 const SummaryGoals = () => {
-    const { goals, setGoals, savePlanData } = useFinancialPlan();
+    const { goals, setGoals, savePlanData, summaryReportGeneratedAt, markReportGenerated } = useFinancialPlan();
     const navigate = useNavigate();
 
     // Only count goals that have actual user-entered values (years and present cost)
@@ -168,14 +168,28 @@ const SummaryGoals = () => {
         goTo(SELECT);
     };
 
-    const handleViewSummary = () => { setShowNarrative(true); };
-    const handleNarrativeDone = async () => {
+    const hasGeneratedReport = Boolean(summaryReportGeneratedAt);
+
+    const handleViewSummary = () => {
+        if (hasGeneratedReport) {
+            handleOpenReport(false);
+            return;
+        }
+        setShowNarrative(true);
+    };
+
+    const handleOpenReport = async (markGenerated = true) => {
         if (savePlanData) {
             try { await savePlanData(); } catch (e) { console.error('Save failed on nav', e); }
+        }
+        if (markGenerated) {
+            await markReportGenerated();
         }
         setShowNarrative(false);
         navigate('/summary-report');
     };
+
+    const handleNarrativeDone = () => handleOpenReport(true);
 
     /* ── Chevron logic ── */
     const editingGoal = editingGoalIndex !== null ? goals[editingGoalIndex] : null;
@@ -517,7 +531,8 @@ const SummaryGoals = () => {
                     <div>
                         {screen === SUMMARY && (
                             <button className="step-nav-btn primary" onClick={handleViewSummary}>
-                                {validGoals.length > 0 ? 'View Summary' : 'Skip & View Report'} <ArrowRight size={16} />
+                                {hasGeneratedReport ? 'View Summary Report' : 'Generate Summary Report'}
+                                <ArrowRight size={16} />
                             </button>
                         )}
                     </div>
