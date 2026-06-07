@@ -17,7 +17,8 @@ import SummaryGoals from './components/SummaryFlow/SummaryGoals';
 import SummaryReportView from './components/SummaryReport/SummaryReportView';
 
 // Detailed Flow Placeholder
-import DetailedPlaceholder from './components/DetailedFlow/DetailedPlaceholder';
+import DetailedFamilyInfo from './components/DetailedFlow/DetailedFamilyInfo';
+import DetailedMoneyInOut from './components/DetailedFlow/DetailedMoneyInOut';
 
 // Legacy Existing App Flow
 import DetailedFlowLayout from './DetailedFlowLayout';
@@ -63,8 +64,10 @@ function App() {
         <Route path="/detailed-flow/existing-app/*" element={<ProtectedRoute><DetailedFlowLayout /></ProtectedRoute>} />
 
         {/* Detailed Flow Routes */}
-        <Route path="/detailed-flow/*" element={<ProtectedRoute><BlankLayout /></ProtectedRoute>}>
-          <Route path="*" element={<DetailedPlaceholder />} />
+        <Route path="/detailed-flow" element={<ProtectedRoute><BlankLayout /></ProtectedRoute>}>
+          <Route path="familyinfo" element={<DetailedFamilyInfo />} />
+          <Route path="money_in_out" element={<DetailedMoneyInOut />} />
+          <Route path="*" element={<Navigate to="/detailed-flow/familyinfo" replace />} />
         </Route>
       </Routes>
     </RoleBasedRouting>

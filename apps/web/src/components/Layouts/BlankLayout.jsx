@@ -5,6 +5,7 @@ import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { signOut } from '../../services/authService';
 import finbrellaLogo from '../../assets/finbrella_logo.png';
+import { detailedFlowSteps } from '../DetailedFlow/detailedFlowSteps';
 
 const steps = [
     { id: 'profile', label: 'Profile', path: '/summary-flow/profile', icon: Users },
@@ -26,9 +27,12 @@ const BlankLayout = () => {
     const currentPath = location.pathname;
     const isSummaryFlow = currentPath.startsWith('/summary-flow');
     const isSummaryReport = currentPath.startsWith('/summary-report');
+    const isDetailedFlow = currentPath.startsWith('/detailed-flow') && !currentPath.startsWith('/detailed-flow/existing-app');
     const isSummaryExperience = isSummaryFlow || isSummaryReport;
+    const isDetailedExperience = isDetailedFlow;
 
     const currentStepIndex = steps.findIndex(s => currentPath.includes(s.id));
+    const detailedStepIndex = detailedFlowSteps.findIndex(s => currentPath.includes(s.id));
     const isStepCompleted = (stepIndex) => stepIndex < currentStepIndex;
 
     const selfMember = familyMembers?.find(m => m.relation === 'Self');
@@ -68,7 +72,7 @@ const BlankLayout = () => {
         navigate('/summary-report');
     };
 
-    if (!isSummaryExperience) {
+    if (!isSummaryExperience && !isDetailedExperience) {
         return (
             <div style={{ minHeight: '100vh', padding: '2rem', background: 'var(--bg-main)' }}>
                 <Outlet />
@@ -76,14 +80,20 @@ const BlankLayout = () => {
         );
     }
 
+    const shellClass = isSummaryReport
+        ? 'summary-shell summary-shell-report'
+        : isDetailedExperience
+            ? 'summary-shell summary-shell-detailed'
+            : 'summary-shell';
+
     return (
-        <div className={`summary-shell ${isSummaryReport ? 'summary-shell-report' : ''}`}>
+        <div className={shellClass}>
             <header className="summary-header">
                 <div className="summary-header-logo">
                     <img src={finbrellaLogo} alt="Finbrella" />
                 </div>
                 <div className="summary-header-right">
-                    {isSummaryFlow && summaryReportGeneratedAt && (
+                    {(isSummaryFlow || isDetailedFlow) && summaryReportGeneratedAt && (
                         <button
                             type="button"
                             className="summary-view-report-btn"
@@ -138,6 +148,40 @@ const BlankLayout = () => {
                     {steps.map((step, idx) => {
                         const isActive = idx === currentStepIndex;
                         const isCompleted = isStepCompleted(idx);
+                        const StepIcon = step.icon;
+
+                        return (
+                            <React.Fragment key={step.id}>
+                                {idx > 0 && (
+                                    <span className="summary-step-separator">
+                                        <ChevronRight size={14} />
+                                    </span>
+                                )}
+                                <div
+                                    className={`summary-step-item ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}
+                                    onClick={() => navigate(step.path)}
+                                >
+                                    <div className="summary-step-icon">
+                                        <StepIcon size={14} />
+                                    </div>
+                                    <span>{step.label}</span>
+                                    {isCompleted && (
+                                        <div className="summary-step-complete-arrow">
+                                            <ArrowRight size={14} />
+                                        </div>
+                                    )}
+                                </div>
+                            </React.Fragment>
+                        );
+                    })}
+                </nav>
+            )}
+
+            {isDetailedFlow && (
+                <nav className="summary-horizontal-nav">
+                    {detailedFlowSteps.map((step, idx) => {
+                        const isActive = idx === detailedStepIndex;
+                        const isCompleted = idx < detailedStepIndex;
                         const StepIcon = step.icon;
 
                         return (

@@ -47,7 +47,7 @@ const SummaryCashFlow = () => {
                     <p className="question-narrative">
                         Let me understand the monthly inflow of your household.
                     </p>
-                    <h2 className="question-title">What is your total monthly household income?</h2>
+                    <h2 className="question-title">What is your monthly in-hand-salary / Take-home-profit?</h2>
 
                     <div className="question-fields" style={{ maxWidth: '420px', margin: '0 auto' }}>
                         <div className="currency-input-wrapper">
@@ -90,7 +90,7 @@ const SummaryCashFlow = () => {
 
                             <div className={`conditional-field ${hasSpouseIncome ? 'visible' : ''}`}>
                                 <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.4rem', display: 'block' }}>
-                                    Spouse's Monthly Income (₹)
+                                    Spouse&apos;s monthly in-hand-salary / Take-home-profit (₹)
                                 </label>
                                 <div className="currency-input-wrapper">
                                     <span className="currency-symbol">₹</span>

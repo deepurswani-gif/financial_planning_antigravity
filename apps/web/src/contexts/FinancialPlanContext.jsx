@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useMemo, useCall
 import { useAuth } from './AuthContext';
 import { createFinancialPlan, getActivePlan, updateFinancialPlan, markSummaryReportGenerated } from '../services/financialPlanService';
 import { generateProjections } from '../components/JourneyModule/ProjectionLogic';
+import { normalizeIncomeState } from '../components/DetailedFlow/incomeDetailSync';
 
 const FinancialPlanContext = createContext();
 
@@ -35,9 +36,7 @@ export const FinancialPlanProvider = ({ children }) => {
     name: '', dob: '', occupation: 'Salaried', retirementAge: 60, relation: 'Self', natureOfBusiness: '', organizationName: '', educationalQualification: '', mobile: ''
   }]);
 
-  const [income, setIncome] = useState({
-    self: '', selfBonus: '', selfPassive: '', selfOther: '', spouse: '', spouseBonus: '', spousePassive: '', spouseOther: '', bonus: '', passive: '', other: ''
-  });
+  const [income, setIncome] = useState(() => normalizeIncomeState({}));
 
   const [expenseCategories, setExpenseCategories] = useState({
     household: { grocery: '', rent: '', education: '', lifestyle: '', medical: '', travel: '' },
@@ -119,7 +118,7 @@ export const FinancialPlanProvider = ({ children }) => {
     setPlanStartMonth(new Date().getMonth());
     setSaving(false);
     setFamilyMembers([{ name: '', dob: '', occupation: 'Salaried', retirementAge: 60, relation: 'Self', natureOfBusiness: '', organizationName: '', educationalQualification: '', mobile: '' }]);
-    setIncome({ self: '', selfBonus: '', selfPassive: '', selfOther: '', spouse: '', spouseBonus: '', spousePassive: '', spouseOther: '', bonus: '', passive: '', other: '' });
+    setIncome(normalizeIncomeState({}));
     setExpenseCategories({
       household: { grocery: '', rent: '', education: '', lifestyle: '', medical: '', travel: '' },
       emi: { personalLoan: '', homeLoan: '', educationLoan: '', carLoan: '', twoWheelerLoan: '', otherEmi: '' },
@@ -220,9 +219,7 @@ export const FinancialPlanProvider = ({ children }) => {
         setFamilyMembers(data.family_members?.length > 0 ? data.family_members.map(m => ({ ...m, mobile: m.mobile || '' })) : [{ name: '', dob: '', occupation: 'Salaried', retirementAge: 60, relation: 'Self', mobile: '' }]);
         
         const loadedIncome = data.income || {};
-        setIncome({
-            self: loadedIncome.self ?? loadedIncome.family ?? '', selfBonus: loadedIncome.selfBonus ?? loadedIncome.bonus ?? '', selfPassive: loadedIncome.selfPassive ?? loadedIncome.passive ?? '', selfOther: loadedIncome.selfOther ?? loadedIncome.other ?? '', spouse: loadedIncome.spouse ?? '', spouseBonus: loadedIncome.spouseBonus ?? '', spousePassive: loadedIncome.spousePassive ?? '', spouseOther: loadedIncome.spouseOther ?? ''
-        });
+        setIncome(normalizeIncomeState(loadedIncome));
         setHasSpouseIncome(!!(loadedIncome.spouse && Number(loadedIncome.spouse) > 0));
 
         const loadedExpenseCategories = data.expense_categories || {};

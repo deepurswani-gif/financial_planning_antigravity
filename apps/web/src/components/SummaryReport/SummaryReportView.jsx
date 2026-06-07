@@ -158,7 +158,7 @@ const SummaryReportView = () => {
                             <button
                                 type="button"
                                 className="btn btn-primary summary-report-action-btn summary-report-cta-primary"
-                                onClick={() => navigate('/detailed-flow/profile')}
+                                onClick={() => navigate('/detailed-flow/familyinfo')}
                             >
                                 Take me to Detailed Report
                             </button>
