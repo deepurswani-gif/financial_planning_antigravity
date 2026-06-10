@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { signOut } from '../../services/authService';
 import finbrellaLogo from '../../assets/finbrella_logo.png';
 import { detailedFlowSteps } from '../DetailedFlow/detailedFlowSteps';
+import { useBreakpoints } from '../../hooks';
 
 const steps = [
     { id: 'profile', label: 'Profile', path: '/summary-flow/profile', icon: Users },
@@ -19,6 +20,7 @@ const steps = [
 const BlankLayout = () => {
     const location = useLocation();
     const navigate = useNavigate();
+    const { lg } = useBreakpoints();
     const { saving, lastSaved, familyMembers, summaryReportGeneratedAt, savePlanData, handleLogoutCleanup } = useFinancialPlan();
     const { user } = useAuth();
     const [profileOpen, setProfileOpen] = useState(false);
@@ -100,7 +102,7 @@ const BlankLayout = () => {
                             onClick={handleViewReport}
                         >
                             <FileText size={16} />
-                            View Summary Report
+                            {lg ? 'View Summary Report' : 'Report'}
                         </button>
                     )}
                     {saving && (

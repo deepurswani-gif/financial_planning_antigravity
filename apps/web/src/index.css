@@ -1340,3 +1340,103 @@ input:focus, select:focus, textarea:focus {
     padding: 0.5rem 0.65rem;
   }
 }
+
+/* ============================================================
+   MOBILE VIEWPORT SUPPORT (< 768px)
+   ============================================================ */
+@media (max-width: 768px) {
+  /* Sidebars transformed into overlay drawers */
+  .sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    width: 280px !important;
+    z-index: 1010 !important;
+    box-shadow: 0 0 24px rgba(0,0,0,0.15) !important;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  }
+
+  .sidebar:hover {
+    width: 280px !important;
+  }
+
+  .sidebar.left-drawer {
+    left: 0 !important;
+    transform: translateX(-100%);
+  }
+
+  .sidebar.left-drawer.mobile-open {
+    transform: translateX(0) !important;
+  }
+
+  .sidebar.right-drawer {
+    display: block !important;
+    right: 0 !important;
+    transform: translateX(100%);
+    background: var(--bg-card) !important;
+    border-left: 1px solid var(--border) !important;
+  }
+
+  .sidebar.right-drawer.mobile-open {
+    transform: translateX(0) !important;
+  }
+
+  .sidebar .nav-label {
+    opacity: 1 !important;
+    display: inline-block !important;
+  }
+
+  .sidebar-btn {
+    width: 100% !important;
+  }
+
+  .sidebar-header {
+    width: 100% !important;
+  }
+
+  /* Content Wrapper adjustments */
+  .main-content-wrapper {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding: 1rem !important;
+  }
+
+  /* Summary Flow UI refinements */
+  .summary-header {
+    padding: 0 1rem !important;
+  }
+
+  .summary-horizontal-nav {
+    padding: 0.6rem 1rem !important;
+  }
+
+  .summary-content-area {
+    padding: 1.5rem 1rem !important;
+  }
+
+  /* Intra-step chevrons */
+  .nav-chevron {
+    width: 38px !important;
+    height: 38px !important;
+  }
+
+  .nav-chevron-left {
+    left: 0.5rem !important;
+  }
+
+  .nav-chevron-right {
+    right: 0.5rem !important;
+  }
+}
+
+/* Stacking Form rows for mobile screens */
+@media (max-width: 640px) {
+  .question-fields .field-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  .custom-field-row {
+    grid-template-columns: 1fr !important;
+    gap: 0.5rem !important;
+  }
+}

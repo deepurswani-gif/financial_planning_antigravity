@@ -1,9 +1,9 @@
-﻿import { 
+import { 
   LogOut, User, Users, ArrowRightLeft, Wallet, Target, Shield, 
   Umbrella, LifeBuoy, Map, PieChart, TrendingUp, ListChecks, 
   LayoutDashboard, Calculator, Percent, Landmark, Car, 
   GraduationCap, LineChart, MoveDown, PiggyBank, Home, CheckCircle2,
-  Copy,
+  Copy, Menu, X,
 } from 'lucide-react';
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -68,9 +68,25 @@ function DetailedFlowLayout() {
   const [planSyncError, setPlanSyncError] = useState(null);
   const [planReloadToken, setPlanReloadToken] = useState(0);
 
+  // States for responsive mobile drawer toggles
+  const [isMobileLeftMenuOpen, setIsMobileLeftMenuOpen] = useState(false);
+  const [isMobileRightMenuOpen, setIsMobileRightMenuOpen] = useState(false);
+
   // State for tracking the current navigation step (1-12)
   const [currentStep, setCurrentStep] = useState(1);
   const [maxStep, setMaxStep] = useState(1); // Track maximum unlocked step
+
+  // New states for Secondary Navigation (Calculators)
+  const [activeSection, setActiveSection] = useState('modules'); // 'modules' or 'calculators'
+  const [activeCalculator, setActiveCalculator] = useState(null);
+  const [insuranceMode, setInsuranceMode] = useState(null); // 'accurate' or 'anyway'
+  const [planStartMonth, setPlanStartMonth] = useState(new Date().getMonth());
+
+  // Auto-close mobile drawers when step or section or calculator changes
+  useEffect(() => {
+    setIsMobileLeftMenuOpen(false);
+    setIsMobileRightMenuOpen(false);
+  }, [currentStep, activeSection, activeCalculator, planReloadToken]);
 
   // Helper to handle step progression securely with async storage track
   const handleStepProgression = async (nextStep) => {
@@ -86,12 +102,6 @@ function DetailedFlowLayout() {
     }
     window.scrollTo(0, 0);
   };
-
-  // New states for Secondary Navigation (Calculators)
-  const [activeSection, setActiveSection] = useState('modules'); // 'modules' or 'calculators'
-  const [activeCalculator, setActiveCalculator] = useState(null);
-  const [insuranceMode, setInsuranceMode] = useState(null); // 'accurate' or 'anyway'
-  const [planStartMonth, setPlanStartMonth] = useState(new Date().getMonth());
 
   // State for Family Profile details
   const [familyMembers, setFamilyMembers] = useState([
@@ -790,15 +800,28 @@ function DetailedFlowLayout() {
     );
   }
 
-  // Tablet/desktop (lg+, same 768px threshold as the hook): full app. Narrow phone browsers: coming-soon (using lg, not !xl, so portrait iPads still qualify).
-  if (!lg) {
-    return <MobileWebComingSoon />;
-  }
+  // Tablet/desktop (lg+, same 768px threshold as the hook): full app. Mobile screens are now fully supported.
 
   return (
     <RoleBasedRouting>
       <ProtectedRoute>
         <div className="app-shell">
+        {(isMobileLeftMenuOpen || isMobileRightMenuOpen) && !lg && (
+          <div 
+            className="sidebar-overlay"
+            onClick={() => {
+              setIsMobileLeftMenuOpen(false);
+              setIsMobileRightMenuOpen(false);
+            }}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(15, 23, 42, 0.4)',
+              backdropFilter: 'blur(4px)',
+              zIndex: 999
+            }}
+          />
+        )}
         {planSyncError && (
           <div
             role="alert"
@@ -829,8 +852,30 @@ function DetailedFlowLayout() {
           </div>
         )}
         {/* Left Drawer: Process Navigation */}
-        <aside className="sidebar left-drawer">
-          <div className="sidebar-header" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '1rem', padding: '1.5rem 1rem 0 1rem', height: 'auto', borderBottom: 'none' }}>
+        <aside className={`sidebar left-drawer ${isMobileLeftMenuOpen ? 'mobile-open' : ''}`}>
+          <div className="sidebar-header" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '1rem', padding: '1.5rem 1rem 0 1rem', height: 'auto', borderBottom: 'none', position: 'relative' }}>
+            {!lg && (
+              <button 
+                type="button"
+                onClick={() => setIsMobileLeftMenuOpen(false)}
+                style={{
+                  position: 'absolute',
+                  top: '1rem',
+                  right: '1rem',
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'white',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '4px'
+                }}
+                aria-label="Close menu"
+              >
+                <X size={20} />
+              </button>
+            )}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <LayoutDashboard size={24} color="var(--primary)" />
               <span className="nav-label" style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>Finbrella</span>
@@ -928,10 +973,32 @@ function DetailedFlowLayout() {
         </aside>
 
         {/* Right Drawer: Calculators Navigation */}
-        <aside className="sidebar right-drawer">
-          <div className="sidebar-header" style={{ color: 'var(--text-main)' }}>
+        <aside className={`sidebar right-drawer ${isMobileRightMenuOpen ? 'mobile-open' : ''}`}>
+          <div className="sidebar-header" style={{ color: 'var(--text-main)', position: 'relative' }}>
             <Calculator size={24} />
             <span className="nav-label">Calculators</span>
+            {!lg && (
+              <button 
+                type="button"
+                onClick={() => setIsMobileRightMenuOpen(false)}
+                style={{
+                  position: 'absolute',
+                  top: '1.5rem',
+                  right: '1rem',
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '4px'
+                }}
+                aria-label="Close calculators"
+              >
+                <X size={20} />
+              </button>
+            )}
           </div>
           <div style={{ flex: 1, padding: '1rem 0' }}>
             {[
@@ -967,23 +1034,77 @@ function DetailedFlowLayout() {
 
         {/* Main Content Area */}
         <div className="main-content-wrapper fade-in">
-          <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', paddingLeft: '4rem' }}>
-              <img src={finbrellaLogo} alt="Finbrella Logo" style={{ height: '56px', width: 'auto', objectFit: 'contain' }} />
+          <header style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between', 
+            marginBottom: '2rem', 
+            paddingBottom: '1rem', 
+            borderBottom: '1px solid var(--border)',
+            position: lg ? 'static' : 'sticky',
+            top: lg ? 'auto' : 0,
+            background: lg ? 'transparent' : 'var(--bg-card)',
+            zIndex: lg ? 'auto' : 100,
+            padding: lg ? '0 0 1rem 0' : '0.75rem 1rem',
+            margin: lg ? '0 0 2rem 0' : '0 -1rem 2rem -1rem',
+            boxShadow: lg ? 'none' : 'var(--shadow-sm)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', paddingLeft: lg ? '4rem' : 0 }}>
+              {!lg && (
+                <button
+                  type="button"
+                  onClick={() => setIsMobileLeftMenuOpen(true)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--text-main)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '8px',
+                    borderRadius: '8px'
+                  }}
+                  aria-label="Toggle menu"
+                >
+                  <Menu size={24} />
+                </button>
+              )}
+              <img src={finbrellaLogo} alt="Finbrella Logo" style={{ height: lg ? '56px' : '36px', width: 'auto', objectFit: 'contain' }} />
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginRight: '3rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginRight: lg ? '3rem' : 0 }}>
               {saving ? (
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-                  Saving...
+                  {lg && "Saving..."}
                 </span>
               ) : lastSaved ? (
                 <span style={{ fontSize: '0.75rem', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                  Saved at {lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {lg && `Saved at ${lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
                 </span>
               ) : null}
-              {SHOW_STAGING_USER_ID_TOOL && user?.id ? (
+              {!lg && (
+                <button
+                  type="button"
+                  onClick={() => setIsMobileRightMenuOpen(true)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--text-main)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '8px',
+                    borderRadius: '8px'
+                  }}
+                  aria-label="Toggle calculators"
+                >
+                  <Calculator size={22} />
+                </button>
+              )}
+              {SHOW_STAGING_USER_ID_TOOL && user?.id && lg ? (
                 <button
                   type="button"
                   onClick={() => { void copySupabaseUserId(); }}
@@ -1014,17 +1135,17 @@ function DetailedFlowLayout() {
                     background: 'var(--primary-light)', 
                     border: '1px solid var(--primary-light)', 
                     borderRadius: '50%', 
-                    width: '40px', 
-                    height: '40px', 
+                    width: lg ? '40px' : '32px', 
+                    height: lg ? '40px' : '32px', 
                     display: 'flex', 
                     alignItems: 'center', 
                     justifyContent: 'center', 
                     cursor: 'pointer',
                     color: 'var(--primary)',
-                    marginLeft: '1rem'
+                    marginLeft: lg ? '1rem' : '0.25rem'
                   }}
                 >
-                  <User size={20} />
+                  <User size={lg ? 20 : 16} />
                 </button>
                 {showProfileMenu && (
                   <>
