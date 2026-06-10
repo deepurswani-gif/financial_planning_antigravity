@@ -9,7 +9,9 @@ import {
     guessEmploymentTypeFromSummaryOccupation,
     createEmptySpouseMember,
     createEmptyChildMember,
+    applyChildOccupationFields,
 } from './employmentTypeSync';
+import { EDUCATION_STANDARDS } from '../JourneyModule/ProjectionLogic';
 
 const formatDate = (value) => {
     if (!value) return '—';
@@ -131,6 +133,28 @@ const DetailedFamilyInfo = () => {
             return [...others, ...updatedChildren];
         });
     }, [setMembers]);
+
+    const updateChildOccupation = useCallback((index, occupation) => {
+        setMembers(prev => {
+            const children = prev.filter(m => m.relation === 'Child');
+            const others = prev.filter(m => m.relation !== 'Child');
+            const updatedChildren = children.map((c, i) => (
+                i === index ? applyChildOccupationFields(c, occupation) : c
+            ));
+            return [...others, ...updatedChildren];
+        });
+    }, [setMembers]);
+
+    const applySemYearHelper = useCallback((index, kind) => {
+        const child = childMembers[index];
+        if (!child) return;
+        const val = (child.currentSemYear || '').trim();
+        if (!val) {
+            updateChild(index, 'currentSemYear', kind === 'semester' ? '1st Semester' : '1st Year');
+        } else if (!/semester|year/i.test(val)) {
+            updateChild(index, 'currentSemYear', `${val} ${kind === 'semester' ? 'Semester' : 'Year'}`);
+        }
+    }, [childMembers, updateChild]);
 
     const addChild = useCallback(() => {
         setMembers(prev => [...prev, createEmptyChildMember()]);
@@ -354,7 +378,7 @@ const DetailedFamilyInfo = () => {
                 id: 'children',
                 content: (
                     <div className="question-container">
-                        <p className="question-narrative">If you have children, add their basic details here. School and college fees will be collected later.</p>
+                        <p className="question-narrative">If you have children, add their details here. Monthly fees will be collected in Money in &amp; Money out.</p>
                         <h2 className="question-title">Children</h2>
                         <div className="question-fields" style={{ maxWidth: '480px', margin: '0 auto', gap: '1rem' }}>
                             {childMembers.length === 0 && (
@@ -381,12 +405,61 @@ const DetailedFamilyInfo = () => {
                                         </div>
                                         <div>
                                             <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.4rem', display: 'block' }}>Studying at</label>
-                                            <select className="conversational-input" value={child.occupation || ''} onChange={(e) => updateChild(index, 'occupation', e.target.value)}>
+                                            <select className="conversational-input" value={child.occupation || ''} onChange={(e) => updateChildOccupation(index, e.target.value)}>
                                                 <option value="">Select option</option>
                                                 <option value="School">School</option>
                                                 <option value="College">College</option>
                                             </select>
                                         </div>
+                                        {child.occupation === 'School' && (
+                                            <div>
+                                                <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.4rem', display: 'block' }}>Studying in Standard</label>
+                                                <select className="conversational-input" value={child.standard || ''} onChange={(e) => updateChild(index, 'standard', e.target.value)}>
+                                                    <option value="">Select Standard</option>
+                                                    {EDUCATION_STANDARDS.map((std) => (
+                                                        <option key={std} value={std}>{std}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        )}
+                                        {child.occupation === 'College' && (
+                                            <>
+                                                <div>
+                                                    <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.4rem', display: 'block' }}>Name of course</label>
+                                                    <input type="text" className="conversational-input" value={child.courseName || ''} onChange={(e) => updateChild(index, 'courseName', e.target.value)} placeholder="e.g. B.Tech" />
+                                                </div>
+                                                <div>
+                                                    <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.4rem', display: 'block' }}>Current Semester / Year</label>
+                                                    <input type="text" className="conversational-input" value={child.currentSemYear || ''} onChange={(e) => updateChild(index, 'currentSemYear', e.target.value)} placeholder="e.g. 2nd Year" />
+                                                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                                                        <button type="button" className="btn btn-secondary" style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }} onClick={() => applySemYearHelper(index, 'semester')}>Semester</button>
+                                                        <button type="button" className="btn btn-secondary" style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }} onClick={() => applySemYearHelper(index, 'year')}>Year</button>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.4rem', display: 'block' }}>Duration of the course (Years)</label>
+                                                    <input type="number" className="conversational-input" value={child.courseDuration || ''} onChange={(e) => updateChild(index, 'courseDuration', e.target.value)} placeholder="e.g. 4" />
+                                                </div>
+                                                <div>
+                                                    <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.4rem', display: 'block' }}>How many years of fee yet to pay?</label>
+                                                    <input type="number" className="conversational-input" value={child.remainingTime || ''} onChange={(e) => updateChild(index, 'remainingTime', e.target.value)} placeholder="e.g. 2" min="0" />
+                                                </div>
+                                                <div>
+                                                    <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.4rem', display: 'block' }}>Cost of complete course</label>
+                                                    <input type="number" className="conversational-input" value={child.costOfCompleteCourse || ''} onChange={(e) => updateChild(index, 'costOfCompleteCourse', e.target.value)} placeholder="0" />
+                                                </div>
+                                                <div>
+                                                    <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.4rem', display: 'block' }}>
+                                                        Is {child.currentSemYear || 'current year'} fee paid?
+                                                    </label>
+                                                    <select className="conversational-input" value={child.isFeePaid || ''} onChange={(e) => updateChild(index, 'isFeePaid', e.target.value)}>
+                                                        <option value="">Select Option</option>
+                                                        <option value="YES">YES</option>
+                                                        <option value="NO">NO</option>
+                                                    </select>
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             ))}
@@ -403,7 +476,7 @@ const DetailedFamilyInfo = () => {
     }, [
         editingRecap, selfMember, spouseMember, childMembers, isMarried, isMarriedExplicitNo,
         isSpouseWorking, isSpouseWorkingExplicitNo, retireAge, sliderPercent, selfEmploymentType,
-        updateSelf, updateSpouse, setMarried, updateChild, addChild, removeChild, setHasSpouseIncome,
+        updateSelf, updateSpouse, setMarried, updateChild, updateChildOccupation, applySemYearHelper, addChild, removeChild, setHasSpouseIncome,
     ]);
 
     const narrative = isMarried

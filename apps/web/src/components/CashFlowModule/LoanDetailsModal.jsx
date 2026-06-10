@@ -46,6 +46,14 @@ const LoanDetailsModal = ({ isOpen, onClose, onSave, initialData, loanTypeTitle 
     if (!isOpen) return null;
 
     const handleSave = () => {
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth() + 1;
+        const startYear = parseInt(formData.startYear, 10);
+        const startMonth = parseInt(formData.startMonth, 10);
+        if (startYear > currentYear || (startYear === currentYear && startMonth > currentMonth)) {
+            return;
+        }
         onSave(formData);
         setShowSuccess(true);
         setTimeout(() => {
@@ -79,6 +87,29 @@ const LoanDetailsModal = ({ isOpen, onClose, onSave, initialData, loanTypeTitle 
         if (regex.test(val)) {
             setFormData({ ...formData, tenure: val });
         }
+    };
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+
+    const yearOptions = [];
+    for (let y = currentYear - 30; y <= currentYear; y++) {
+        yearOptions.push(y);
+    }
+
+    const handleStartYearChange = (yearVal) => {
+        const y = parseInt(yearVal, 10);
+        let month = parseInt(formData.startMonth, 10);
+        if (y === currentYear && month > currentMonth) {
+            month = currentMonth;
+        }
+        setFormData({ ...formData, startYear: y, startMonth: month });
+    };
+
+    const handleStartMonthChange = (monthVal) => {
+        const m = parseInt(monthVal, 10);
+        setFormData({ ...formData, startMonth: m });
     };
 
     return createPortal(
@@ -141,31 +172,34 @@ const LoanDetailsModal = ({ isOpen, onClose, onSave, initialData, loanTypeTitle 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
                         <div className="input-group">
                             <label htmlFor="startMonth">Start Month</label>
-                            <select id="startMonth" aria-label="Start Month" value={formData.startMonth} onChange={(e) => setFormData({...formData, startMonth: e.target.value})}
+                            <select id="startMonth" aria-label="Start Month" value={formData.startMonth} onChange={(e) => handleStartMonthChange(e.target.value)}
                                 style={{ appearance: 'auto', padding: '0.6rem', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-main)', color: 'var(--text-main)', width: '100%' }}
                             >
-                                {[...Array(12)].map((_, i) => (
-                                    <option key={i+1} value={i+1}>{new Date(2000, i, 1).toLocaleString('default', { month: 'short' })}</option>
-                                ))}
+                                {[...Array(12)].map((_, i) => {
+                                    const m = i + 1;
+                                    if (formData.startYear === currentYear && m > currentMonth) return null;
+                                    return (
+                                        <option key={i + 1} value={i + 1}>{new Date(2000, i, 1).toLocaleString('default', { month: 'short' })}</option>
+                                    );
+                                })}
                             </select>
                         </div>
 
                         <div className="input-group">
                             <label htmlFor="startYear">Start Year</label>
                             <select id="startYear" aria-label="Start Year"
-                                value={formData.startYear} 
-                                onChange={(e) => setFormData({...formData, startYear: parseInt(e.target.value, 10)})}
+                                value={formData.startYear}
+                                onChange={(e) => handleStartYearChange(e.target.value)}
                                 style={{ appearance: 'auto', padding: '0.6rem', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-main)', color: 'var(--text-main)', width: '100%' }}
                             >
-                                {[...Array(31)].map((_, i) => {
-                                    const y = new Date().getFullYear() - 30 + i;
-                                    return <option key={y} value={y}>{y}</option>;
-                                })}
+                                {yearOptions.map((y) => (
+                                    <option key={y} value={y}>{y}</option>
+                                ))}
                             </select>
                         </div>
                     </div>
                     <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '0.75rem', display: 'block' }}>
-                        Used by the Timeline Engine to map exact loan closures.
+                        Loan start date cannot be in the future. Used by the Timeline Engine to map exact loan closures.
                     </small>
                 </div>
 

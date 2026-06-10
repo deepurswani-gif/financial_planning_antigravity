@@ -1,3 +1,5 @@
+import { getEffectiveMonthlyEmi, sumConfiguredEmis } from '../DetailedFlow/expenseDetailSync';
+
 export const convertToMonthly = (value, frequency) => {
     const val = parseFloat(value) || 0;
     switch (frequency) {
@@ -36,10 +38,7 @@ export const calculateCashFlow = (income, expenseCategories) => {
                        (parseFloat(income.family) || 0);
 
     const householdSum = Object.values(expenseCategories.household || {}).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
-    const emiSum = Object.values(expenseCategories.emi || {}).reduce((sum, val) => {
-        const amount = (val !== null && typeof val === 'object') ? parseFloat(val.emi) : parseFloat(val);
-        return sum + (amount || 0);
-    }, 0);
+    const emiSum = getEffectiveMonthlyEmi(expenseCategories);
     
     // Insurance specialized handling for nested life insurance
     const insuranceSum = Object.entries(expenseCategories.insurance || {}).reduce((sum, [key, item]) => {
@@ -109,6 +108,13 @@ export const calculateCashFlow = (income, expenseCategories) => {
             }
         });
     });
+    if (emiSum > 0 && sumConfiguredEmis(expenseCategories.emi) === 0 && parseFloat(expenseCategories.summaryEmiTotal) > 0) {
+        expenseBreakdown.push({
+            name: 'Monthly EMI (Summary)',
+            category: getCategoryLabel('emi'),
+            value: parseFloat(expenseCategories.summaryEmiTotal),
+        });
+    }
     // Insurance specialized handling
     Object.entries(expenseCategories.insurance || {}).forEach(([itemKey, item]) => {
         if (itemKey === 'life') {

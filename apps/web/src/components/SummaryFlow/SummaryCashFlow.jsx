@@ -168,8 +168,10 @@ const SummaryCashFlow = () => {
                             className={`yes-no-btn ${hasEMI === false ? 'active-no' : ''}`}
                             onClick={() => {
                                 setHasEMI(false);
-                                handleExpenseChange('emi', 'homeLoan', '');
-                                handleExpenseChange('emi', 'personalLoan', '');
+                                setExpenseCategories(prev => ({
+                                    ...prev,
+                                    summaryEmiTotal: '',
+                                }));
                             }}
                         >
                             No
@@ -187,13 +189,16 @@ const SummaryCashFlow = () => {
                                     type="number"
                                     className="conversational-input"
                                     placeholder="e.g. 35000"
-                                    value={expenseCategories.emi.homeLoan || ''}
-                                    onChange={(e) => handleExpenseChange('emi', 'homeLoan', e.target.value)}
+                                    value={expenseCategories.summaryEmiTotal || ''}
+                                    onChange={(e) => setExpenseCategories(prev => ({
+                                        ...prev,
+                                        summaryEmiTotal: e.target.value,
+                                    }))}
                                 />
                             </div>
-                            {expenseCategories.emi.homeLoan && (
+                            {expenseCategories.summaryEmiTotal && (
                                 <div className="currency-display">
-                                    {formatInr(expenseCategories.emi.homeLoan)} / month
+                                    {formatInr(expenseCategories.summaryEmiTotal)} / month
                                 </div>
                             )}
                         </div>

@@ -44,11 +44,45 @@ export function createEmptySpouseMember() {
     };
 }
 
+export const CHILD_COLLEGE_FIELDS = [
+    'courseName',
+    'courseDuration',
+    'currentSemYear',
+    'remainingTime',
+    'costOfCompleteCourse',
+    'isFeePaid',
+];
+
+export const CHILD_SCHOOL_FIELDS = ['standard'];
+
+export const CHILD_FEE_FIELDS = ['monthlyEducationExpense', 'annualSchoolFee'];
+
 export function createEmptyChildMember() {
     return {
         name: '',
         dob: '',
         occupation: '',
         relation: 'Child',
+        standard: '',
+        courseName: '',
+        courseDuration: '',
+        currentSemYear: '',
+        remainingTime: '',
+        costOfCompleteCourse: '',
+        isFeePaid: '',
+        monthlyEducationExpense: '',
     };
+}
+
+/** Clear education fields that do not apply after occupation change. */
+export function applyChildOccupationFields(child, occupation) {
+    const next = { ...child, occupation };
+    if (occupation === 'School') {
+        CHILD_COLLEGE_FIELDS.forEach((f) => { next[f] = ''; });
+    } else if (occupation === 'College') {
+        CHILD_SCHOOL_FIELDS.forEach((f) => { next[f] = ''; });
+    } else {
+        [...CHILD_SCHOOL_FIELDS, ...CHILD_COLLEGE_FIELDS].forEach((f) => { next[f] = ''; });
+    }
+    return next;
 }

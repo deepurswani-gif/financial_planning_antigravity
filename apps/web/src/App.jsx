@@ -67,6 +67,7 @@ function App() {
         <Route path="/detailed-flow" element={<ProtectedRoute><BlankLayout /></ProtectedRoute>}>
           <Route path="familyinfo" element={<DetailedFamilyInfo />} />
           <Route path="money_in_out" element={<DetailedMoneyInOut />} />
+          <Route path="expenses_emis" element={<Navigate to="/detailed-flow/money_in_out" replace />} />
           <Route path="*" element={<Navigate to="/detailed-flow/familyinfo" replace />} />
         </Route>
       </Routes>

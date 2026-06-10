@@ -149,7 +149,21 @@ const DetailedProgressiveLayout = ({
         if (questions.length === 0) return;
         if (questions.some(q => q.id === currentQuestionId)) return;
 
-        const stepOrder = ['recap', 'self-profile', 'self-main', 'self-tax-earnings', 'self-tax-deductions', 'spouse-main', 'spouse-tax-earnings', 'spouse-tax-deductions', 'spouse-details', 'spouse-employment', 'children'];
+        const childMatch = currentQuestionId.match(/^child-\d+-education$/);
+        if (childMatch) {
+            const childQ = questions.find(q => q.id.startsWith('child-') && q.id.endsWith('-education'));
+            if (childQ) {
+                setCurrentQuestionId(childQ.id);
+                return;
+            }
+        }
+
+        const stepOrder = [
+            'recap', 'self-profile', 'self-main', 'self-tax-earnings', 'self-tax-deductions',
+            'spouse-main', 'spouse-tax-earnings', 'spouse-tax-deductions',
+            'spouse-details', 'spouse-employment', 'children',
+            'recap-household', 'household-breakup', 'recap-emi', 'emi-loans',
+        ];
         const prevIdx = stepOrder.indexOf(currentQuestionId);
         for (let i = prevIdx >= 0 ? prevIdx : stepOrder.length - 1; i >= 0; i--) {
             if (questions.some(q => q.id === stepOrder[i])) {

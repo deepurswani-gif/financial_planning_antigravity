@@ -3,6 +3,7 @@ import { useAuth } from './AuthContext';
 import { createFinancialPlan, getActivePlan, updateFinancialPlan, markSummaryReportGenerated } from '../services/financialPlanService';
 import { generateProjections } from '../components/JourneyModule/ProjectionLogic';
 import { normalizeIncomeState } from '../components/DetailedFlow/incomeDetailSync';
+import { initializeExpenseSnapshots, hasAnyEmiCommitment } from '../components/DetailedFlow/expenseDetailSync';
 
 const FinancialPlanContext = createContext();
 
@@ -224,8 +225,10 @@ export const FinancialPlanProvider = ({ children }) => {
 
         const loadedExpenseCategories = data.expense_categories || {};
         const emiObj = loadedExpenseCategories.emi || {};
-        const hasAnyEmi = Object.values(emiObj).some(val => val && Number(val) > 0);
-        setHasEMI(hasAnyEmi);
+        setHasEMI(hasAnyEmiCommitment({
+            ...loadedExpenseCategories,
+            emi: emiObj,
+        }));
         const loadedInsurance = loadedExpenseCategories.insurance || {};
         let migratedLife = {};
         const selfMember = (data.family_members || []).find(m => m.relation === 'Self') || { name: '', relation: 'Self' };
@@ -243,18 +246,20 @@ export const FinancialPlanProvider = ({ children }) => {
             }
         }
 
-        setExpenseCategories({
+        setExpenseCategories(initializeExpenseSnapshots({
           household: { grocery: '', rent: '', education: '', lifestyle: '', medical: '', travel: '', ...(loadedExpenseCategories.household || {}) },
           emi: { 
-            personalLoan: loadedExpenseCategories.emi?.personalLoan ?? '', homeLoan: loadedExpenseCategories.emi?.homeLoan ?? '', educationLoan: loadedExpenseCategories.emi?.educationLoan ?? '', carLoan: loadedExpenseCategories.emi?.carLoan ?? '', twoWheelerLoan: loadedExpenseCategories.emi?.twoWheelerLoan ?? '', otherEmi: loadedExpenseCategories.emi?.otherEmi ?? ''
+            personalLoan: loadedExpenseCategories.emi?.personalLoan ?? '', homeLoan: loadedExpenseCategories.emi?.homeLoan ?? '', educationLoan: loadedExpenseCategories.emi?.educationLoan ?? '', carLoan: loadedExpenseCategories.emi?.carLoan ?? '', twoWheelerLoan: loadedExpenseCategories.emi?.twoWheelerLoan ?? '', otherEmi: loadedExpenseCategories.emi?.otherEmi ?? '', otherEmiName: loadedExpenseCategories.emi?.otherEmiName ?? '',
           },
           insurance: {
             health: loadedInsurance.health || { value: loadedExpenseCategories.emi?.healthInsurance || '', frequency: 'Annual' }, car: loadedInsurance.car || { value: loadedExpenseCategories.emi?.carInsurance || '', frequency: 'Annual' }, bike: loadedInsurance.bike || { value: loadedExpenseCategories.emi?.bikeInsurance || '', frequency: 'Annual' }, life: migratedLife, others: loadedInsurance.others || { value: loadedExpenseCategories.emi?.otherInsurance || '', frequency: 'Annual' }
           },
           savings: { 
             ppf: '', nps: '', rd: '', otherSaving: '', ...(loadedExpenseCategories.savings || {}), sip: loadedExpenseCategories.savings?.sip || loadedExpenseCategories.savings?.mfSip || ''
-          }
-        });
+          },
+          summaryHouseholdTotal: loadedExpenseCategories.summaryHouseholdTotal ?? '',
+          summaryEmiTotal: loadedExpenseCategories.summaryEmiTotal ?? '',
+        }));
 
         const defaultAssetCategories = { realEstate: { residential: '', secondProperty: '', landPlot: '' }, vehicles: { idv: '' }, valuables: { gold: '', art: '' }, cash: { savings: '' }, investments: { equity: '', mutualFunds: '', fixedDeposit: '', recurringDeposit: '' }, insurance: { savingPlans: '', ulip: '' }, retirement: { epf: '', ppf: '', nps: '' }, others: { other: '' }, custom: [] };
         const loadedAssetCategories = data.asset_categories || {};

@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { Plus, Trash2, Pencil, Check } from 'lucide-react';
 import DetailedProgressiveLayout from './DetailedProgressiveLayout';
+import LoanDetailsModal from '../CashFlowModule/LoanDetailsModal';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 import {
     createEmptyIncomeDetail,
@@ -12,6 +13,8 @@ import {
     applyDetailSyncToIncome,
 } from './incomeDetailSync';
 import { guessEmploymentTypeFromSummaryOccupation } from './employmentTypeSync';
+import { useExpenseEmiQuestions } from './useExpenseEmiQuestions';
+import { EMI_LOAN_KEYS } from './expenseDetailSync';
 
 const formatInr = (val) => {
     if (!val || isNaN(val)) return '₹0';
@@ -182,16 +185,96 @@ const DetailedMoneyInOut = () => {
         </div>
     );
 
+    const buildTaxEarningsFields = (memberKey, detail, employmentType) => {
+        const isGov = isGovernmentSector(employmentType);
+        const e = detail.taxPlanning?.earnings || {};
+
+        return (
+            <>
+                <CurrencyField label="Basic Pay" value={e.basicPay} onChange={(v) => updateTaxField(memberKey, 'earnings', 'basicPay', v)} />
+                <CurrencyField label="Dearness Allowance" value={e.dearnessAllowance} onChange={(v) => updateTaxField(memberKey, 'earnings', 'dearnessAllowance', v)} />
+                <CurrencyField label="House Rent Allowance" value={e.houseRentAllowance} onChange={(v) => updateTaxField(memberKey, 'earnings', 'houseRentAllowance', v)} />
+                <CurrencyField label="Allowances (All)" value={e.allowances} onChange={(v) => updateTaxField(memberKey, 'earnings', 'allowances', v)} />
+                {isGov ? (
+                    <>
+                        <CurrencyField label="Leave Encashment" value={e.leaveEncashment} onChange={(v) => updateTaxField(memberKey, 'earnings', 'leaveEncashment', v)} />
+                        <CurrencyField label="Bonus" value={e.bonus} onChange={(v) => updateTaxField(memberKey, 'earnings', 'bonus', v)} />
+                    </>
+                ) : (
+                    <CurrencyField label="Performance Bonus" value={e.performanceBonus} onChange={(v) => updateTaxField(memberKey, 'earnings', 'performanceBonus', v)} />
+                )}
+                <input
+                    type="text"
+                    className="conversational-input"
+                    placeholder="Other earning name"
+                    value={e.other?.name || ''}
+                    onChange={(ev) => updateTaxField(memberKey, 'earnings', 'other', { ...e.other, name: ev.target.value })}
+                />
+                <CurrencyField
+                    value={e.other?.amount}
+                    onChange={(v) => updateTaxField(memberKey, 'earnings', 'other', { ...e.other, amount: v })}
+                    placeholder="Other earning amount"
+                />
+            </>
+        );
+    };
+
+    const buildTaxDeductionsFields = (memberKey, detail, employmentType) => {
+        const isGov = isGovernmentSector(employmentType);
+        const d = detail.taxPlanning?.deductions || {};
+
+        return (
+            <>
+                <CurrencyField
+                    label={isGov ? 'Employee PF / NPS' : 'Employee PF'}
+                    value={d.employeePF}
+                    onChange={(v) => updateTaxField(memberKey, 'deductions', 'employeePF', v)}
+                />
+                {isGov ? (
+                    <>
+                        <CurrencyField label="Group Insurance" value={d.groupInsurance} onChange={(v) => updateTaxField(memberKey, 'deductions', 'groupInsurance', v)} />
+                        <CurrencyField label="Health Scheme" value={d.healthScheme} onChange={(v) => updateTaxField(memberKey, 'deductions', 'healthScheme', v)} />
+                    </>
+                ) : (
+                    <>
+                        <CurrencyField label="Group Personal Accident" value={d.groupPersonalAccident} onChange={(v) => updateTaxField(memberKey, 'deductions', 'groupPersonalAccident', v)} />
+                        <CurrencyField label="Group Medical Coverage" value={d.groupMedicalCoverage} onChange={(v) => updateTaxField(memberKey, 'deductions', 'groupMedicalCoverage', v)} />
+                    </>
+                )}
+                <input
+                    type="text"
+                    className="conversational-input"
+                    placeholder="Other deduction name"
+                    value={d.other?.name || ''}
+                    onChange={(ev) => updateTaxField(memberKey, 'deductions', 'other', { ...d.other, name: ev.target.value })}
+                />
+                <CurrencyField
+                    value={d.other?.amount}
+                    onChange={(v) => updateTaxField(memberKey, 'deductions', 'other', { ...d.other, amount: v })}
+                    placeholder="Other deduction amount"
+                />
+            </>
+        );
+    };
+
     const buildMainScreen = (memberKey, detail, employmentType, personLabel) => {
         const isSal = isSalariedEmployment(employmentType);
         const isBiz = isBusinessEmployment(employmentType);
         const isPen = isPensionerEmployment(employmentType);
+        const showTaxSlip = isSal && detail.needTaxPlanning === true;
 
         return (
             <div className="question-container">
                 <p className="question-narrative">{personLabel} income details</p>
                 <h2 className="question-title">Money coming in</h2>
-                <div className="question-fields" style={{ maxWidth: '420px', margin: '0 auto', gap: '1rem' }}>
+                <div
+                    className="question-fields"
+                    style={{
+                        maxWidth: showTaxSlip ? '820px' : '420px',
+                        margin: '0 auto',
+                        gap: '1rem',
+                    }}
+                >
                     {isSal && (
                         <>
                             <CurrencyField
@@ -240,109 +323,67 @@ const DetailedMoneyInOut = () => {
                             )}
                         </div>
                     )}
-                </div>
-            </div>
-        );
-    };
-
-    const buildTaxEarningsScreen = (memberKey, detail, employmentType) => {
-        const isGov = isGovernmentSector(employmentType);
-        const e = detail.taxPlanning?.earnings || {};
-
-        return (
-            <div className="question-container">
-                <p className="question-narrative">Break down your earnings for tax planning.</p>
-                <h2 className="question-title">Earnings</h2>
-                <div className="question-fields" style={{ maxWidth: '420px', margin: '0 auto', gap: '1rem' }}>
-                    <CurrencyField label="Basic Pay" value={e.basicPay} onChange={(v) => updateTaxField(memberKey, 'earnings', 'basicPay', v)} />
-                    <CurrencyField label="Dearness Allowance" value={e.dearnessAllowance} onChange={(v) => updateTaxField(memberKey, 'earnings', 'dearnessAllowance', v)} />
-                    <CurrencyField label="House Rent Allowance" value={e.houseRentAllowance} onChange={(v) => updateTaxField(memberKey, 'earnings', 'houseRentAllowance', v)} />
-                    <CurrencyField label="Allowances (All)" value={e.allowances} onChange={(v) => updateTaxField(memberKey, 'earnings', 'allowances', v)} />
-                    {isGov ? (
-                        <>
-                            <CurrencyField label="Leave Encashment" value={e.leaveEncashment} onChange={(v) => updateTaxField(memberKey, 'earnings', 'leaveEncashment', v)} />
-                            <CurrencyField label="Bonus" value={e.bonus} onChange={(v) => updateTaxField(memberKey, 'earnings', 'bonus', v)} />
-                        </>
-                    ) : (
-                        <CurrencyField label="Performance Bonus" value={e.performanceBonus} onChange={(v) => updateTaxField(memberKey, 'earnings', 'performanceBonus', v)} />
+                    {showTaxSlip && (
+                        <div
+                            style={{
+                                marginTop: '1.25rem',
+                                paddingTop: '1.25rem',
+                                borderTop: '1px solid var(--border)',
+                                textAlign: 'left',
+                            }}
+                        >
+                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem', textAlign: 'center' }}>
+                                Break down your earnings and deductions — like filling a salary slip.
+                            </p>
+                            <div
+                                style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                                    gap: '1.25rem',
+                                }}
+                            >
+                                <div
+                                    className="card"
+                                    style={{
+                                        padding: '1rem',
+                                        border: '1px solid var(--border)',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '0.85rem',
+                                    }}
+                                >
+                                    <h3 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--primary)', textAlign: 'center' }}>
+                                        Earnings
+                                    </h3>
+                                    {buildTaxEarningsFields(memberKey, detail, employmentType)}
+                                </div>
+                                <div
+                                    className="card"
+                                    style={{
+                                        padding: '1rem',
+                                        border: '1px solid var(--border)',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '0.85rem',
+                                    }}
+                                >
+                                    <h3 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--primary)', textAlign: 'center' }}>
+                                        Deductions
+                                    </h3>
+                                    {buildTaxDeductionsFields(memberKey, detail, employmentType)}
+                                </div>
+                            </div>
+                        </div>
                     )}
-                    <input
-                        type="text"
-                        className="conversational-input"
-                        placeholder="Other earning name"
-                        value={e.other?.name || ''}
-                        onChange={(ev) => updateTaxField(memberKey, 'earnings', 'other', { ...e.other, name: ev.target.value })}
-                    />
-                    <CurrencyField
-                        value={e.other?.amount}
-                        onChange={(v) => updateTaxField(memberKey, 'earnings', 'other', { ...e.other, amount: v })}
-                        placeholder="Other earning amount"
-                    />
                 </div>
             </div>
         );
     };
 
-    const buildTaxDeductionsScreen = (memberKey, detail, employmentType) => {
-        const isGov = isGovernmentSector(employmentType);
-        const d = detail.taxPlanning?.deductions || {};
-
-        return (
-            <div className="question-container">
-                <p className="question-narrative">Break down your deductions for tax planning.</p>
-                <h2 className="question-title">Deductions</h2>
-                <div className="question-fields" style={{ maxWidth: '420px', margin: '0 auto', gap: '1rem' }}>
-                    <CurrencyField
-                        label={isGov ? 'Employee PF / NPS' : 'Employee PF'}
-                        value={d.employeePF}
-                        onChange={(v) => updateTaxField(memberKey, 'deductions', 'employeePF', v)}
-                    />
-                    {isGov ? (
-                        <>
-                            <CurrencyField label="Group Insurance" value={d.groupInsurance} onChange={(v) => updateTaxField(memberKey, 'deductions', 'groupInsurance', v)} />
-                            <CurrencyField label="Health Scheme" value={d.healthScheme} onChange={(v) => updateTaxField(memberKey, 'deductions', 'healthScheme', v)} />
-                        </>
-                    ) : (
-                        <>
-                            <CurrencyField label="Group Personal Accident" value={d.groupPersonalAccident} onChange={(v) => updateTaxField(memberKey, 'deductions', 'groupPersonalAccident', v)} />
-                            <CurrencyField label="Group Medical Coverage" value={d.groupMedicalCoverage} onChange={(v) => updateTaxField(memberKey, 'deductions', 'groupMedicalCoverage', v)} />
-                        </>
-                    )}
-                    <input
-                        type="text"
-                        className="conversational-input"
-                        placeholder="Other deduction name"
-                        value={d.other?.name || ''}
-                        onChange={(ev) => updateTaxField(memberKey, 'deductions', 'other', { ...d.other, name: ev.target.value })}
-                    />
-                    <CurrencyField
-                        value={d.other?.amount}
-                        onChange={(v) => updateTaxField(memberKey, 'deductions', 'other', { ...d.other, amount: v })}
-                        placeholder="Other deduction amount"
-                    />
-                </div>
-            </div>
-        );
-    };
-
-    const buildMemberQuestions = (memberKey, detail, employmentType, personLabel) => {
-        const list = [{
-            id: `${memberKey}-main`,
-            content: buildMainScreen(memberKey, detail, employmentType, personLabel),
-        }];
-
-        if (isSalariedEmployment(employmentType) && detail.needTaxPlanning === true) {
-            list.push({
-                id: `${memberKey}-tax-earnings`,
-                content: buildTaxEarningsScreen(memberKey, detail, employmentType),
-            });
-            list.push({
-                id: `${memberKey}-tax-deductions`,
-                content: buildTaxDeductionsScreen(memberKey, detail, employmentType),
-            });
-        }
-        return list;
-    };
+    const buildMemberQuestions = (memberKey, detail, employmentType, personLabel) => ([{
+        id: `${memberKey}-main`,
+        content: buildMainScreen(memberKey, detail, employmentType, personLabel),
+    }]);
 
     const saveRecapEdits = () => {
         syncAndSetIncome(prev => {
@@ -369,6 +410,14 @@ const DetailedMoneyInOut = () => {
         setRecapSelf(income.self || '');
         setRecapSpouse(income.spouse || '');
     }, [income.self, income.spouse]);
+
+    const {
+        expenseQuestions,
+        activeLoanModal,
+        setActiveLoanModal,
+        emi,
+        handleEmiSave,
+    } = useExpenseEmiQuestions();
 
     const questions = useMemo(() => {
         const list = [{
@@ -432,21 +481,36 @@ const DetailedMoneyInOut = () => {
             list.push(...buildMemberQuestions('spouse', spouseDetail, spouseEmploymentType, spouseMember?.name || 'Spouse'));
         }
 
+        list.push(...expenseQuestions);
+
         return list;
     }, [
         editingRecap, income.self, income.spouse, selfDetail, spouseDetail,
         selfEmploymentType, spouseEmploymentType, includeSpouse, selfMember.name,
-        spouseMember?.name, recapSelf, recapSpouse,
+        spouseMember?.name, recapSelf, recapSpouse, expenseQuestions,
         updateDetail, updateTaxField, updateOtherIncome, addOtherIncome, removeOtherIncome,
     ]);
 
+    const activeLoanMeta = EMI_LOAN_KEYS.find(l => l.key === activeLoanModal);
+
     return (
-        <DetailedProgressiveLayout
-            currentStepId="money_in_out"
-            questions={questions}
-            narrative="Thank you. I now have a clearer picture of your income. Expense details will come in the next step."
-            lastSectionLabel="Save & Continue"
-        />
+        <>
+            <DetailedProgressiveLayout
+                currentStepId="money_in_out"
+                questions={questions}
+                narrative="Thank you. I now have a clearer picture of your money in and money out. Next we'll capture your insurance premiums."
+                lastSectionLabel="Save & Continue"
+            />
+            {activeLoanModal && (
+                <LoanDetailsModal
+                    isOpen={!!activeLoanModal}
+                    onClose={() => setActiveLoanModal(null)}
+                    onSave={(data) => handleEmiSave(activeLoanModal, data)}
+                    initialData={typeof emi[activeLoanModal] === 'object' ? emi[activeLoanModal] : null}
+                    loanTypeTitle={activeLoanMeta?.label || 'Loan Details'}
+                />
+            )}
+        </>
     );
 };
 

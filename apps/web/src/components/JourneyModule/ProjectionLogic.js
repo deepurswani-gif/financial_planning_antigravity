@@ -1,4 +1,5 @@
 import { calculateIncomeTax } from '../IncomeTaxModule/IncomeTaxLogic';
+import { hasConfiguredLoan } from '../DetailedFlow/expenseDetailSync';
 
 export const EDUCATION_STANDARDS = [
     "Play Group",
@@ -185,6 +186,13 @@ export const generateProjections = ({
                 activeCashFlowEMIThisYear += primEMI * 12; // Legacy assumption defaults to infinite
             }
         });
+
+        if (!hasConfiguredLoan(expenseCategories.emi) && activeCashFlowEMIThisYear === 0) {
+            const summaryMonthly = parseFloat(expenseCategories.summaryEmiTotal) || 0;
+            if (summaryMonthly > 0) {
+                activeCashFlowEMIThisYear = summaryMonthly * 12;
+            }
+        }
         
         const fixedOutflow = activeCashFlowEMIThisYear; 
         // Dynamic Insurance Calculation for this year
@@ -245,7 +253,8 @@ export const generateProjections = ({
             if (member.relation === 'Child') {
                 if (member.occupation === 'School' || !member.occupation) {
                     const currentStandard = member.standard || '';
-                    const baseFee = parseFloat(member.annualSchoolFee) || 0;
+                    const baseFee = parseFloat(member.annualSchoolFee)
+                        || (parseFloat(member.monthlyEducationExpense) || 0) * 12;
                     const currentIndex = EDUCATION_STANDARDS.findIndex(s => 
                         s.toLowerCase().includes(currentStandard.toLowerCase()) || 
                         currentStandard.toLowerCase().includes(s.toLowerCase())
