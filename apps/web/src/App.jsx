@@ -37,10 +37,7 @@ function App() {
     );
   }
 
-  // Tablet/desktop (lg+, same 768px threshold as the hook): full app. Narrow phone browsers: coming-soon
-  if (!lg) {
-    return <MobileWebComingSoon />;
-  }
+  // Tablet/desktop (lg+, same 768px threshold as the hook): full app. Mobile screens are now fully supported.
 
   return (
     <RoleBasedRouting>
