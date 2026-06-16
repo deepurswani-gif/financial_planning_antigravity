@@ -15,6 +15,7 @@ import {
     getMemberDetailMonthlyTotal,
 } from './incomeDetailSync';
 import ReconciliationStatus from './ReconciliationStatus';
+import ReconciliationStickyPanel from './ReconciliationStickyPanel';
 import { guessEmploymentTypeFromSummaryOccupation } from './employmentTypeSync';
 import { useExpenseEmiQuestions } from './useExpenseEmiQuestions';
 import { useInsurancePremiumQuestions } from './useInsurancePremiumQuestions';
@@ -279,6 +280,16 @@ const DetailedMoneyInOut = () => {
             <div className="question-container">
                 <p className="question-narrative">{personLabel} income details</p>
                 <h2 className="question-title">Money coming in</h2>
+                {parseFloat(summaryAmount) > 0 && (
+                    <ReconciliationStickyPanel>
+                        <div className="reconciliation-sticky-panel__title">Summary vs detailed income</div>
+                        <div>Summary in-hand: <strong>{formatInr(summaryAmount)}</strong> / month</div>
+                        <div>Your detailed total: <strong style={{ color: 'var(--primary)' }}>{formatInr(detailTotal)}</strong> / month</div>
+                        <div style={{ marginTop: '0.35rem' }}>
+                            <ReconciliationStatus reconciliation={memberReconciliation} matchLabel="Matches summary" />
+                        </div>
+                    </ReconciliationStickyPanel>
+                )}
                 <div
                     className="question-fields"
                     style={{
@@ -384,23 +395,6 @@ const DetailedMoneyInOut = () => {
                                     </h3>
                                     {buildTaxDeductionsFields(memberKey, detail, employmentType)}
                                 </div>
-                            </div>
-                        </div>
-                    )}
-                    {parseFloat(summaryAmount) > 0 && (
-                        <div style={{
-                            marginTop: '1rem',
-                            paddingTop: '1rem',
-                            borderTop: '1px solid var(--border)',
-                            fontSize: '0.85rem',
-                            color: 'var(--text-muted)',
-                            lineHeight: 1.5,
-                            textAlign: 'left',
-                        }}>
-                            <div>Summary in-hand: <strong>{formatInr(summaryAmount)}</strong> / month</div>
-                            <div>Your detailed total: <strong style={{ color: 'var(--primary)' }}>{formatInr(detailTotal)}</strong> / month</div>
-                            <div style={{ marginTop: '0.35rem' }}>
-                                <ReconciliationStatus reconciliation={memberReconciliation} matchLabel="Matches summary" />
                             </div>
                         </div>
                     )}

@@ -13,15 +13,11 @@ import {
     applyLifeEntryUpdate,
     getLifeMemberMonthlyTotal,
     initializeInsuranceSnapshots,
-    sumExistingPoliciesAnnual,
-    sumAllLifeAnnual,
     syncPolicySlots,
-    reconcileLifeCover,
-    reconcileHealthCover,
-    sumPolicySumAssured,
-    sumHealthPolicyCover,
+    reconcileMemberLifePremiumSummary,
 } from './insuranceDetailSync';
 import ReconciliationStatus from './ReconciliationStatus';
+import ReconciliationStickyPanel from './ReconciliationStickyPanel';
 
 const formatInr = (val) => {
     if (!val || isNaN(val)) return '₹0';
@@ -97,8 +93,6 @@ export function useInsurancePremiumQuestions() {
         loading,
         hasHealthInsurance,
         hasLifeInsurance,
-        summaryLifeCover,
-        summaryHealthCover,
     } = useFinancialPlan();
     const { user } = useAuth();
 
@@ -225,29 +219,24 @@ export function useInsurancePremiumQuestions() {
         });
     }, [familyMembers, lifeMap, policies]);
 
-    const premiumMismatch = useMemo(() => {
-        const cashFlowAnnual = sumAllLifeAnnual(lifeMap);
-        const policyAnnual = sumExistingPoliciesAnnual(policies);
-        if (cashFlowAnnual <= 0 && policyAnnual <= 0) return null;
-        if (Math.round(cashFlowAnnual) !== Math.round(policyAnnual)) {
-            return { cashFlowAnnual: Math.round(cashFlowAnnual), policyAnnual: Math.round(policyAnnual) };
-        }
-        return null;
-    }, [lifeMap, policies]);
+    const summaryLifePremiums = expenseCategories.summaryLifePremiums || {};
 
-    const lifeCoverMismatch = useMemo(() => {
-        if (!hasLifeInsurance || !parseFloat(summaryLifeCover)) return null;
-        const reconciliation = reconcileLifeCover(summaryLifeCover, policies);
-        if (reconciliation.status === 'match' || reconciliation.status === 'empty') return null;
-        return reconciliation;
-    }, [hasLifeInsurance, summaryLifeCover, policies]);
+    const lifePremiumReconciliations = useMemo(() => {
+        const members = [...adultLifeMembers, ...childLifeMembers];
+        return members.map((member) => {
+            const memberKey = getMemberInsuranceKey(member);
+            const displayName = member.name || member.relation;
+            const entry = migrateLifeEntry(lifeMap[memberKey]);
+            const summaryMonthly = parseFloat(summaryLifePremiums[memberKey]) || 0;
+            const detailMonthly = getLifeMemberMonthlyTotal(entry);
+            if (summaryMonthly <= 0 && detailMonthly <= 0) return null;
+            const reconciliation = reconcileMemberLifePremiumSummary(summaryLifePremiums[memberKey], entry);
+            return { memberKey, displayName, reconciliation, summaryMonthly, detailMonthly };
+        }).filter(Boolean);
+    }, [adultLifeMembers, childLifeMembers, lifeMap, summaryLifePremiums]);
 
-    const healthCoverMismatch = useMemo(() => {
-        if (!hasHealthInsurance || !parseFloat(summaryHealthCover)) return null;
-        const reconciliation = reconcileHealthCover(summaryHealthCover, policies);
-        if (reconciliation.status === 'match' || reconciliation.status === 'empty') return null;
-        return reconciliation;
-    }, [hasHealthInsurance, summaryHealthCover, policies]);
+    const showLifePremiumPanel = hasLifeInsurance !== false
+        && (lifePremiumReconciliations.length > 0 || adultLifeMembers.length + childLifeMembers.length > 0);
 
     const renderInsuranceLine = (key, label, note, showUpload = true) => (
         <div key={key} style={{ marginBottom: '1.5rem' }}>
@@ -386,31 +375,6 @@ export function useInsurancePremiumQuestions() {
                                 'Health Insurance',
                                 'Your health insurance is your family\'s first line of financial protection. Upload your policy document, and we\'ll review the coverage to help identify any gaps or improvement opportunities.',
                             )}
-                            {parseFloat(summaryHealthCover) > 0 && (
-                                <div style={{
-                                    marginTop: '0.5rem',
-                                    padding: '0.65rem 0.85rem',
-                                    background: healthCoverMismatch ? 'rgba(239, 68, 68, 0.08)' : 'rgba(37, 99, 235, 0.05)',
-                                    borderRadius: '8px',
-                                    fontSize: '0.82rem',
-                                    lineHeight: 1.5,
-                                }}>
-                                    <div>Summary health cover: <strong>{formatInr(summaryHealthCover)}</strong></div>
-                                    <div>Policy details total: <strong>{formatInr(sumHealthPolicyCover(policies))}</strong></div>
-                                    {healthCoverMismatch ? (
-                                        <div style={{ marginTop: '0.35rem', color: '#b91c1c' }}>
-                                            <ReconciliationStatus
-                                                reconciliation={healthCoverMismatch}
-                                                matchLabel="Matches summary cover"
-                                                underPrefix="Cover shortfall:"
-                                                overPrefix="Cover exceeds summary by"
-                                            />
-                                        </div>
-                                    ) : (
-                                        <div style={{ marginTop: '0.35rem', color: 'var(--success)', fontWeight: 600 }}>Matches summary cover</div>
-                                    )}
-                                </div>
-                            )}
                         </div>
                     </div>
                 ),
@@ -427,6 +391,30 @@ export function useInsurancePremiumQuestions() {
                             : 'Now tell us about life insurance premiums for your family.'}
                     </p>
                     <h2 className="question-title">Life Insurance Premium</h2>
+                    <ReconciliationStickyPanel visible={showLifePremiumPanel}>
+                        <div className="reconciliation-sticky-panel__title">Summary vs detailed premium</div>
+                        {lifePremiumReconciliations.length > 0 ? (
+                            lifePremiumReconciliations.map(({ memberKey, displayName, reconciliation, summaryMonthly, detailMonthly }) => (
+                                <div key={memberKey} className="reconciliation-sticky-panel__row">
+                                    <div style={{ fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.25rem' }}>{displayName}</div>
+                                    {summaryMonthly > 0 && (
+                                        <div>Summary premium: <strong>{formatInr(summaryMonthly)}</strong> / month</div>
+                                    )}
+                                    <div>Your detailed total: <strong style={{ color: 'var(--primary)' }}>{formatInr(detailMonthly)}</strong> / month</div>
+                                    {summaryMonthly > 0 && (
+                                        <div style={{ marginTop: '0.35rem' }}>
+                                            <ReconciliationStatus
+                                                reconciliation={reconciliation}
+                                                matchLabel="Matches summary"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            ))
+                        ) : (
+                            <div>Enter each member&apos;s premium below — allocation status will update here.</div>
+                        )}
+                    </ReconciliationStickyPanel>
                     <div className="question-fields" style={{ maxWidth: '480px', margin: '0 auto', gap: '1rem', textAlign: 'left' }}>
                         {adultLifeMembers.map(renderLifeMemberBlock)}
                         {childLifeMembers.length > 0 && (
@@ -466,52 +454,6 @@ export function useInsurancePremiumQuestions() {
                         >
                             Fill policy details
                         </button>
-
-                        {premiumMismatch && (
-                            <div
-                                style={{
-                                    marginTop: '0.75rem',
-                                    padding: '0.65rem 0.85rem',
-                                    background: 'rgba(239, 68, 68, 0.08)',
-                                    borderRadius: '8px',
-                                    fontSize: '0.82rem',
-                                    color: '#b91c1c',
-                                    lineHeight: 1.5,
-                                }}
-                            >
-                                Premium mismatch: cash-flow total is {formatInr(premiumMismatch.cashFlowAnnual / 12)} / month
-                                vs policy details total {formatInr(premiumMismatch.policyAnnual / 12)} / month.
-                                Please align amounts or update policy details.
-                            </div>
-                        )}
-
-                        {parseFloat(summaryLifeCover) > 0 && (
-                            <div
-                                style={{
-                                    marginTop: '0.75rem',
-                                    padding: '0.65rem 0.85rem',
-                                    background: lifeCoverMismatch ? 'rgba(239, 68, 68, 0.08)' : 'rgba(37, 99, 235, 0.05)',
-                                    borderRadius: '8px',
-                                    fontSize: '0.82rem',
-                                    lineHeight: 1.5,
-                                }}
-                            >
-                                <div>Summary life cover: <strong>{formatInr(summaryLifeCover)}</strong></div>
-                                <div>Policy sum assured total: <strong>{formatInr(sumPolicySumAssured(policies))}</strong></div>
-                                {lifeCoverMismatch ? (
-                                    <div style={{ marginTop: '0.35rem', color: '#b91c1c' }}>
-                                        <ReconciliationStatus
-                                            reconciliation={lifeCoverMismatch}
-                                            matchLabel="Matches summary cover"
-                                            underPrefix="Cover shortfall:"
-                                            overPrefix="Cover exceeds summary by"
-                                        />
-                                    </div>
-                                ) : (
-                                    <div style={{ marginTop: '0.35rem', color: 'var(--success)', fontWeight: 600 }}>Matches summary cover</div>
-                                )}
-                            </div>
-                        )}
 
                         <UserNote>
                             Your life insurance policies play an important role in securing your family&apos;s future.
@@ -563,8 +505,8 @@ export function useInsurancePremiumQuestions() {
         return list;
     }, [
         insurance, policyDocs, adultLifeMembers, childLifeMembers, lifeMap,
-        premiumMismatch, lifeCoverMismatch, healthCoverMismatch,
-        skipHealthInsuranceQuestion, summaryLifeCover, summaryHealthCover, policies,
+        lifePremiumReconciliations, showLifePremiumPanel, summaryLifePremiums,
+        skipHealthInsuranceQuestion, hasLifeInsurance, policies,
         handleInsurancePremiumChange, handlePolicyDocChange, updateLifeMember,
     ]);
 

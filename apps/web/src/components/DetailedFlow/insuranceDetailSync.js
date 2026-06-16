@@ -138,8 +138,20 @@ export function migrateInsuranceBlock(insurance = {}) {
 
 export function initializeInsuranceSnapshots(expenseCategories = {}) {
     const insurance = migrateInsuranceBlock(expenseCategories.insurance || {});
+    const existingSummaries = expenseCategories.summaryLifePremiums || {};
+    const summaryLifePremiums = { ...existingSummaries };
+
+    Object.entries(insurance.life || {}).forEach(([key, entry]) => {
+        if (summaryLifePremiums[key] !== undefined && summaryLifePremiums[key] !== '') return;
+        const monthly = getLifeMemberMonthlyTotal(migrateLifeEntry(entry));
+        if (monthly > 0) {
+            summaryLifePremiums[key] = String(Math.round(monthly));
+        }
+    });
+
     return {
         ...expenseCategories,
+        summaryLifePremiums,
         insurance,
     };
 }
@@ -272,4 +284,18 @@ export function reconcileLifeCover(summaryLifeCover, policies = []) {
 
 export function reconcileHealthCover(summaryHealthCover, policies = []) {
     return reconcileAmounts(summaryHealthCover, sumHealthPolicyCover(policies));
+}
+
+/** Compare cash-flow life premium entry vs policy-details premium for one member (monthly). */
+export function reconcileMemberLifePremium(memberEntry, policies = [], memberName) {
+    const cashFlowMonthly = getLifeMemberMonthlyTotal(migrateLifeEntry(memberEntry));
+    const policyMonthly = sumPolicyPremiumsAnnual(policies, memberName, false) / 12;
+    return reconcileAmounts(cashFlowMonthly, policyMonthly);
+}
+
+/** Compare preserved summary premium snapshot vs detailed premium entry for one member (monthly). */
+export function reconcileMemberLifePremiumSummary(summaryMonthly, memberEntry) {
+    const summary = parseFloat(summaryMonthly) || 0;
+    const detail = getLifeMemberMonthlyTotal(migrateLifeEntry(memberEntry));
+    return reconcileAmounts(summary, detail);
 }

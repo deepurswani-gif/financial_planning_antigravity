@@ -133,9 +133,8 @@ import { reconcileAmounts, RECONCILE_TOLERANCE } from './detailReconcile';
 
 export { reconcileAmounts, RECONCILE_TOLERANCE };
 export function reconcileHousehold(expenseCategories = {}, familyMembers = []) {
-    const household = expenseCategories.household || {};
     const summaryTotal = parseFloat(expenseCategories.summaryHouseholdTotal) || 0;
-    const detailTotal = sumHouseholdExceptEducation(household);
+    const detailTotal = getHouseholdBreakdownTotal(expenseCategories, familyMembers);
     return reconcileAmounts(summaryTotal, detailTotal);
 }
 

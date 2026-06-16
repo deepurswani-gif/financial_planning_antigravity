@@ -126,6 +126,17 @@ describe('expenseDetailSync household snapshot', () => {
         expect(result.delta).toBe(20000);
     });
 
+    it('reconcileHousehold includes education fees in detailed total', () => {
+        const result = reconcileHousehold({
+            summaryHouseholdTotal: '50000',
+            household: { grocery: '30000', rent: '', lifestyle: '', medical: '', travel: '', education: '5000' },
+        }, [
+            { relation: 'Child', monthlyEducationExpense: '5000' },
+        ]);
+        expect(result.status).toBe('under');
+        expect(result.delta).toBe(15000);
+    });
+
     it('reconcileEmi reports match when configured total equals summary', () => {
         const result = reconcileEmi({
             summaryEmiTotal: '25000',

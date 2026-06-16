@@ -7,6 +7,7 @@ import {
     getSummarySavingsTotal,
 } from './savingsDetailSync';
 import ReconciliationStatus from './ReconciliationStatus';
+import ReconciliationStickyPanel from './ReconciliationStickyPanel';
 
 const formatInr = (val) => {
     if (!val || isNaN(val)) return '₹0';
@@ -239,6 +240,21 @@ export function useSavingsInvestmentQuestions() {
                 <div className="question-container">
                     <p className="question-narrative">Split your monthly investments across the instruments you use.</p>
                     <h2 className="question-title">Savings &amp; investments</h2>
+                    {summaryCombined > 0 && (
+                        <ReconciliationStickyPanel>
+                            <div className="reconciliation-sticky-panel__title">Summary vs detailed savings</div>
+                            <div>Your detailed total: <strong style={{ color: 'var(--primary)' }}>{formatInr(detailedTotal)}</strong> / month</div>
+                            <div>Summary combined: <strong>{formatInr(summaryCombined)}</strong> / month</div>
+                            <div style={{ marginTop: '0.35rem' }}>
+                                <ReconciliationStatus reconciliation={{
+                                    summaryTotal: summaryCombined,
+                                    detailTotal: detailedTotal,
+                                    delta: remainingToAllocate,
+                                    status: remainingToAllocate === 0 ? 'match' : remainingToAllocate > 0 ? 'under' : 'over',
+                                }} />
+                            </div>
+                        </ReconciliationStickyPanel>
+                    )}
                     <div className="question-fields" style={{ maxWidth: '480px', margin: '0 auto', gap: '1.25rem' }}>
                         <CurrencyField
                             label="Mutual Fund SIPs"
@@ -318,20 +334,6 @@ export function useSavingsInvestmentQuestions() {
                             helperText="Include direct stock investing, equity SIPs outside mutual funds, and any monthly saving not covered above."
                         />
 
-                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.5rem', lineHeight: 1.5 }}>
-                            <div>Your detailed total: <strong style={{ color: 'var(--primary)' }}>{formatInr(detailedTotal)}</strong> / month</div>
-                            <div>Summary combined: <strong>{formatInr(summaryCombined)}</strong> / month</div>
-                            {summaryCombined > 0 && (
-                                <div style={{ marginTop: '0.35rem' }}>
-                                    <ReconciliationStatus reconciliation={{
-                                        summaryTotal: summaryCombined,
-                                        detailTotal: detailedTotal,
-                                        delta: remainingToAllocate,
-                                        status: remainingToAllocate === 0 ? 'match' : remainingToAllocate > 0 ? 'under' : 'over',
-                                    }} />
-                                </div>
-                            )}
-                        </div>
                     </div>
                 </div>
             ),
