@@ -269,9 +269,18 @@ export const FinancialPlanProvider = ({ children }) => {
             others: loadedInsurance.others || { value: loadedExpenseCategories.emi?.otherInsurance || '', frequency: 'Annual' },
             policyDocs: loadedInsurance.policyDocs || {},
           }),
-          savings: { 
-            ppf: '', nps: '', rd: '', otherSaving: '', ...(loadedExpenseCategories.savings || {}), sip: loadedExpenseCategories.savings?.sip || loadedExpenseCategories.savings?.mfSip || ''
-          },
+          savings: (() => {
+            const loadedSavings = loadedExpenseCategories.savings || {};
+            const { sip: _legacySip, mfSip: _legacyMfSip, ...restSavings } = loadedSavings;
+            return {
+              ppf: '',
+              nps: '',
+              rd: '',
+              otherSaving: '',
+              ...restSavings,
+              sip: loadedSavings.sip || loadedSavings.mfSip || '',
+            };
+          })(),
           summaryHouseholdTotal: loadedExpenseCategories.summaryHouseholdTotal ?? '',
           summaryEmiTotal: loadedExpenseCategories.summaryEmiTotal ?? '',
           summaryMonthlyInvestments: loadedExpenseCategories.summaryMonthlyInvestments ?? '',

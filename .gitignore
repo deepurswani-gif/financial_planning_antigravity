@@ -31,3 +31,9 @@ dist-ssr
 *.sln
 *.sw?
 rzp-key.csv
+
+# Build artifacts / logs
+build_plain.txt
+*.ppsx
+*.pptx
+*.pps
