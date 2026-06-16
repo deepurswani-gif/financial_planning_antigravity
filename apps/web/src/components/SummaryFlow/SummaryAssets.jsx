@@ -5,13 +5,10 @@ import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 const SummaryAssets = () => {
     const { assetCategories, setAssetCategories } = useFinancialPlan();
 
-    const handleAssetChange = (category, field, value) => {
+    const handleSnapshotChange = (field, value) => {
         setAssetCategories(prev => ({
             ...prev,
-            [category]: {
-                ...prev[category],
-                [field]: value
-            }
+            [field]: value,
         }));
     };
 
@@ -52,13 +49,13 @@ const SummaryAssets = () => {
                                 type="number"
                                 className="conversational-input"
                                 placeholder="e.g. 500000"
-                                value={assetCategories.investments.mutualFunds || ''}
-                                onChange={(e) => handleAssetChange('investments', 'mutualFunds', e.target.value)}
+                                value={assetCategories.summaryPortfolioValue || ''}
+                                onChange={(e) => handleSnapshotChange('summaryPortfolioValue', e.target.value)}
                             />
                         </div>
-                        {assetCategories.investments.mutualFunds && (
+                        {assetCategories.summaryPortfolioValue && (
                             <div className="currency-display">
-                                {formatInr(assetCategories.investments.mutualFunds)}
+                                {formatInr(assetCategories.summaryPortfolioValue)}
                             </div>
                         )}
                     </div>
@@ -90,13 +87,13 @@ const SummaryAssets = () => {
                                 type="number"
                                 className="conversational-input"
                                 placeholder="e.g. 200000"
-                                value={assetCategories.cash.savings || ''}
-                                onChange={(e) => handleAssetChange('cash', 'savings', e.target.value)}
+                                value={assetCategories.summaryLiquidCash || ''}
+                                onChange={(e) => handleSnapshotChange('summaryLiquidCash', e.target.value)}
                             />
                         </div>
-                        {assetCategories.cash.savings && (
+                        {assetCategories.summaryLiquidCash && (
                             <div className="currency-display">
-                                {formatInr(assetCategories.cash.savings)}
+                                {formatInr(assetCategories.summaryLiquidCash)}
                             </div>
                         )}
                     </div>
@@ -125,13 +122,13 @@ const SummaryAssets = () => {
                                 type="number"
                                 className="conversational-input"
                                 placeholder="e.g. 5000000"
-                                value={assetCategories.realEstate.residential || ''}
-                                onChange={(e) => handleAssetChange('realEstate', 'residential', e.target.value)}
+                                value={assetCategories.summaryRealEstateAssets || ''}
+                                onChange={(e) => handleSnapshotChange('summaryRealEstateAssets', e.target.value)}
                             />
                         </div>
-                        {assetCategories.realEstate.residential && (
+                        {assetCategories.summaryRealEstateAssets && (
                             <div className="currency-display">
-                                {formatInr(assetCategories.realEstate.residential)}
+                                {formatInr(assetCategories.summaryRealEstateAssets)}
                             </div>
                         )}
                     </div>

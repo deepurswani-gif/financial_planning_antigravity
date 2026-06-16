@@ -19,6 +19,8 @@ import SummaryReportView from './components/SummaryReport/SummaryReportView';
 // Detailed Flow Placeholder
 import DetailedFamilyInfo from './components/DetailedFlow/DetailedFamilyInfo';
 import DetailedMoneyInOut from './components/DetailedFlow/DetailedMoneyInOut';
+import DetailedMyWealthSnapshot from './components/DetailedFlow/DetailedMyWealthSnapshot';
+import DetailedDreamsGoals from './components/DetailedFlow/DetailedDreamsGoals';
 
 // Legacy Existing App Flow
 import DetailedFlowLayout from './DetailedFlowLayout';
@@ -57,7 +59,8 @@ function App() {
 
         {/* Summary Report View */}
         <Route path="/summary-report" element={<ProtectedRoute><BlankLayout /></ProtectedRoute>}>
-          <Route index element={<SummaryReportView />} />
+          <Route index element={<Navigate to="money_story" replace />} />
+          <Route path=":section" element={<SummaryReportView />} />
         </Route>
 
         {/* Legacy Existing App */}
@@ -67,6 +70,8 @@ function App() {
         <Route path="/detailed-flow" element={<ProtectedRoute><BlankLayout /></ProtectedRoute>}>
           <Route path="familyinfo" element={<DetailedFamilyInfo />} />
           <Route path="money_in_out" element={<DetailedMoneyInOut />} />
+          <Route path="mywealth" element={<DetailedMyWealthSnapshot />} />
+          <Route path="dreams_goals" element={<DetailedDreamsGoals />} />
           <Route path="expenses_emis" element={<Navigate to="/detailed-flow/money_in_out" replace />} />
           <Route path="*" element={<Navigate to="/detailed-flow/familyinfo" replace />} />
         </Route>

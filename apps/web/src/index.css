@@ -734,6 +734,19 @@ input:focus, select:focus, textarea:focus {
   color: #b0bec5;
 }
 
+/* Selects need tighter vertical padding than text inputs — large padding clips option text */
+select.conversational-input,
+.conversational-select {
+  padding: 0.6rem 2rem 0.6rem 1.1rem;
+  line-height: 1.35;
+  min-height: 48px;
+  height: auto;
+  box-sizing: border-box;
+  appearance: auto;
+  -webkit-appearance: menulist;
+  cursor: pointer;
+}
+
 .currency-input-wrapper {
   position: relative;
 }

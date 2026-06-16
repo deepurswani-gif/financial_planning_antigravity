@@ -4,6 +4,8 @@ import { createFinancialPlan, getActivePlan, updateFinancialPlan, markSummaryRep
 import { generateProjections } from '../components/JourneyModule/ProjectionLogic';
 import { normalizeIncomeState } from '../components/DetailedFlow/incomeDetailSync';
 import { initializeExpenseSnapshots, hasAnyEmiCommitment } from '../components/DetailedFlow/expenseDetailSync';
+import { initializeSavingsSnapshots } from '../components/DetailedFlow/savingsDetailSync';
+import { migrateInsuranceBlock } from '../components/DetailedFlow/insuranceDetailSync';
 
 const FinancialPlanContext = createContext();
 
@@ -42,15 +44,19 @@ export const FinancialPlanProvider = ({ children }) => {
   const [expenseCategories, setExpenseCategories] = useState({
     household: { grocery: '', rent: '', education: '', lifestyle: '', medical: '', travel: '' },
     emi: { personalLoan: '', homeLoan: '', educationLoan: '', carLoan: '', twoWheelerLoan: '', otherEmi: '' },
-    insurance: { health: { value: '', frequency: 'Annual' }, car: { value: '', frequency: 'Annual' }, bike: { value: '', frequency: 'Annual' }, life: {}, others: { value: '', frequency: 'Annual' } },
-    savings: { sip: '', ppf: '', nps: '', rd: '', otherSaving: '' }
+    insurance: { health: { value: '', frequency: 'Annual' }, car: { value: '', frequency: 'Annual' }, bike: { value: '', frequency: 'Annual' }, life: {}, others: { value: '', frequency: 'Annual' }, policyDocs: {} },
+    savings: { sip: '', ppf: '', nps: '', rd: '', otherSaving: '' },
+    summaryMonthlyInvestments: '',
+    summaryOtherSavings: '',
   });
 
   const [assetCategories, setAssetCategories] = useState({
-    realEstate: { residential: '', secondProperty: '', landPlot: '' }, vehicles: { idv: '' }, valuables: { gold: '', art: '' }, cash: { savings: '' }, investments: { equity: '', mutualFunds: '', fixedDeposit: '', recurringDeposit: '' }, insurance: { savingPlans: '', ulip: '' }, retirement: { epf: '', ppf: '', nps: '' }, others: { other: '' }, custom: []
+    summaryPortfolioValue: '', summaryLiquidCash: '', summaryRealEstateAssets: '',
+    realEstate: { residential: '', secondProperty: '', landPlot: '' }, vehicles: { idv: '' }, valuables: { gold: '', art: '' }, cash: { savings: '', cashInHand: '' }, investments: { equity: '', mutualFunds: '', fixedDeposit: '', recurringDeposit: '' }, insurance: { savingPlans: '', ulip: '' }, retirement: { epf: '', ppf: '', nps: '' }, others: { other: '' }, custom: []
   });
 
   const [liabilityCategories, setLiabilityCategories] = useState({
+    summaryOutstandingLoans: '', summaryCreditCardDues: '', summaryOtherPayables: '',
     loans: { home: '', personal: '', car: '', education: '', otherEmis: '', creditCard: '' }, custom: []
   });
 
@@ -123,13 +129,17 @@ export const FinancialPlanProvider = ({ children }) => {
     setExpenseCategories({
       household: { grocery: '', rent: '', education: '', lifestyle: '', medical: '', travel: '' },
       emi: { personalLoan: '', homeLoan: '', educationLoan: '', carLoan: '', twoWheelerLoan: '', otherEmi: '' },
-      insurance: { health: { value: '', frequency: 'Annual' }, car: { value: '', frequency: 'Annual' }, bike: { value: '', frequency: 'Annual' }, life: {}, others: { value: '', frequency: 'Annual' } },
-      savings: { sip: '', ppf: '', nps: '', rd: '', otherSaving: '' }
+      insurance: { health: { value: '', frequency: 'Annual' }, car: { value: '', frequency: 'Annual' }, bike: { value: '', frequency: 'Annual' }, life: {}, others: { value: '', frequency: 'Annual' }, policyDocs: {} },
+      savings: { sip: '', ppf: '', nps: '', rd: '', otherSaving: '' },
+      summaryMonthlyInvestments: '',
+      summaryOtherSavings: '',
     });
     setAssetCategories({
-      realEstate: { residential: '', secondProperty: '', landPlot: '' }, vehicles: { idv: '' }, valuables: { gold: '', art: '' }, cash: { savings: '' }, investments: { equity: '', mutualFunds: '', fixedDeposit: '', recurringDeposit: '' }, insurance: { savingPlans: '', ulip: '' }, retirement: { epf: '', ppf: '', nps: '' }, others: { other: '' }, custom: []
+      summaryPortfolioValue: '', summaryLiquidCash: '', summaryRealEstateAssets: '',
+      realEstate: { residential: '', secondProperty: '', landPlot: '' }, vehicles: { idv: '' }, valuables: { gold: '', art: '' }, cash: { savings: '', cashInHand: '' }, investments: { equity: '', mutualFunds: '', fixedDeposit: '', recurringDeposit: '' }, insurance: { savingPlans: '', ulip: '' }, retirement: { epf: '', ppf: '', nps: '' }, others: { other: '' }, custom: []
     });
     setLiabilityCategories({
+      summaryOutstandingLoans: '', summaryCreditCardDues: '', summaryOtherPayables: '',
       loans: { home: '', personal: '', car: '', education: '', otherEmis: '', creditCard: '' }, custom: []
     });
     setGoals([]);
@@ -246,25 +256,35 @@ export const FinancialPlanProvider = ({ children }) => {
             }
         }
 
-        setExpenseCategories(initializeExpenseSnapshots({
+        setExpenseCategories(initializeSavingsSnapshots(initializeExpenseSnapshots({
           household: { grocery: '', rent: '', education: '', lifestyle: '', medical: '', travel: '', ...(loadedExpenseCategories.household || {}) },
           emi: { 
             personalLoan: loadedExpenseCategories.emi?.personalLoan ?? '', homeLoan: loadedExpenseCategories.emi?.homeLoan ?? '', educationLoan: loadedExpenseCategories.emi?.educationLoan ?? '', carLoan: loadedExpenseCategories.emi?.carLoan ?? '', twoWheelerLoan: loadedExpenseCategories.emi?.twoWheelerLoan ?? '', otherEmi: loadedExpenseCategories.emi?.otherEmi ?? '', otherEmiName: loadedExpenseCategories.emi?.otherEmiName ?? '',
           },
-          insurance: {
-            health: loadedInsurance.health || { value: loadedExpenseCategories.emi?.healthInsurance || '', frequency: 'Annual' }, car: loadedInsurance.car || { value: loadedExpenseCategories.emi?.carInsurance || '', frequency: 'Annual' }, bike: loadedInsurance.bike || { value: loadedExpenseCategories.emi?.bikeInsurance || '', frequency: 'Annual' }, life: migratedLife, others: loadedInsurance.others || { value: loadedExpenseCategories.emi?.otherInsurance || '', frequency: 'Annual' }
-          },
+          insurance: migrateInsuranceBlock({
+            health: loadedInsurance.health || { value: loadedExpenseCategories.emi?.healthInsurance || '', frequency: 'Annual' },
+            car: loadedInsurance.car || { value: loadedExpenseCategories.emi?.carInsurance || '', frequency: 'Annual' },
+            bike: loadedInsurance.bike || { value: loadedExpenseCategories.emi?.bikeInsurance || '', frequency: 'Annual' },
+            life: migratedLife,
+            others: loadedInsurance.others || { value: loadedExpenseCategories.emi?.otherInsurance || '', frequency: 'Annual' },
+            policyDocs: loadedInsurance.policyDocs || {},
+          }),
           savings: { 
             ppf: '', nps: '', rd: '', otherSaving: '', ...(loadedExpenseCategories.savings || {}), sip: loadedExpenseCategories.savings?.sip || loadedExpenseCategories.savings?.mfSip || ''
           },
           summaryHouseholdTotal: loadedExpenseCategories.summaryHouseholdTotal ?? '',
           summaryEmiTotal: loadedExpenseCategories.summaryEmiTotal ?? '',
-        }));
+          summaryMonthlyInvestments: loadedExpenseCategories.summaryMonthlyInvestments ?? '',
+          summaryOtherSavings: loadedExpenseCategories.summaryOtherSavings ?? '',
+        })));
 
-        const defaultAssetCategories = { realEstate: { residential: '', secondProperty: '', landPlot: '' }, vehicles: { idv: '' }, valuables: { gold: '', art: '' }, cash: { savings: '' }, investments: { equity: '', mutualFunds: '', fixedDeposit: '', recurringDeposit: '' }, insurance: { savingPlans: '', ulip: '' }, retirement: { epf: '', ppf: '', nps: '' }, others: { other: '' }, custom: [] };
+        const defaultAssetCategories = { summaryPortfolioValue: '', summaryLiquidCash: '', summaryRealEstateAssets: '', realEstate: { residential: '', secondProperty: '', landPlot: '' }, vehicles: { idv: '' }, valuables: { gold: '', art: '' }, cash: { savings: '', cashInHand: '' }, investments: { equity: '', mutualFunds: '', fixedDeposit: '', recurringDeposit: '' }, insurance: { savingPlans: '', ulip: '' }, retirement: { epf: '', ppf: '', nps: '' }, others: { other: '' }, custom: [] };
         const loadedAssetCategories = data.asset_categories || {};
         setAssetCategories({
           ...defaultAssetCategories,
+          summaryPortfolioValue: loadedAssetCategories.summaryPortfolioValue ?? '',
+          summaryLiquidCash: loadedAssetCategories.summaryLiquidCash ?? '',
+          summaryRealEstateAssets: loadedAssetCategories.summaryRealEstateAssets ?? '',
           realEstate: { ...defaultAssetCategories.realEstate, ...(loadedAssetCategories.realEstate || {}), residential: loadedAssetCategories.realEstate?.residential || loadedAssetCategories.realEstate?.residence || '', secondProperty: loadedAssetCategories.realEstate?.secondProperty || loadedAssetCategories.realEstate?.investmentProp || '' },
           vehicles: { ...defaultAssetCategories.vehicles, ...(loadedAssetCategories.vehicles || {}) },
           valuables: { ...defaultAssetCategories.valuables, ...(loadedAssetCategories.valuables || {}), gold: loadedAssetCategories.valuables?.gold || loadedAssetCategories.others?.gold || '' },
@@ -278,6 +298,9 @@ export const FinancialPlanProvider = ({ children }) => {
 
         const loadedLiabilityCategories = data.liability_categories || {};
         setLiabilityCategories({
+          summaryOutstandingLoans: loadedLiabilityCategories.summaryOutstandingLoans ?? '',
+          summaryCreditCardDues: loadedLiabilityCategories.summaryCreditCardDues ?? '',
+          summaryOtherPayables: loadedLiabilityCategories.summaryOtherPayables ?? '',
           loans: { home: loadedLiabilityCategories.loans?.home || '', personal: loadedLiabilityCategories.loans?.personal || '', car: loadedLiabilityCategories.loans?.car || '', education: loadedLiabilityCategories.loans?.education || '', otherEmis: loadedLiabilityCategories.loans?.otherEmis || loadedLiabilityCategories.loans?.other || '', creditCard: loadedLiabilityCategories.loans?.creditCard || '' },
           custom: Array.isArray(loadedLiabilityCategories.custom) ? loadedLiabilityCategories.custom : []
         });

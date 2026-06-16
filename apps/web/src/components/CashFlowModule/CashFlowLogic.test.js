@@ -55,4 +55,67 @@ describe('CashFlowLogic', () => {
             category: 'EMIs'
         }));
     });
+
+    it('uses summary savings snapshots when detailed fields are empty', () => {
+        const income = { self: 100000 };
+        const expenseCategories = {
+            household: {},
+            emi: {},
+            insurance: {},
+            savings: { sip: '', ppf: '', nps: '', rd: '', otherSaving: '' },
+            summaryMonthlyInvestments: '15000',
+            summaryOtherSavings: '5000',
+        };
+
+        const results = calculateCashFlow(income, expenseCategories);
+
+        expect(results.totalSavings).toBe(20000);
+    });
+
+    it('prefers configured savings over summary snapshots', () => {
+        const income = { self: 100000 };
+        const expenseCategories = {
+            household: {},
+            emi: {},
+            insurance: {},
+            savings: { sip: '8000', ppf: '', nps: '', rd: '', otherSaving: '2000' },
+            summaryMonthlyInvestments: '15000',
+            summaryOtherSavings: '5000',
+        };
+
+        const results = calculateCashFlow(income, expenseCategories);
+
+        expect(results.totalSavings).toBe(10000);
+    });
+
+    it('uses summary household snapshot when detailed fields are empty', () => {
+        const income = { self: 100000 };
+        const expenseCategories = {
+            household: { grocery: '', rent: '', lifestyle: '', medical: '', travel: '', education: '' },
+            emi: {},
+            insurance: {},
+            savings: {},
+            summaryHouseholdTotal: '40000',
+        };
+
+        const results = calculateCashFlow(income, expenseCategories);
+
+        expect(results.categorySums.household).toBe(40000);
+        expect(results.totalExpenses).toBe(40000);
+    });
+
+    it('prefers household breakdown over summary snapshot', () => {
+        const income = { self: 100000 };
+        const expenseCategories = {
+            household: { grocery: '25000', rent: '10000', lifestyle: '', medical: '', travel: '', education: '' },
+            emi: {},
+            insurance: {},
+            savings: {},
+            summaryHouseholdTotal: '50000',
+        };
+
+        const results = calculateCashFlow(income, expenseCategories);
+
+        expect(results.categorySums.household).toBe(35000);
+    });
 });

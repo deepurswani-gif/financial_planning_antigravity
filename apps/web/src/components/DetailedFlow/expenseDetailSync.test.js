@@ -3,6 +3,9 @@ import {
     initializeExpenseSnapshots,
     syncSummaryEmiSnapshot,
     getEffectiveMonthlyEmi,
+    getEffectiveMonthlyHousehold,
+    reconcileHousehold,
+    reconcileEmi,
     hasAnyEmiCommitment,
     isLikelySummaryEmiInHomeLoan,
 } from './expenseDetailSync';
@@ -96,5 +99,40 @@ describe('expenseDetailSync EMI snapshot', () => {
             homeLoan: '50000',
             personalLoan: '10000',
         })).toBe(false);
+    });
+});
+
+describe('expenseDetailSync household snapshot', () => {
+    it('getEffectiveMonthlyHousehold uses summaryHouseholdTotal when breakdown is cleared', () => {
+        expect(getEffectiveMonthlyHousehold({
+            summaryHouseholdTotal: '45000',
+            household: { grocery: '', rent: '', lifestyle: '', medical: '', travel: '', education: '' },
+        })).toBe(45000);
+    });
+
+    it('getEffectiveMonthlyHousehold prefers detailed breakdown over snapshot', () => {
+        expect(getEffectiveMonthlyHousehold({
+            summaryHouseholdTotal: '45000',
+            household: { grocery: '20000', rent: '15000', lifestyle: '', medical: '', travel: '', education: '' },
+        })).toBe(35000);
+    });
+
+    it('reconcileHousehold reports under-allocation when detail is below summary', () => {
+        const result = reconcileHousehold({
+            summaryHouseholdTotal: '50000',
+            household: { grocery: '30000', rent: '', lifestyle: '', medical: '', travel: '', education: '' },
+        });
+        expect(result.status).toBe('under');
+        expect(result.delta).toBe(20000);
+    });
+
+    it('reconcileEmi reports match when configured total equals summary', () => {
+        const result = reconcileEmi({
+            summaryEmiTotal: '25000',
+            emi: {
+                homeLoan: { principal: 1000000, emi: '25000', tenure: 120, startYear: 2024, startMonth: 1 },
+            },
+        });
+        expect(result.status).toBe('match');
     });
 });

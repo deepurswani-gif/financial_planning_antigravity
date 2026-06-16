@@ -4,6 +4,12 @@
  * No React imports — just data transformations.
  */
 
+import { getEffectiveMonthlyEmi, getEffectiveMonthlyHousehold } from '../DetailedFlow/expenseDetailSync';
+
+function getEffectiveMonthlyNeed(expenseCategories = {}, familyMembers = []) {
+    return getEffectiveMonthlyHousehold(expenseCategories, familyMembers) + getEffectiveMonthlyEmi(expenseCategories);
+}
+
 /**
  * Calculate protection (life insurance) gap data.
  *
@@ -14,14 +20,8 @@
  * @param {string|number} summaryLifeCover - Total life cover from summary flow
  * @returns {object} Protection data
  */
-export const calculateProtectionData = (expenseCategories, summaryLifeCover) => {
-    const householdTotal = Object.values(expenseCategories?.household || {})
-        .reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
-
-    const emiTotal = Object.values(expenseCategories?.emi || {})
-        .reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
-
-    const monthlyNeed = householdTotal + emiTotal;
+export const calculateProtectionData = (expenseCategories, summaryLifeCover, familyMembers = []) => {
+    const monthlyNeed = getEffectiveMonthlyNeed(expenseCategories, familyMembers);
     const annualNeed = monthlyNeed * 12;
 
     const multiplier = 200;
@@ -60,14 +60,8 @@ export const calculateProtectionData = (expenseCategories, summaryLifeCover) => 
  * @param {string|number} contingencyFund - Available emergency fund amount
  * @returns {object} Contingency data
  */
-export const calculateContingencyData = (expenseCategories, contingencyFund) => {
-    const householdTotal = Object.values(expenseCategories?.household || {})
-        .reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
-
-    const emiTotal = Object.values(expenseCategories?.emi || {})
-        .reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
-
-    const monthlyNeed = householdTotal + emiTotal;
+export const calculateContingencyData = (expenseCategories, contingencyFund, familyMembers = []) => {
+    const monthlyNeed = getEffectiveMonthlyNeed(expenseCategories, familyMembers);
     const contingencyPeriod = 6; // months
     const emergencyFundNeeded = monthlyNeed * contingencyPeriod;
     const emergencyFundHave = parseFloat(contingencyFund) || 0;

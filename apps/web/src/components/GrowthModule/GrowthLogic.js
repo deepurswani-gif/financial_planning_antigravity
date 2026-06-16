@@ -1,3 +1,5 @@
+import { getSavingsMonthlyAmount } from '../DetailedFlow/savingsDetailSync';
+
 export const calculateGrowthProjections = (params) => {
     const {
         familyMembers,
@@ -28,11 +30,11 @@ export const calculateGrowthProjections = (params) => {
 
     // 3. Recurring Savings (Annualized)
     const recurringSavings = [
-        { name: 'SIP (Existing)', amount: (parseFloat(expenseCategories.savings?.sip?.amount !== undefined ? expenseCategories.savings.sip.amount : expenseCategories.savings?.sip) || 0) * 12, cagr: 12 },
-        { name: 'PPF (Savings)', amount: (parseFloat(expenseCategories.savings?.ppf?.amount !== undefined ? expenseCategories.savings.ppf.amount : expenseCategories.savings?.ppf) || 0) * 12, cagr: 7.1 },
-        { name: 'RD', amount: (parseFloat(expenseCategories.savings?.rd?.amount !== undefined ? expenseCategories.savings.rd.amount : expenseCategories.savings?.rd) || 0) * 12, cagr: 6 },
-        { name: 'FD (Savings)', amount: (parseFloat(expenseCategories.savings?.fd?.amount !== undefined ? expenseCategories.savings.fd.amount : expenseCategories.savings?.fd) || 0) * 12, cagr: 6 },
-        { name: 'Other Savings', amount: (parseFloat(expenseCategories.savings?.otherSaving?.amount !== undefined ? expenseCategories.savings.otherSaving.amount : expenseCategories.savings?.otherSaving) || 0) * 12, cagr: 6 }
+        { name: 'SIP (Existing)', amount: getSavingsMonthlyAmount(expenseCategories.savings?.sip) * 12, cagr: 12 },
+        { name: 'PPF (Savings)', amount: getSavingsMonthlyAmount(expenseCategories.savings?.ppf) * 12, cagr: 7.1 },
+        { name: 'NPS (Savings)', amount: getSavingsMonthlyAmount(expenseCategories.savings?.nps) * 12, cagr: 10 },
+        { name: 'RD', amount: getSavingsMonthlyAmount(expenseCategories.savings?.rd) * 12, cagr: 6 },
+        { name: 'Other Savings', amount: getSavingsMonthlyAmount(expenseCategories.savings?.otherSaving) * 12, cagr: 6 },
     ].filter(s => s.amount > 0);
 
     // 4. New Allocations

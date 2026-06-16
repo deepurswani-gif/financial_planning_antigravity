@@ -9,6 +9,7 @@ import {
     buildRecoverySteps,
     formatCompactSN
 } from './SafetyNetLogic';
+import { getEmergencyFundAmount } from '../DetailedFlow/wealthDetailSync';
 
 /* ─────────────── Animated Counter ─────────────── */
 const AnimatedCounter = ({ value, prefix = '', suffix = '', duration = 1500, decimals = 0 }) => {
@@ -200,14 +201,14 @@ const SafetyNetSection = () => {
 
     // ── Derived Calculations ──
     const protectionData = useMemo(
-        () => calculateProtectionData(expenseCategories, summaryLifeCover),
-        [expenseCategories, summaryLifeCover]
+        () => calculateProtectionData(expenseCategories, summaryLifeCover, familyMembers),
+        [expenseCategories, summaryLifeCover, familyMembers]
     );
 
     const contingencyData = useMemo(() => {
-        const emergencyCash = assetCategories?.cash?.savings || contingencyFund;
-        return calculateContingencyData(expenseCategories, emergencyCash);
-    }, [expenseCategories, contingencyFund, assetCategories]);
+        const emergencyCash = getEmergencyFundAmount(assetCategories, contingencyFund);
+        return calculateContingencyData(expenseCategories, emergencyCash, familyMembers);
+    }, [expenseCategories, contingencyFund, assetCategories, familyMembers]);
 
     const crisisTimeline = useMemo(
         () => buildCrisisTimeline(contingencyData, protectionData),

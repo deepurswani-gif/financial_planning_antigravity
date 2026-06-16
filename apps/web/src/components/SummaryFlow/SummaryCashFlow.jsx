@@ -13,7 +13,9 @@ const SummaryCashFlow = () => {
     const handleIncomeChange = (field, value) => {
         setIncome(prev => ({
             ...prev,
-            [field]: value
+            [field]: value,
+            ...(field === 'self' ? { summarySelfInHand: value } : {}),
+            ...(field === 'spouse' ? { summarySpouseInHand: value } : {}),
         }));
     };
 
@@ -133,13 +135,23 @@ const SummaryCashFlow = () => {
                                 type="number"
                                 className="conversational-input"
                                 placeholder="e.g. 50000"
-                                value={expenseCategories.household.lifestyle || ''}
-                                onChange={(e) => handleExpenseChange('household', 'lifestyle', e.target.value)}
+                                value={expenseCategories.summaryHouseholdTotal || expenseCategories.household?.lifestyle || ''}
+                                onChange={(e) => {
+                                    const value = e.target.value;
+                                    setExpenseCategories(prev => ({
+                                        ...prev,
+                                        summaryHouseholdTotal: value,
+                                        household: {
+                                            ...prev.household,
+                                            lifestyle: '',
+                                        },
+                                    }));
+                                }}
                             />
                         </div>
-                        {expenseCategories.household.lifestyle && (
+                        {(expenseCategories.summaryHouseholdTotal || expenseCategories.household?.lifestyle) && (
                             <div className="currency-display">
-                                {formatInr(expenseCategories.household.lifestyle)} / month
+                                {formatInr(expenseCategories.summaryHouseholdTotal || expenseCategories.household?.lifestyle)} / month
                             </div>
                         )}
                     </div>

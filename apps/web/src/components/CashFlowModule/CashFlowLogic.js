@@ -1,4 +1,15 @@
-import { getEffectiveMonthlyEmi, sumConfiguredEmis } from '../DetailedFlow/expenseDetailSync';
+import {
+    getEffectiveMonthlyEmi,
+    getEffectiveMonthlyHousehold,
+    hasHouseholdDetailEntered,
+    sumConfiguredEmis,
+} from '../DetailedFlow/expenseDetailSync';
+import { getLifeMemberMonthlyTotal } from '../DetailedFlow/insuranceDetailSync';
+import {
+    getEffectiveMonthlySavings,
+    getSavingsMonthlyAmount,
+    hasConfiguredSavings,
+} from '../DetailedFlow/savingsDetailSync';
 
 export const convertToMonthly = (value, frequency) => {
     const val = parseFloat(value) || 0;
@@ -26,7 +37,7 @@ export const convertToAnnual = (value, frequency) => {
     }
 };
 
-export const calculateCashFlow = (income, expenseCategories) => {
+export const calculateCashFlow = (income, expenseCategories, familyMembers = []) => {
     const totalIncome = (parseFloat(income.self) || 0) + 
                        (parseFloat(income.selfBonus) || 0) + 
                        (parseFloat(income.selfPassive) || 0) + 
@@ -37,24 +48,24 @@ export const calculateCashFlow = (income, expenseCategories) => {
                        (parseFloat(income.spouseOther) || 0) +
                        (parseFloat(income.family) || 0);
 
-    const householdSum = Object.values(expenseCategories.household || {}).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
+    const householdSum = getEffectiveMonthlyHousehold(expenseCategories, familyMembers);
     const emiSum = getEffectiveMonthlyEmi(expenseCategories);
     
     // Insurance specialized handling for nested life insurance
     const insuranceSum = Object.entries(expenseCategories.insurance || {}).reduce((sum, [key, item]) => {
         if (key === 'life') {
-            const lifeTotalMonthly = Object.values(item || {}).reduce((lSum, lItem) => lSum + convertToMonthly(lItem.value, lItem.frequency), 0);
+            const lifeTotalMonthly = Object.values(item || {}).reduce(
+                (lSum, lItem) => lSum + getLifeMemberMonthlyTotal(lItem),
+                0,
+            );
             return sum + lifeTotalMonthly;
         }
+        if (key === 'policyDocs') return sum;
+        if (!item || typeof item !== 'object' || item.value === undefined) return sum;
         return sum + convertToMonthly(item.value, item.frequency);
     }, 0);
 
-    const savingsSum = Object.values(expenseCategories.savings || {}).reduce((sum, val) => {
-        if (Array.isArray(val)) {
-            return sum + val.reduce((arrSum, item) => arrSum + (parseFloat(item?.amount !== undefined ? item.amount : item) || 0), 0);
-        }
-        return sum + (parseFloat(val?.amount !== undefined ? val.amount : val) || 0);
-    }, 0);
+    const savingsSum = getEffectiveMonthlySavings(expenseCategories);
 
     const categorySums = {
         household: householdSum,
@@ -75,8 +86,21 @@ export const calculateCashFlow = (income, expenseCategories) => {
     const savingsRatio = totalIncome > 0 ? (savingsSum / totalIncome) * 100 : 0;
 
     const expenseBreakdown = [];
+    const householdUsesSnapshot = householdSum > 0
+        && !hasHouseholdDetailEntered(expenseCategories, familyMembers)
+        && parseFloat(expenseCategories.summaryHouseholdTotal) > 0;
+
+    if (householdUsesSnapshot) {
+        expenseBreakdown.push({
+            name: 'Household & Lifestyle (Summary)',
+            category: getCategoryLabel('household'),
+            value: parseFloat(expenseCategories.summaryHouseholdTotal),
+        });
+    }
+
     // Regular categories
-    ['household', 'emi', 'savings'].forEach(cat => {
+    ['household', 'emi'].forEach(cat => {
+        if (cat === 'household' && householdUsesSnapshot) return;
         Object.entries(expenseCategories[cat] || {}).forEach(([itemKey, value]) => {
             if (Array.isArray(value)) {
                 value.forEach((v, idx) => {
@@ -108,6 +132,50 @@ export const calculateCashFlow = (income, expenseCategories) => {
             }
         });
     });
+
+    const savings = expenseCategories.savings || {};
+    if (hasConfiguredSavings(savings)) {
+        Object.entries(savings).forEach(([itemKey, value]) => {
+            if (Array.isArray(value)) {
+                value.forEach((v, idx) => {
+                    const amount = getSavingsMonthlyAmount(v);
+                    if (amount > 0) {
+                        expenseBreakdown.push({
+                            name: `${getItemLabel(itemKey)} #${idx + 1}`,
+                            category: getCategoryLabel('savings'),
+                            value: amount,
+                        });
+                    }
+                });
+            } else {
+                const amount = getSavingsMonthlyAmount(value);
+                if (amount > 0) {
+                    expenseBreakdown.push({
+                        name: getItemLabel(itemKey),
+                        category: getCategoryLabel('savings'),
+                        value: amount,
+                    });
+                }
+            }
+        });
+    } else {
+        const summaryInvest = parseFloat(expenseCategories.summaryMonthlyInvestments) || 0;
+        const summaryOther = parseFloat(expenseCategories.summaryOtherSavings) || 0;
+        if (summaryInvest > 0) {
+            expenseBreakdown.push({
+                name: 'Monthly Investments (Summary)',
+                category: getCategoryLabel('savings'),
+                value: summaryInvest,
+            });
+        }
+        if (summaryOther > 0) {
+            expenseBreakdown.push({
+                name: 'Other Savings (Summary)',
+                category: getCategoryLabel('savings'),
+                value: summaryOther,
+            });
+        }
+    }
     if (emiSum > 0 && sumConfiguredEmis(expenseCategories.emi) === 0 && parseFloat(expenseCategories.summaryEmiTotal) > 0) {
         expenseBreakdown.push({
             name: 'Monthly EMI (Summary)',
@@ -119,7 +187,7 @@ export const calculateCashFlow = (income, expenseCategories) => {
     Object.entries(expenseCategories.insurance || {}).forEach(([itemKey, item]) => {
         if (itemKey === 'life') {
             Object.entries(item || {}).forEach(([memberName, lItem]) => {
-                const monthlyAmount = convertToMonthly(lItem.value, lItem.frequency);
+                const monthlyAmount = getLifeMemberMonthlyTotal(lItem);
                 if (monthlyAmount > 0) {
                     expenseBreakdown.push({
                         name: `Life Insurance Premium (${memberName})`,
@@ -128,7 +196,7 @@ export const calculateCashFlow = (income, expenseCategories) => {
                     });
                 }
             });
-        } else {
+        } else if (itemKey !== 'policyDocs' && item?.value !== undefined) {
             const monthlyAmount = convertToMonthly(item.value, item.frequency);
             if (monthlyAmount > 0) {
                 expenseBreakdown.push({
@@ -203,9 +271,10 @@ const getItemLabel = (key) => {
         fd: 'FD',
         lifeInsurance: 'Life Insurance',
         ppf: 'PPF',
-        savingSchemes: 'Saving Schemes',
+        nps: 'NPS',
         mfSip: 'MFs – SIP',
-        otherSaving: 'Other Saving'
+        sip: 'Mutual Fund SIPs',
+        otherSaving: 'Other Saving',
     };
     return labels[key] || key;
 };

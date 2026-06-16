@@ -5,13 +5,10 @@ import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 const SummaryLiabilities = () => {
     const { liabilityCategories, setLiabilityCategories, hasEMI } = useFinancialPlan();
 
-    const handleLiabilityChange = (category, field, value) => {
+    const handleSnapshotChange = (field, value) => {
         setLiabilityCategories(prev => ({
             ...prev,
-            [category]: {
-                ...prev[category],
-                [field]: value
-            }
+            [field]: value,
         }));
     };
 
@@ -56,13 +53,13 @@ const SummaryLiabilities = () => {
                                     type="number"
                                     className="conversational-input"
                                     placeholder="e.g. 3500000"
-                                    value={liabilityCategories.loans.home || ''}
-                                    onChange={(e) => handleLiabilityChange('loans', 'home', e.target.value)}
+                                    value={liabilityCategories.summaryOutstandingLoans || ''}
+                                    onChange={(e) => handleSnapshotChange('summaryOutstandingLoans', e.target.value)}
                                 />
                             </div>
-                            {liabilityCategories.loans.home && (
+                            {liabilityCategories.summaryOutstandingLoans && (
                                 <div className="currency-display">
-                                    {formatInr(liabilityCategories.loans.home)}
+                                    {formatInr(liabilityCategories.summaryOutstandingLoans)}
                                 </div>
                             )}
                         </div>
@@ -90,13 +87,13 @@ const SummaryLiabilities = () => {
                                 type="number"
                                 className="conversational-input"
                                 placeholder="e.g. 45000"
-                                value={liabilityCategories.loans.creditCard || ''}
-                                onChange={(e) => handleLiabilityChange('loans', 'creditCard', e.target.value)}
+                                value={liabilityCategories.summaryCreditCardDues || ''}
+                                onChange={(e) => handleSnapshotChange('summaryCreditCardDues', e.target.value)}
                             />
                         </div>
-                        {liabilityCategories.loans.creditCard && (
+                        {liabilityCategories.summaryCreditCardDues && (
                             <div className="currency-display">
-                                {formatInr(liabilityCategories.loans.creditCard)}
+                                {formatInr(liabilityCategories.summaryCreditCardDues)}
                             </div>
                         )}
                     </div>
@@ -126,13 +123,13 @@ const SummaryLiabilities = () => {
                                 type="number"
                                 className="conversational-input"
                                 placeholder="e.g. 100000"
-                                value={liabilityCategories.loans.personal || ''}
-                                onChange={(e) => handleLiabilityChange('loans', 'personal', e.target.value)}
+                                value={liabilityCategories.summaryOtherPayables || ''}
+                                onChange={(e) => handleSnapshotChange('summaryOtherPayables', e.target.value)}
                             />
                         </div>
-                        {liabilityCategories.loans.personal && (
+                        {liabilityCategories.summaryOtherPayables && (
                             <div className="currency-display">
-                                {formatInr(liabilityCategories.loans.personal)}
+                                {formatInr(liabilityCategories.summaryOtherPayables)}
                             </div>
                         )}
                     </div>
@@ -141,7 +138,7 @@ const SummaryLiabilities = () => {
         });
 
         return qList;
-    }, [hasEMI, liabilityCategories, handleLiabilityChange, formatInr]);
+    }, [hasEMI, liabilityCategories, handleSnapshotChange, formatInr]);
 
     return (
         <ProgressiveQuestionLayout

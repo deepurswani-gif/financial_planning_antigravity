@@ -16,11 +16,24 @@ const InvestmentDetailsModal = ({ isOpen, onClose, onSave, initialData, investme
 
     useEffect(() => {
         if (isOpen) {
+            const clampIfFuture = (year, month) => {
+                const y = parseInt(year, 10) || currentYearVal;
+                const m = parseInt(month, 10) || currentMonthVal;
+                if (y > currentYearVal || (y === currentYearVal && m > currentMonthVal)) {
+                    return { startYear: currentYearVal, startMonth: currentMonthVal };
+                }
+                return { startYear: y, startMonth: m };
+            };
+
             if (initialData && typeof initialData === 'object') {
+                const { startYear, startMonth } = clampIfFuture(
+                    initialData.startYear || currentYearVal,
+                    initialData.startMonth || currentMonthVal,
+                );
                 setFormData({
                     amount: initialData.amount || '',
-                    startMonth: initialData.startMonth || currentMonthVal,
-                    startYear: initialData.startYear || currentYearVal,
+                    startMonth,
+                    startYear,
                     duration: initialData.duration || (investmentTypeTitle === 'PPF' ? 15 : 10)
                 });
             } else {
@@ -38,15 +51,26 @@ const InvestmentDetailsModal = ({ isOpen, onClose, onSave, initialData, investme
 
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+    const clampStartDate = (year, month) => {
+        let y = parseInt(year, 10);
+        let m = parseInt(month, 10);
+        if (y > currentYearVal || (y === currentYearVal && m > currentMonthVal)) {
+            y = currentYearVal;
+            m = currentMonthVal;
+        }
+        return { startYear: y, startMonth: m };
+    };
+
     const handleSave = () => {
         const val = parseFloat(formData.amount);
         if (isNaN(val) || val <= 0) {
             onSave(''); // Revert to pure unconfigured mode
         } else {
+            const { startYear, startMonth } = clampStartDate(formData.startYear, formData.startMonth);
             onSave({
                 amount: val,
-                startMonth: parseInt(formData.startMonth, 10),
-                startYear: parseInt(formData.startYear, 10),
+                startMonth,
+                startYear,
                 duration: investmentTypeTitle === 'PPF' ? 15 : (parseInt(formData.duration, 10) || 10)
             });
         }
@@ -63,6 +87,25 @@ const InvestmentDetailsModal = ({ isOpen, onClose, onSave, initialData, investme
     }
 
     const isPPF = investmentTypeTitle === 'PPF';
+
+    const yearOptions = [];
+    for (let y = currentYearVal - 40; y <= currentYearVal; y++) {
+        yearOptions.push(y);
+    }
+
+    const handleStartYearChange = (yearVal) => {
+        const y = parseInt(yearVal, 10);
+        let month = parseInt(formData.startMonth, 10);
+        if (y === currentYearVal && month > currentMonthVal) {
+            month = currentMonthVal;
+        }
+        setFormData({ ...formData, startYear: y, startMonth: month });
+    };
+
+    const handleStartMonthChange = (monthVal) => {
+        const m = parseInt(monthVal, 10);
+        setFormData({ ...formData, startMonth: m });
+    };
 
     return createPortal(
         <div style={{
@@ -130,29 +173,35 @@ const InvestmentDetailsModal = ({ isOpen, onClose, onSave, initialData, investme
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
                         <div className="input-group">
                             <label htmlFor="startMonth">Start Month</label>
-                            <select id="startMonth" aria-label="Start Month" value={formData.startMonth} onChange={(e) => setFormData({...formData, startMonth: e.target.value})}
+                            <select id="startMonth" aria-label="Start Month" value={formData.startMonth} onChange={(e) => handleStartMonthChange(e.target.value)}
                                 style={{ appearance: 'auto', padding: '0.6rem', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-main)', color: 'var(--text-main)', width: '100%' }}
                             >
-                                {monthNames.map((m, i) => (
-                                    <option key={m} value={i+1}>{m}</option>
-                                ))}
+                                {monthNames.map((m, i) => {
+                                    const monthNum = i + 1;
+                                    if (parseInt(formData.startYear, 10) === currentYearVal && monthNum > currentMonthVal) {
+                                        return null;
+                                    }
+                                    return <option key={m} value={monthNum}>{m}</option>;
+                                })}
                             </select>
                         </div>
 
                         <div className="input-group">
                             <label htmlFor="startYear">Start Year</label>
                             <select id="startYear" aria-label="Start Year"
-                                value={formData.startYear} 
-                                onChange={(e) => setFormData({...formData, startYear: parseInt(e.target.value, 10)})}
+                                value={formData.startYear}
+                                onChange={(e) => handleStartYearChange(e.target.value)}
                                 style={{ appearance: 'auto', padding: '0.6rem', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-main)', color: 'var(--text-main)', width: '100%' }}
                             >
-                                {[...Array(41)].map((_, i) => {
-                                    const y = currentYearVal - 40 + i;
-                                    return <option key={y} value={y}>{y}</option>;
-                                })}
+                                {yearOptions.map((y) => (
+                                    <option key={y} value={y}>{y}</option>
+                                ))}
                             </select>
                         </div>
                     </div>
+                    <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '0.75rem', display: 'block' }}>
+                        Start date cannot be in the future. Only past or current month/year can be selected.
+                    </small>
                 </div>
 
                 {showSuccess && (

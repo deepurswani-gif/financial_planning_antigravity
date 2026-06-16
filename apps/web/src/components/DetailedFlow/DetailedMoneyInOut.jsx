@@ -11,9 +11,16 @@ import {
     isGovernmentSector,
     prefillDetailFromSummaryAmount,
     applyDetailSyncToIncome,
+    reconcileMemberIncome,
+    getMemberDetailMonthlyTotal,
 } from './incomeDetailSync';
+import ReconciliationStatus from './ReconciliationStatus';
 import { guessEmploymentTypeFromSummaryOccupation } from './employmentTypeSync';
 import { useExpenseEmiQuestions } from './useExpenseEmiQuestions';
+import { useInsurancePremiumQuestions } from './useInsurancePremiumQuestions';
+import { useSavingsInvestmentQuestions } from './useSavingsInvestmentQuestions';
+import LifePolicyDetailsModal from './LifePolicyDetailsModal';
+import InvestmentDetailsModal from '../CashFlowModule/InvestmentDetailsModal';
 import { EMI_LOAN_KEYS } from './expenseDetailSync';
 
 const formatInr = (val) => {
@@ -46,7 +53,7 @@ const CurrencyField = ({ label, value, onChange, placeholder = '0' }) => (
 );
 
 const DetailedMoneyInOut = () => {
-    const { familyMembers, income, setIncome, hasSpouseIncome } = useFinancialPlan();
+    const { familyMembers, income, setIncome, hasSpouseIncome, policies, setPolicies } = useFinancialPlan();
     const [editingRecap, setEditingRecap] = useState(false);
     const [recapSelf, setRecapSelf] = useState('');
     const [recapSpouse, setRecapSpouse] = useState('');
@@ -76,8 +83,8 @@ const DetailedMoneyInOut = () => {
             if (prev.selfDetail?.inHandSalary || prev.selfDetail?.takeHomeProfit || prev.selfDetail?.netPension) {
                 return prev;
             }
-            const selfD = prefillDetailFromSummaryAmount(prev.selfDetail, prev.self, selfType);
-            const spouseD = prefillDetailFromSummaryAmount(prev.spouseDetail, prev.spouse, spouseType);
+            const selfD = prefillDetailFromSummaryAmount(prev.selfDetail, prev.summarySelfInHand || prev.self, selfType);
+            const spouseD = prefillDetailFromSummaryAmount(prev.spouseDetail, prev.summarySpouseInHand || prev.spouse, spouseType);
             return applyDetailSyncToIncome(
                 { ...prev, selfDetail: selfD, spouseDetail: spouseD },
                 selfType,
@@ -262,6 +269,11 @@ const DetailedMoneyInOut = () => {
         const isBiz = isBusinessEmployment(employmentType);
         const isPen = isPensionerEmployment(employmentType);
         const showTaxSlip = isSal && detail.needTaxPlanning === true;
+        const summaryAmount = memberKey === 'self'
+            ? (income.summarySelfInHand || income.self)
+            : (income.summarySpouseInHand || income.spouse);
+        const memberReconciliation = reconcileMemberIncome(summaryAmount, detail, employmentType);
+        const detailTotal = getMemberDetailMonthlyTotal(detail, employmentType);
 
         return (
             <div className="question-container">
@@ -375,6 +387,23 @@ const DetailedMoneyInOut = () => {
                             </div>
                         </div>
                     )}
+                    {parseFloat(summaryAmount) > 0 && (
+                        <div style={{
+                            marginTop: '1rem',
+                            paddingTop: '1rem',
+                            borderTop: '1px solid var(--border)',
+                            fontSize: '0.85rem',
+                            color: 'var(--text-muted)',
+                            lineHeight: 1.5,
+                            textAlign: 'left',
+                        }}>
+                            <div>Summary in-hand: <strong>{formatInr(summaryAmount)}</strong> / month</div>
+                            <div>Your detailed total: <strong style={{ color: 'var(--primary)' }}>{formatInr(detailTotal)}</strong> / month</div>
+                            <div style={{ marginTop: '0.35rem' }}>
+                                <ReconciliationStatus reconciliation={memberReconciliation} matchLabel="Matches summary" />
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         );
@@ -387,19 +416,28 @@ const DetailedMoneyInOut = () => {
 
     const saveRecapEdits = () => {
         syncAndSetIncome(prev => {
-            const selfD = { ...createEmptyIncomeDetail(), ...prev.selfDetail };
-            if (isSalariedEmployment(selfEmploymentType)) selfD.inHandSalary = recapSelf;
-            else if (isBusinessEmployment(selfEmploymentType)) selfD.takeHomeProfit = recapSelf;
-            else if (isPensionerEmployment(selfEmploymentType)) selfD.netPension = recapSelf;
-
-            let next = { ...prev, self: recapSelf, selfDetail: selfD };
+            const selfD = prefillDetailFromSummaryAmount(
+                { ...createEmptyIncomeDetail(), ...prev.selfDetail },
+                recapSelf,
+                selfEmploymentType,
+            );
+            let next = {
+                ...prev,
+                summarySelfInHand: recapSelf,
+                selfDetail: selfD,
+            };
 
             if (includeSpouse) {
-                const spouseD = { ...createEmptyIncomeDetail(), ...prev.spouseDetail };
-                if (isSalariedEmployment(spouseEmploymentType)) spouseD.inHandSalary = recapSpouse;
-                else if (isBusinessEmployment(spouseEmploymentType)) spouseD.takeHomeProfit = recapSpouse;
-                else if (isPensionerEmployment(spouseEmploymentType)) spouseD.netPension = recapSpouse;
-                next = { ...next, spouse: recapSpouse, spouseDetail: spouseD };
+                const spouseD = prefillDetailFromSummaryAmount(
+                    { ...createEmptyIncomeDetail(), ...prev.spouseDetail },
+                    recapSpouse,
+                    spouseEmploymentType,
+                );
+                next = {
+                    ...next,
+                    summarySpouseInHand: recapSpouse,
+                    spouseDetail: spouseD,
+                };
             }
             return next;
         });
@@ -407,9 +445,9 @@ const DetailedMoneyInOut = () => {
     };
 
     useEffect(() => {
-        setRecapSelf(income.self || '');
-        setRecapSpouse(income.spouse || '');
-    }, [income.self, income.spouse]);
+        setRecapSelf(income.summarySelfInHand || income.self || '');
+        setRecapSpouse(income.summarySpouseInHand || income.spouse || '');
+    }, [income.summarySelfInHand, income.summarySpouseInHand, income.self, income.spouse]);
 
     const {
         expenseQuestions,
@@ -418,6 +456,23 @@ const DetailedMoneyInOut = () => {
         emi,
         handleEmiSave,
     } = useExpenseEmiQuestions();
+
+    const {
+        insuranceQuestions,
+        showPolicyDetailsModal,
+        setShowPolicyDetailsModal,
+        policyDetailsMembers,
+        lifeUploadHelpModal,
+    } = useInsurancePremiumQuestions();
+
+    const {
+        savingsQuestions,
+        activeInvModal,
+        setActiveInvModal,
+        handleInvSave,
+        activeInvInitialData,
+        activeInvTitle,
+    } = useSavingsInvestmentQuestions();
 
     const questions = useMemo(() => {
         const list = [{
@@ -437,9 +492,9 @@ const DetailedMoneyInOut = () => {
                                     </button>
                                 </div>
                                 <div style={{ display: 'grid', gap: '0.5rem', fontSize: '0.95rem' }}>
-                                    <div><strong>{selfMember.name || 'Self'}:</strong> {formatInr(income.self)} / month</div>
+                                    <div><strong>{selfMember.name || 'Self'}:</strong> {formatInr(income.summarySelfInHand || income.self)} / month</div>
                                     {includeSpouse && (
-                                        <div><strong>{spouseMember?.name || 'Spouse'}:</strong> {formatInr(income.spouse)} / month</div>
+                                        <div><strong>{spouseMember?.name || 'Spouse'}:</strong> {formatInr(income.summarySpouseInHand || income.spouse)} / month</div>
                                     )}
                                     <div style={{ marginTop: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                                         Employment: {selfEmploymentType}{includeSpouse ? ` · Spouse: ${spouseEmploymentType}` : ''}
@@ -482,12 +537,15 @@ const DetailedMoneyInOut = () => {
         }
 
         list.push(...expenseQuestions);
+        list.push(...insuranceQuestions);
+        list.push(...savingsQuestions);
 
         return list;
     }, [
-        editingRecap, income.self, income.spouse, selfDetail, spouseDetail,
+        editingRecap, income.self, income.spouse, income.summarySelfInHand, income.summarySpouseInHand,
+        selfDetail, spouseDetail,
         selfEmploymentType, spouseEmploymentType, includeSpouse, selfMember.name,
-        spouseMember?.name, recapSelf, recapSpouse, expenseQuestions,
+        spouseMember?.name, recapSelf, recapSpouse, expenseQuestions, insuranceQuestions, savingsQuestions,
         updateDetail, updateTaxField, updateOtherIncome, addOtherIncome, removeOtherIncome,
     ]);
 
@@ -498,9 +556,19 @@ const DetailedMoneyInOut = () => {
             <DetailedProgressiveLayout
                 currentStepId="money_in_out"
                 questions={questions}
-                narrative="Thank you. I now have a clearer picture of your money in and money out. Next we'll capture your insurance premiums."
+                narrative="Thank you. I now have a clearer picture of your money in and money out — including your savings and investments."
                 lastSectionLabel="Save & Continue"
             />
+            {lifeUploadHelpModal}
+            {showPolicyDetailsModal && (
+                <LifePolicyDetailsModal
+                    isOpen={showPolicyDetailsModal}
+                    onClose={() => setShowPolicyDetailsModal(false)}
+                    familyMembers={policyDetailsMembers}
+                    policies={policies}
+                    setPolicies={setPolicies}
+                />
+            )}
             {activeLoanModal && (
                 <LoanDetailsModal
                     isOpen={!!activeLoanModal}
@@ -508,6 +576,15 @@ const DetailedMoneyInOut = () => {
                     onSave={(data) => handleEmiSave(activeLoanModal, data)}
                     initialData={typeof emi[activeLoanModal] === 'object' ? emi[activeLoanModal] : null}
                     loanTypeTitle={activeLoanMeta?.label || 'Loan Details'}
+                />
+            )}
+            {activeInvModal && (
+                <InvestmentDetailsModal
+                    isOpen={!!activeInvModal}
+                    onClose={() => setActiveInvModal(null)}
+                    initialData={activeInvInitialData}
+                    investmentTypeTitle={activeInvTitle}
+                    onSave={handleInvSave}
                 />
             )}
         </>

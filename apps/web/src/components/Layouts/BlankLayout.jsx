@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { signOut } from '../../services/authService';
 import finbrellaLogo from '../../assets/finbrella_logo.png';
 import { detailedFlowSteps } from '../DetailedFlow/detailedFlowSteps';
+import { DEFAULT_SUMMARY_REPORT_PATH } from '../SummaryReport/summaryReportSteps';
 
 const steps = [
     { id: 'profile', label: 'Profile', path: '/summary-flow/profile', icon: Users },
@@ -69,7 +70,7 @@ const BlankLayout = () => {
         if (savePlanData) {
             try { await savePlanData(); } catch (e) { console.error('Save failed on nav', e); }
         }
-        navigate('/summary-report');
+        navigate(DEFAULT_SUMMARY_REPORT_PATH);
     };
 
     if (!isSummaryExperience && !isDetailedExperience) {

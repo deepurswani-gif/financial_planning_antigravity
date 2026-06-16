@@ -12,13 +12,10 @@ const SummarySavings = () => {
         summaryHealthCover, setSummaryHealthCover
     } = useFinancialPlan();
 
-    const handleSavingsChange = (field, value) => {
+    const handleSummaryChange = (field, value) => {
         setExpenseCategories(prev => ({
             ...prev,
-            savings: {
-                ...prev.savings,
-                [field]: value
-            }
+            [field]: value,
         }));
     };
 
@@ -51,7 +48,7 @@ const SummarySavings = () => {
 
                     <div className="question-fields" style={{ maxWidth: '420px', margin: '0 auto' }}>
                         <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.2rem', display: 'block' }}>
-                            Monthly Investments / SIPs
+                            Monthly Investments
                         </label>
                         <div className="currency-input-wrapper">
                             <span className="currency-symbol">₹</span>
@@ -59,13 +56,13 @@ const SummarySavings = () => {
                                 type="number"
                                 className="conversational-input"
                                 placeholder="e.g. 15000"
-                                value={expenseCategories.savings.sip || ''}
-                                onChange={(e) => handleSavingsChange('sip', e.target.value)}
+                                value={expenseCategories.summaryMonthlyInvestments || ''}
+                                onChange={(e) => handleSummaryChange('summaryMonthlyInvestments', e.target.value)}
                             />
                         </div>
-                        {expenseCategories.savings.sip && (
+                        {expenseCategories.summaryMonthlyInvestments && (
                             <div className="currency-display">
-                                {formatInr(expenseCategories.savings.sip)} / month
+                                {formatInr(expenseCategories.summaryMonthlyInvestments)} / month
                             </div>
                         )}
                     </div>
@@ -94,13 +91,13 @@ const SummarySavings = () => {
                                 type="number"
                                 className="conversational-input"
                                 placeholder="e.g. 10000"
-                                value={expenseCategories.savings.otherSaving || ''}
-                                onChange={(e) => handleSavingsChange('otherSaving', e.target.value)}
+                                value={expenseCategories.summaryOtherSavings || ''}
+                                onChange={(e) => handleSummaryChange('summaryOtherSavings', e.target.value)}
                             />
                         </div>
-                        {expenseCategories.savings.otherSaving && (
+                        {expenseCategories.summaryOtherSavings && (
                             <div className="currency-display">
-                                {formatInr(expenseCategories.savings.otherSaving)} / month
+                                {formatInr(expenseCategories.summaryOtherSavings)} / month
                             </div>
                         )}
                     </div>

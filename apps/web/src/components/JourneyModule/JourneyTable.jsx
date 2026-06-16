@@ -246,7 +246,7 @@ const JourneyTable = ({ projections }) => {
                                                         </div>
                                                         <div className="breakdown-item">
                                                             <span>Any other savings</span>
-                                                            <strong>{formatCurrency(row.savingsBreakdown.otherSaving + (row.savingsBreakdown.savingSchemes || 0) + (row.savingsBreakdown.fdTotal || 0))}</strong>
+                                                            <strong>{formatCurrency(row.savingsBreakdown.otherSaving)}</strong>
                                                         </div>
                                                         <div className="breakdown-divider"></div>
                                                         <div className="breakdown-total">

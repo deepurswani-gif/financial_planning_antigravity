@@ -14,7 +14,7 @@ const DetailedPlaceholder = () => {
             </p>
             <div style={{ marginTop: '3rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
                 <div style={{ display: 'flex', gap: '1rem' }}>
-                    <button className="btn btn-secondary" onClick={() => navigate('/summary-report')}>Back to Summary Report</button>
+                    <button className="btn btn-secondary" onClick={() => navigate('/summary-report/money_story')}>Back to Summary Report</button>
                     <button className="btn btn-primary" onClick={() => navigate('/detailed-flow/next-step')}>Next Step</button>
                 </div>
                 <button 

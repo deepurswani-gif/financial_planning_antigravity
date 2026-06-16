@@ -1,25 +1,28 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { useNavigate, useParams, Navigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 import MoneyStorySection from './MoneyStorySection';
 import SafetyNetSection from './SafetyNetSection';
 import FutureSelfSection from './FutureSelfSection';
 import ExecutiveSummarySection from './ExecutiveSummarySection';
+import {
+    DEFAULT_SUMMARY_REPORT_PATH,
+    summaryReportSlugs,
+    summaryReportSteps,
+} from './summaryReportSteps';
 
-const TABS = [
-    { id: 'money-story', label: 'Your Money Story' },
-    { id: 'safety-net', label: 'The Safety Net' },
-    { id: 'future-self', label: 'Your Future Self' },
-    { id: 'executive', label: 'Useful Insights' },
-];
-
-const FULL_WIDTH_TABS = new Set(TABS.map((t) => t.id));
+const SECTION_BY_SLUG = {
+    money_story: MoneyStorySection,
+    safety_net: SafetyNetSection,
+    your_future_self: FutureSelfSection,
+    useful_insights: ExecutiveSummarySection,
+};
 
 const SummaryReportView = () => {
     const navigate = useNavigate();
+    const { section } = useParams();
     const { summaryReportGeneratedAt, markReportGenerated } = useFinancialPlan();
-    const [activeTab, setActiveTab] = useState('money-story');
 
     useEffect(() => {
         if (!summaryReportGeneratedAt) {
@@ -27,25 +30,29 @@ const SummaryReportView = () => {
         }
     }, [summaryReportGeneratedAt, markReportGenerated]);
 
-    const activeIndex = TABS.findIndex((t) => t.id === activeTab);
+    if (!section || !summaryReportSlugs.has(section)) {
+        return <Navigate to={DEFAULT_SUMMARY_REPORT_PATH} replace />;
+    }
+
+    const activeIndex = summaryReportSteps.findIndex((step) => step.slug === section);
+    const activeStep = summaryReportSteps[activeIndex];
+    const ActiveSection = SECTION_BY_SLUG[section];
     const isFirstTab = activeIndex === 0;
-    const isLastTab = activeIndex === TABS.length - 1;
+    const isLastTab = activeIndex === summaryReportSteps.length - 1;
 
-    const goToTab = (index) => {
-        if (index >= 0 && index < TABS.length) {
-            setActiveTab(TABS[index].id);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
+    const goToStep = (index) => {
+        const step = summaryReportSteps[index];
+        if (!step) return;
+        navigate(step.path);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
-
-    const isFullWidth = FULL_WIDTH_TABS.has(activeTab);
 
     return (
         <div
             className="summary-report-view fade-in"
             style={{
-                padding: isFullWidth ? '0' : '2rem',
-                maxWidth: isFullWidth ? '100%' : '1200px',
+                padding: '0',
+                maxWidth: '100%',
                 margin: '0 auto',
                 paddingBottom: '6rem',
             }}
@@ -63,43 +70,35 @@ const SummaryReportView = () => {
                     justifyContent: 'center',
                 }}
             >
-                {TABS.map((tab) => (
+                {summaryReportSteps.map((step) => (
                     <button
-                        key={tab.id}
+                        key={step.slug}
                         type="button"
-                        className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
+                        className={`tab-btn ${section === step.slug ? 'active' : ''}`}
                         onClick={() => {
-                            setActiveTab(tab.id);
+                            navigate(step.path);
                             window.scrollTo({ top: 0, behavior: 'smooth' });
                         }}
                         style={{
                             padding: '1rem 2rem',
                             border: 'none',
                             background: 'transparent',
-                            color: activeTab === tab.id ? 'var(--primary)' : 'var(--text-muted)',
-                            fontWeight: activeTab === tab.id ? 'bold' : 'normal',
+                            color: section === step.slug ? 'var(--primary)' : 'var(--text-muted)',
+                            fontWeight: section === step.slug ? 'bold' : 'normal',
                             borderBottom:
-                                activeTab === tab.id
+                                section === step.slug
                                     ? '3px solid var(--primary)'
                                     : '3px solid transparent',
                             cursor: 'pointer',
                             fontSize: '1rem',
                         }}
                     >
-                        {tab.label}
+                        {step.label}
                     </button>
                 ))}
             </div>
 
-            {activeTab === 'money-story' ? (
-                <MoneyStorySection />
-            ) : activeTab === 'safety-net' ? (
-                <SafetyNetSection />
-            ) : activeTab === 'future-self' ? (
-                <FutureSelfSection />
-            ) : activeTab === 'executive' ? (
-                <ExecutiveSummarySection />
-            ) : (
+            {ActiveSection ? <ActiveSection /> : (
                 <div
                     className="card"
                     style={{
@@ -112,7 +111,7 @@ const SummaryReportView = () => {
                     }}
                 >
                     <h2 style={{ color: 'var(--text-main)', marginBottom: '1rem' }}>
-                        {TABS.find((t) => t.id === activeTab)?.label}
+                        {activeStep?.label}
                     </h2>
                     <p className="text-muted">Report content coming soon...</p>
                 </div>
@@ -135,7 +134,7 @@ const SummaryReportView = () => {
                             <button
                                 type="button"
                                 className="btn btn-secondary summary-report-action-btn"
-                                onClick={() => goToTab(activeIndex - 1)}
+                                onClick={() => goToStep(activeIndex - 1)}
                             >
                                 <ChevronLeft size={18} />
                                 Previous Section
@@ -145,7 +144,7 @@ const SummaryReportView = () => {
                             <button
                                 type="button"
                                 className="btn btn-primary summary-report-action-btn"
-                                onClick={() => goToTab(activeIndex + 1)}
+                                onClick={() => goToStep(activeIndex + 1)}
                             >
                                 Next Section
                                 <ChevronRight size={18} />

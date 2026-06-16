@@ -20,6 +20,29 @@ describe('AssetLogic', () => {
         expect(results.netWorth).toBe(4200000);
     });
 
+    it('includes summary snapshot totals when detail fields are blank', () => {
+        const assetCategories = {
+            summaryPortfolioValue: '500000',
+            summaryLiquidCash: '200000',
+            summaryRealEstateAssets: '5000000',
+            investments: { equity: '', mutualFunds: '' },
+            cash: { savings: '', cashInHand: '' },
+            realEstate: { residential: '', secondProperty: '', landPlot: '' },
+        };
+        const liabilityCategories = {
+            summaryOutstandingLoans: '1000000',
+            summaryCreditCardDues: '50000',
+            summaryOtherPayables: '100000',
+            loans: { home: '', personal: '', car: '', education: '', otherEmis: '', creditCard: '' },
+        };
+
+        const results = calculateNetWorth(assetCategories, liabilityCategories);
+
+        expect(results.totalAssets).toBe(5700000);
+        expect(results.totalLiabilities).toBe(1150000);
+        expect(results.netWorth).toBe(4550000);
+    });
+
     it('calculates asset allocation percentages correctly', () => {
         const assetCategories = {
             investments: { equity: 30000, fixedDeposit: 70000 }

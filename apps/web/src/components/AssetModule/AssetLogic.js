@@ -1,7 +1,13 @@
 import { formatCurrency } from '../CashFlowModule/CashFlowLogic';
+import {
+    getAssetAmount,
+    hasWealthDetailEntered,
+    hasLiabilityDetailEntered,
+    getSummaryAssetTotal,
+    getSummaryLiabilityTotal,
+} from '../DetailedFlow/wealthDetailSync';
 
 export const calculateNetWorth = (assetCategories, liabilityCategories) => {
-    let totalAssets = 0;
     const assetBreakdown = [];
 
     // Helper to process categories safely
@@ -33,7 +39,7 @@ export const calculateNetWorth = (assetCategories, liabilityCategories) => {
                 });
             } else if (typeof items === 'object' && items !== null) {
                 Object.entries(items).forEach(([itemKey, value]) => {
-                    const amount = parseFloat(value) || 0;
+                    const amount = getAssetAmount(value);
                     total += amount;
                     if (isAsset && amount > 0) {
                         assetBreakdown.push({
@@ -48,8 +54,16 @@ export const calculateNetWorth = (assetCategories, liabilityCategories) => {
         return total;
     };
 
-    totalAssets = processItems(assetCategories, true);
-    const totalLiabilities = processItems(liabilityCategories, false);
+    let totalAssets = processItems(assetCategories, true);
+    let totalLiabilities = processItems(liabilityCategories, false);
+
+    if (!hasWealthDetailEntered(assetCategories)) {
+        totalAssets += getSummaryAssetTotal(assetCategories);
+    }
+    if (!hasLiabilityDetailEntered(liabilityCategories)) {
+        const includeLoans = getAssetAmount(liabilityCategories.summaryOutstandingLoans) > 0;
+        totalLiabilities += getSummaryLiabilityTotal(liabilityCategories, includeLoans);
+    }
 
     const netWorth = totalAssets - totalLiabilities;
 
@@ -104,6 +118,7 @@ export const getItemLabel = (key) => {
         gold: 'Gold Jewellery',
         art: 'Art / Collectibles',
         savings: 'Bank Savings',
+        cashInHand: 'Cash-in-hand',
         equity: 'Equity Investments',
         mutualFunds: 'Mutual Funds Portfolio',
         fixedDeposit: 'Fixed Deposit',
@@ -121,7 +136,7 @@ export const getItemLabel = (key) => {
         car: 'Car Loan',
         education: 'Education Loan',
         otherEmis: 'Other EMIs',
-        creditCard: 'Credit Card / Other'
+        creditCard: 'Credit Card'
     };
     return labels[key] || key;
 };

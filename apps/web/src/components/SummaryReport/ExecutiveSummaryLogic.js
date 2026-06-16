@@ -1,6 +1,7 @@
 import { calculateCashFlow } from '../CashFlowModule/CashFlowLogic';
 import { calculateProtectionData, calculateContingencyData } from './SafetyNetLogic';
 import { buildFutureSelfReport, buildGoalReadiness } from './FutureSelfLogic';
+import { getEmergencyFundAmount } from '../DetailedFlow/wealthDetailSync';
 
 const SCORE_BANDS = {
     overall: [
@@ -326,12 +327,13 @@ export const buildExecutiveSummaryReport = ({
     summaryHealthCover,
     contingencyFund,
     goals,
-    inflationRates
+    inflationRates,
+    familyMembers = [],
 }) => {
-    const cashFlow = calculateCashFlow(income, expenseCategories);
-    const protectionData = calculateProtectionData(expenseCategories, summaryLifeCover);
-    const emergencyCash = assetCategories?.cash?.savings || contingencyFund;
-    const contingencyData = calculateContingencyData(expenseCategories, emergencyCash);
+    const cashFlow = calculateCashFlow(income, expenseCategories, familyMembers);
+    const protectionData = calculateProtectionData(expenseCategories, summaryLifeCover, familyMembers);
+    const emergencyCash = getEmergencyFundAmount(assetCategories, contingencyFund);
+    const contingencyData = calculateContingencyData(expenseCategories, emergencyCash, familyMembers);
     const futureSelfReport = buildFutureSelfReport({
         goals,
         cashFlowResults: cashFlow,

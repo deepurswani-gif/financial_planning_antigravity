@@ -4,100 +4,33 @@
  * No React imports — just data transformations.
  */
 
+import { classifyWealthSnapshot, getAssetAmount, hasWealthDetailEntered, hasLiabilityDetailEntered } from '../DetailedFlow/wealthDetailSync';
+
 /**
  * Classify assets into Income Assets vs Legacy Assets.
- *
- * Income Assets: Items delivering predictable cash distributions
- *   - investments (equity, mutualFunds, fixedDeposit, recurringDeposit)
- *   - insurance (savingPlans, ulip)
- *   - retirement (epf, ppf, nps)
- *   - cash (savings)
- *
- * Legacy Assets: Assets which are never sold, passed to next generations
- *   - realEstate (residential, secondProperty, landPlot)
- *   - vehicles (idv)
- *   - valuables (gold, art)
- *   - others
+ * Retirement is tracked separately via classifyWealthSnapshot.
  */
 export const classifyAssets = (assetCategories) => {
-    const incomeCategories = ['investments', 'insurance', 'retirement', 'cash'];
-    const legacyCategories = ['realEstate', 'vehicles', 'valuables', 'others'];
+    const { legacyTotal, incomeTotal, retirementTotal, grandTotal, legacyPercent, incomePercent, retirementPercent } = classifyWealthSnapshot(assetCategories);
 
-    let incomeTotal = 0;
-    let legacyTotal = 0;
     const incomeBreakdown = [];
     const legacyBreakdown = [];
 
-    const sumCategory = (catKey, items) => {
-        if (!items || typeof items !== 'object') return 0;
-        // Skip arrays (custom items)
-        if (Array.isArray(items)) {
-            return items.reduce((sum, item) => sum + (parseFloat(item.value) || 0), 0);
-        }
-        let catTotal = 0;
-        Object.entries(items).forEach(([itemKey, value]) => {
-            const amount = parseFloat(value) || 0;
-            if (amount > 0) {
-                catTotal += amount;
-            }
-        });
-        return catTotal;
-    };
-
-    incomeCategories.forEach(catKey => {
-        const items = assetCategories[catKey];
-        const total = sumCategory(catKey, items);
-        if (total > 0) {
-            incomeTotal += total;
-            incomeBreakdown.push({ category: getCategoryDisplayName(catKey), value: total });
-        }
-    });
-
-    legacyCategories.forEach(catKey => {
-        const items = assetCategories[catKey];
-        const total = sumCategory(catKey, items);
-        if (total > 0) {
-            legacyTotal += total;
-            legacyBreakdown.push({ category: getCategoryDisplayName(catKey), value: total });
-        }
-    });
-
-    // Also include custom items as legacy by default
-    if (Array.isArray(assetCategories.custom)) {
-        const customTotal = assetCategories.custom.reduce((sum, item) => sum + (parseFloat(item.value) || 0), 0);
-        if (customTotal > 0) {
-            legacyTotal += customTotal;
-            legacyBreakdown.push({ category: 'Custom Assets', value: customTotal });
-        }
-    }
-
-    const grandTotal = incomeTotal + legacyTotal;
-    const incomePercent = grandTotal > 0 ? (incomeTotal / grandTotal) * 100 : 0;
-    const legacyPercent = grandTotal > 0 ? (legacyTotal / grandTotal) * 100 : 0;
+    if (incomeTotal > 0) incomeBreakdown.push({ category: 'Income Assets', value: incomeTotal });
+    if (legacyTotal > 0) legacyBreakdown.push({ category: 'Legacy Assets', value: legacyTotal });
+    if (retirementTotal > 0) incomeBreakdown.push({ category: 'Retirement Accounts', value: retirementTotal });
 
     return {
-        incomeTotal,
+        incomeTotal: incomeTotal + retirementTotal,
         legacyTotal,
+        retirementTotal,
         grandTotal,
-        incomePercent,
+        incomePercent: grandTotal > 0 ? ((incomeTotal + retirementTotal) / grandTotal) * 100 : 0,
         legacyPercent,
+        retirementPercent,
         incomeBreakdown,
-        legacyBreakdown
+        legacyBreakdown,
     };
-};
-
-const getCategoryDisplayName = (key) => {
-    const names = {
-        investments: 'Investments',
-        insurance: 'Insurance (Cash Value)',
-        retirement: 'Retirement Accounts',
-        cash: 'Bank Savings',
-        realEstate: 'Real Estate',
-        vehicles: 'Vehicles',
-        valuables: 'Gold & Valuables',
-        others: 'Other Assets'
-    };
-    return names[key] || key;
 };
 
 /**
@@ -212,9 +145,7 @@ export const buildWaterfallData = (cashFlowResults) => {
  * Build asset breakdown data for visualization.
  * Groups by major category with percentage.
  */
-export const buildAssetBreakdownData = (assetCategories, totalAssets) => {
-    if (totalAssets <= 0) return [];
-
+const buildDetailAssetBreakdownData = (assetCategories, totalAssets) => {
     const categories = [
         { key: 'realEstate', label: 'Real Estate', color: '#6366F1' },
         { key: 'cash', label: 'Bank Savings', color: '#10B981' },
@@ -231,7 +162,7 @@ export const buildAssetBreakdownData = (assetCategories, totalAssets) => {
         if (!items || typeof items !== 'object') return null;
         const total = Array.isArray(items)
             ? items.reduce((sum, item) => sum + (parseFloat(item.value) || 0), 0)
-            : Object.values(items).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
+            : Object.values(items).reduce((sum, val) => sum + getAssetAmount(val), 0);
         if (total <= 0) return null;
         return {
             name: cat.label,
@@ -240,6 +171,40 @@ export const buildAssetBreakdownData = (assetCategories, totalAssets) => {
             color: cat.color
         };
     }).filter(Boolean).sort((a, b) => b.value - a.value);
+};
+
+/** Fallback breakdown from summary-flow snapshot fields when detail fields are blank. */
+function buildSummaryAssetBreakdownData(assetCategories, totalAssets) {
+    const snapshots = [
+        { key: 'summaryPortfolioValue', label: 'Investments', color: '#00A9F2' },
+        { key: 'summaryLiquidCash', label: 'Bank Savings', color: '#10B981' },
+        { key: 'summaryRealEstateAssets', label: 'Real Estate', color: '#6366F1' },
+    ];
+
+    return snapshots
+        .map((snap) => {
+            const value = getAssetAmount(assetCategories[snap.key]);
+            if (value <= 0) return null;
+            return {
+                name: snap.label,
+                value,
+                percentage: Math.round((value / totalAssets) * 100),
+                color: snap.color,
+            };
+        })
+        .filter(Boolean)
+        .sort((a, b) => b.value - a.value);
+}
+
+export const buildAssetBreakdownData = (assetCategories, totalAssets) => {
+    if (totalAssets <= 0) return [];
+
+    const detailBreakdown = buildDetailAssetBreakdownData(assetCategories, totalAssets);
+    if (detailBreakdown.length > 0) return detailBreakdown;
+    if (!hasWealthDetailEntered(assetCategories)) {
+        return buildSummaryAssetBreakdownData(assetCategories, totalAssets);
+    }
+    return detailBreakdown;
 };
 
 /**
@@ -261,7 +226,7 @@ export const buildLiabilityBreakdownData = (liabilityCategories, totalLiabilitie
     const loans = liabilityCategories.loans || {};
 
     Object.entries(loans).forEach(([key, value]) => {
-        const amount = parseFloat(value) || 0;
+        const amount = getAssetAmount(value);
         if (amount > 0) {
             result.push({
                 name: labels[key] || key,
@@ -280,6 +245,26 @@ export const buildLiabilityBreakdownData = (liabilityCategories, totalLiabilitie
                     name: item.label || 'Other',
                     value: amount,
                     percentage: Math.round((amount / totalLiabilities) * 100)
+                });
+            }
+        });
+    }
+
+    if (result.length > 0) return result.sort((a, b) => b.value - a.value);
+
+    if (!hasLiabilityDetailEntered(liabilityCategories)) {
+        const snapshots = [
+            { key: 'summaryOutstandingLoans', label: 'Outstanding Loans' },
+            { key: 'summaryCreditCardDues', label: 'Credit Card Dues' },
+            { key: 'summaryOtherPayables', label: 'Other Payables' },
+        ];
+        snapshots.forEach((snap) => {
+            const amount = getAssetAmount(liabilityCategories[snap.key]);
+            if (amount > 0) {
+                result.push({
+                    name: snap.label,
+                    value: amount,
+                    percentage: Math.round((amount / totalLiabilities) * 100),
                 });
             }
         });

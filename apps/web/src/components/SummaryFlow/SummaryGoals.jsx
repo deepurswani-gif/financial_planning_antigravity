@@ -119,13 +119,13 @@ const SummaryGoals = () => {
         // If user already selected a template on this screen, replace it instead of adding another
         if (editingGoalIndex !== null && screen === SELECT) {
             const updated = [...goals];
-            updated[editingGoalIndex] = { ...updated[editingGoalIndex], name: tmpl.label, inflationRate: tmpl.defaultInflation };
+            updated[editingGoalIndex] = { ...updated[editingGoalIndex], name: tmpl.label, templateId: tmpl.id, inflationRate: tmpl.defaultInflation };
             setGoals(updated);
             return;
         }
 
         const id = `goal_${Date.now()}`;
-        const newGoal = { id, name: tmpl.label, presentValue: '', yearsToGoal: '', inflationRate: tmpl.defaultInflation, courseDuration: 1 };
+        const newGoal = { id, name: tmpl.label, templateId: tmpl.id, presentValue: '', yearsToGoal: '', inflationRate: tmpl.defaultInflation, courseDuration: 1 };
         const updated = [...goals, newGoal];
         setGoals(updated);
         setEditingGoalIndex(updated.length - 1);
@@ -186,7 +186,7 @@ const SummaryGoals = () => {
             await markReportGenerated();
         }
         setShowNarrative(false);
-        navigate('/summary-report');
+        navigate('/summary-report/money_story');
     };
 
     const handleNarrativeDone = () => handleOpenReport(true);

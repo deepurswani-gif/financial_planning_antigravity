@@ -1,3 +1,5 @@
+import { reconcileAmounts } from './detailReconcile';
+
 export const createEmptyTaxPlanning = () => ({
     earnings: {
         basicPay: '',
@@ -84,6 +86,52 @@ export function syncLegacyFromDetail(detail, employmentType) {
     };
 }
 
+/** Total monthly in-hand from detailed fields (primary + bonus + passive + other). */
+export function getMemberDetailMonthlyTotal(detail, employmentType) {
+    const legacy = syncLegacyFromDetail(detail, employmentType);
+    return (parseFloat(legacy.primary) || 0)
+        + (parseFloat(legacy.bonus) || 0)
+        + (parseFloat(legacy.passive) || 0)
+        + (parseFloat(legacy.other) || 0);
+}
+
+export function hasIncomeDetailEntered(detail, employmentType) {
+    const d = { ...createEmptyIncomeDetail(), ...detail };
+    if (parseFloat(d.grossSalary) > 0) return true;
+    if (isSalariedEmployment(employmentType) && parseFloat(d.inHandSalary) > 0) return true;
+    if (isBusinessEmployment(employmentType) && (parseFloat(d.takeHomeProfit) > 0 || parseFloat(d.passiveIncome) > 0)) return true;
+    if (isPensionerEmployment(employmentType) && parseFloat(d.netPension) > 0) return true;
+    return sumOtherIncome(d.otherIncome) > 0;
+}
+
+export function reconcileMemberIncome(summaryAmount, detail, employmentType) {
+    const summaryTotal = parseFloat(summaryAmount) || 0;
+    if (!hasIncomeDetailEntered(detail, employmentType)) {
+        return reconcileAmounts(summaryTotal, 0);
+    }
+    return reconcileAmounts(summaryTotal, getMemberDetailMonthlyTotal(detail, employmentType));
+}
+
+/** Preserve summary in-hand amounts separately from synced flat keys. */
+export function initializeIncomeSnapshots(income = {}) {
+    const loaded = income || {};
+    let summarySelfInHand = loaded.summarySelfInHand ?? '';
+    let summarySpouseInHand = loaded.summarySpouseInHand ?? '';
+
+    if (!summarySelfInHand && loaded.self) {
+        summarySelfInHand = String(parseFloat(loaded.self) || '');
+    }
+    if (!summarySpouseInHand && loaded.spouse) {
+        summarySpouseInHand = String(parseFloat(loaded.spouse) || '');
+    }
+
+    return {
+        ...loaded,
+        summarySelfInHand,
+        summarySpouseInHand,
+    };
+}
+
 /** Pre-fill detail from summary in-hand amount when detail fields are empty. */
 export function prefillDetailFromSummaryAmount(detail, summaryAmount, employmentType) {
     const next = { ...createEmptyIncomeDetail(), ...detail };
@@ -103,7 +151,7 @@ export function prefillDetailFromSummaryAmount(detail, summaryAmount, employment
 }
 
 export function normalizeIncomeState(income = {}) {
-    const loaded = income || {};
+    const loaded = initializeIncomeSnapshots(income || {});
     return {
         self: loaded.self ?? loaded.family ?? '',
         selfBonus: loaded.selfBonus ?? loaded.bonus ?? '',
@@ -113,6 +161,8 @@ export function normalizeIncomeState(income = {}) {
         spouseBonus: loaded.spouseBonus ?? '',
         spousePassive: loaded.spousePassive ?? '',
         spouseOther: loaded.spouseOther ?? '',
+        summarySelfInHand: loaded.summarySelfInHand ?? '',
+        summarySpouseInHand: loaded.summarySpouseInHand ?? '',
         selfDetail: { ...createEmptyIncomeDetail(), ...(loaded.selfDetail || {}) },
         spouseDetail: { ...createEmptyIncomeDetail(), ...(loaded.spouseDetail || {}) },
     };

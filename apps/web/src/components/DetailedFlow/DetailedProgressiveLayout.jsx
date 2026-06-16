@@ -66,6 +66,8 @@ const DetailedProgressiveLayout = ({
     onComplete,
     nextSectionLabel = 'Next Section',
     lastSectionLabel = 'Next Section',
+    navigateToQuestionId,
+    onNavigateToQuestionHandled,
 }) => {
     const navigate = useNavigate();
     const { savePlanData } = useFinancialPlan();
@@ -109,7 +111,7 @@ const DetailedProgressiveLayout = ({
         if (nextStep) {
             navigate(nextStep.path);
         } else {
-            navigate('/summary-report');
+            navigate('/summary-report/money_story');
         }
     };
 
@@ -126,7 +128,7 @@ const DetailedProgressiveLayout = ({
             try { await savePlanData(); } catch (e) { console.error('Save failed on nav', e); }
         }
         if (currentGlobalIndex <= 0) {
-            navigate('/summary-report');
+            navigate('/summary-report/money_story');
             return;
         }
         const prevStep = detailedFlowSteps[currentGlobalIndex - 1];
@@ -146,6 +148,14 @@ const DetailedProgressiveLayout = ({
     }, [currentStepId]);
 
     useEffect(() => {
+        if (!navigateToQuestionId) return;
+        if (!questions.some((q) => q.id === navigateToQuestionId)) return;
+        setDirection(1);
+        setCurrentQuestionId(navigateToQuestionId);
+        onNavigateToQuestionHandled?.();
+    }, [navigateToQuestionId, questions, onNavigateToQuestionHandled]);
+
+    useEffect(() => {
         if (questions.length === 0) return;
         if (questions.some(q => q.id === currentQuestionId)) return;
 
@@ -163,6 +173,9 @@ const DetailedProgressiveLayout = ({
             'spouse-main', 'spouse-tax-earnings', 'spouse-tax-deductions',
             'spouse-details', 'spouse-employment', 'children',
             'recap-household', 'household-breakup', 'recap-emi', 'emi-loans',
+            'savings-snapshot', 'savings-breakdown',
+            'wealth-recap', 'legacy-assets', 'income-assets', 'retirement-assets', 'custom-assets', 'liabilities', 'custom-liabilities',
+            'goals-intro', 'goals-catalog', 'goals-review',
         ];
         const prevIdx = stepOrder.indexOf(currentQuestionId);
         for (let i = prevIdx >= 0 ? prevIdx : stepOrder.length - 1; i >= 0; i--) {

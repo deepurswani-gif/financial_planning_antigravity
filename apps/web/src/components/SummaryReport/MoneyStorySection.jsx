@@ -14,6 +14,8 @@ import {
     buildLiabilityBreakdownData,
     formatCompact
 } from './MoneyStoryLogic';
+import { calculateProtectionData, calculateContingencyData } from './SafetyNetLogic';
+import { getEmergencyFundAmount } from '../DetailedFlow/wealthDetailSync';
 
 /* ─────────────── Animated Counter ─────────────── */
 const AnimatedCounter = ({ value, prefix = '₹', duration = 1500 }) => {
@@ -103,11 +105,15 @@ const MoneyStorySection = () => {
         expenseCategories,
         assetCategories,
         liabilityCategories,
-        contingencyFund
+        contingencyFund,
+        summaryLifeCover,
     } = useFinancialPlan();
 
     // ── Derived Calculations ──
-    const cashFlowResults = useMemo(() => calculateCashFlow(income, expenseCategories), [income, expenseCategories]);
+    const cashFlowResults = useMemo(
+        () => calculateCashFlow(income, expenseCategories, familyMembers),
+        [income, expenseCategories, familyMembers],
+    );
     const assetResults = useMemo(() => calculateNetWorth(assetCategories, liabilityCategories), [assetCategories, liabilityCategories]);
 
     const surplusData = useMemo(() => calculateUnallocatedSurplus(cashFlowResults), [cashFlowResults]);
@@ -129,6 +135,20 @@ const MoneyStorySection = () => {
     const sipProjection = useMemo(() => {
         return computeSIPProjection(Math.max(0, surplusData.unallocated), 12, yearsToRetirement);
     }, [surplusData.unallocated, yearsToRetirement]);
+
+    const protectionData = useMemo(
+        () => calculateProtectionData(expenseCategories, summaryLifeCover, familyMembers),
+        [expenseCategories, summaryLifeCover, familyMembers]
+    );
+
+    const contingencyData = useMemo(
+        () => calculateContingencyData(
+            expenseCategories,
+            getEmergencyFundAmount(assetCategories, contingencyFund),
+            familyMembers,
+        ),
+        [expenseCategories, assetCategories, contingencyFund, familyMembers]
+    );
 
     const userName = selfMember?.name?.split(' ')[0] || 'there';
 
@@ -270,7 +290,7 @@ const MoneyStorySection = () => {
                             </div>
                             <h4 className="ms-suggestion-title">Wealth Building via SIP</h4>
                             <p className="ms-suggestion-desc">
-                                A monthly SIP of <strong>{formatCurrency(surplusData.unallocated)}</strong> at
+                                A monthly SIP of your unallocated surplus <strong>{formatCurrency(surplusData.unallocated)}</strong> at
                                 12% expected returns could grow to
                             </p>
                             <div className="ms-suggestion-highlight">
@@ -292,9 +312,15 @@ const MoneyStorySection = () => {
                             <p className="ms-suggestion-desc">
                                 A term insurance plan can secure your family's financial future against life's uncertainties. Adequate life cover protects household expenses, EMIs, and children's education.
                             </p>
+                            <div className="ms-suggestion-highlight" style={{ color: protectionData.hasGap ? '#EF4444' : '#10B981' }}>
+                                {protectionData.hasGap ? formatCurrency(protectionData.protectionGap) : 'Fully Covered'}
+                            </div>
+                            <p className="ms-suggestion-tenure">
+                                {protectionData.hasGap ? 'Protection gap to close' : 'No protection gap'}
+                            </p>
                             <div className="ms-suggestion-note">
                                 <Info size={14} />
-                                <span>Your detailed protection gap analysis will be covered in the Safety Net section of this report.</span>
+                                <span>Based on {protectionData.multiplier}× monthly expenses vs your current life cover of {formatCurrency(protectionData.coverageHave)}.</span>
                             </div>
                         </div>
 
@@ -307,9 +333,15 @@ const MoneyStorySection = () => {
                             <p className="ms-suggestion-desc">
                                 An emergency fund of 3–6 months of expenses ensures you can handle medical emergencies, job transitions, or unexpected events without breaking your investment portfolio.
                             </p>
+                            <div className="ms-suggestion-highlight" style={{ color: contingencyData.gap > 0 ? '#EF4444' : '#10B981' }}>
+                                {contingencyData.gap > 0 ? formatCurrency(contingencyData.gap) : 'Fully Funded'}
+                            </div>
+                            <p className="ms-suggestion-tenure">
+                                {contingencyData.gap > 0 ? 'Emergency fund gap to build' : 'Emergency fund on target'}
+                            </p>
                             <div className="ms-suggestion-note">
                                 <Info size={14} />
-                                <span>Recommended: maintain at least 6 months of household expenses + EMIs as liquid emergency reserves.</span>
+                                <span>Target: 6 months of household expenses + EMIs ({formatCurrency(contingencyData.emergencyFundNeeded)}). Currently available: {formatCurrency(contingencyData.emergencyFundHave)}.</span>
                             </div>
                         </div>
                     </div>

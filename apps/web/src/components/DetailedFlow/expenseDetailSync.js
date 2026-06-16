@@ -102,6 +102,49 @@ export function getEffectiveMonthlyEmi(expenseCategories = {}) {
     return parseFloat(expenseCategories.summaryEmiTotal) || 0;
 }
 
+/** Sum of detailed household fields including per-child education. */
+export function getHouseholdBreakdownTotal(expenseCategories = {}, familyMembers = []) {
+    const household = expenseCategories.household || {};
+    const educationMonthly = sumUserEducationFromChildren(familyMembers);
+    return sumHouseholdIncludingEducation(household, educationMonthly);
+}
+
+/** True when the user has started a detailed household split (not summary-only storage). */
+export function hasHouseholdDetailEntered(expenseCategories = {}, familyMembers = []) {
+    const household = expenseCategories.household || {};
+    const summaryHouseholdTotal = expenseCategories.summaryHouseholdTotal ?? '';
+    const educationMonthly = sumUserEducationFromChildren(familyMembers);
+    if (educationMonthly > 0) return true;
+    return hasHouseholdBreakdown(household, summaryHouseholdTotal);
+}
+
+/**
+ * Prefer detailed household breakdown when entered; otherwise use summary snapshot.
+ * Mirrors getEffectiveMonthlyEmi / getEffectiveMonthlySavings.
+ */
+export function getEffectiveMonthlyHousehold(expenseCategories = {}, familyMembers = []) {
+    if (hasHouseholdDetailEntered(expenseCategories, familyMembers)) {
+        return getHouseholdBreakdownTotal(expenseCategories, familyMembers);
+    }
+    return parseFloat(expenseCategories.summaryHouseholdTotal) || 0;
+}
+
+import { reconcileAmounts, RECONCILE_TOLERANCE } from './detailReconcile';
+
+export { reconcileAmounts, RECONCILE_TOLERANCE };
+export function reconcileHousehold(expenseCategories = {}, familyMembers = []) {
+    const household = expenseCategories.household || {};
+    const summaryTotal = parseFloat(expenseCategories.summaryHouseholdTotal) || 0;
+    const detailTotal = sumHouseholdExceptEducation(household);
+    return reconcileAmounts(summaryTotal, detailTotal);
+}
+
+export function reconcileEmi(expenseCategories = {}) {
+    const summaryTotal = parseFloat(expenseCategories.summaryEmiTotal) || 0;
+    const detailTotal = sumConfiguredEmis(expenseCategories.emi);
+    return reconcileAmounts(summaryTotal, detailTotal);
+}
+
 export function hasAnyEmiCommitment(expenseCategories = {}) {
     if (parseFloat(expenseCategories.summaryEmiTotal) > 0) return true;
     if (hasConfiguredLoan(expenseCategories.emi)) return true;

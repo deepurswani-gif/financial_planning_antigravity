@@ -12,8 +12,11 @@ const LoanDetailsModal = ({ isOpen, onClose, onSave, initialData, loanTypeTitle 
     });
 
     const [showSuccess, setShowSuccess] = useState(false);
+    const [dateError, setDateError] = useState('');
 
     useEffect(() => {
+        if (!isOpen) return;
+        setDateError('');
         if (initialData && typeof initialData === 'object' && initialData.principal) {
             setFormData(initialData);
         } else {
@@ -52,8 +55,10 @@ const LoanDetailsModal = ({ isOpen, onClose, onSave, initialData, loanTypeTitle 
         const startYear = parseInt(formData.startYear, 10);
         const startMonth = parseInt(formData.startMonth, 10);
         if (startYear > currentYear || (startYear === currentYear && startMonth > currentMonth)) {
+            setDateError('Loan start date cannot be in the future. Please select a past or current month and year.');
             return;
         }
+        setDateError('');
         onSave(formData);
         setShowSuccess(true);
         setTimeout(() => {
@@ -104,11 +109,13 @@ const LoanDetailsModal = ({ isOpen, onClose, onSave, initialData, loanTypeTitle 
         if (y === currentYear && month > currentMonth) {
             month = currentMonth;
         }
+        setDateError('');
         setFormData({ ...formData, startYear: y, startMonth: month });
     };
 
     const handleStartMonthChange = (monthVal) => {
         const m = parseInt(monthVal, 10);
+        setDateError('');
         setFormData({ ...formData, startMonth: m });
     };
 
@@ -201,6 +208,11 @@ const LoanDetailsModal = ({ isOpen, onClose, onSave, initialData, loanTypeTitle 
                     <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '0.75rem', display: 'block' }}>
                         Loan start date cannot be in the future. Used by the Timeline Engine to map exact loan closures.
                     </small>
+                    {dateError && (
+                        <p role="alert" style={{ color: 'var(--negative, #dc2626)', fontSize: '0.82rem', marginTop: '0.75rem', marginBottom: 0, fontWeight: 600 }}>
+                            {dateError}
+                        </p>
+                    )}
                 </div>
 
                 {/* Section 3: Summary (Calculated EMI) */}

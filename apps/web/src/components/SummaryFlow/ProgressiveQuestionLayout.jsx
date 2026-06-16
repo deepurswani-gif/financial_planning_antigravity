@@ -119,7 +119,7 @@ const ProgressiveQuestionLayout = ({
             if (nextStep) {
                 navigate(nextStep.path);
             } else {
-                navigate('/summary-report');
+                navigate('/summary-report/money_story');
             }
         }
     };

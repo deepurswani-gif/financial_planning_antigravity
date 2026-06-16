@@ -1,5 +1,7 @@
 import { calculateIncomeTax } from '../IncomeTaxModule/IncomeTaxLogic';
 import { hasConfiguredLoan } from '../DetailedFlow/expenseDetailSync';
+import { getLifeMemberMonthlyTotal } from '../DetailedFlow/insuranceDetailSync';
+import { getEffectiveMonthlySavings, buildSavingsBreakdownAnnual } from '../DetailedFlow/savingsDetailSync';
 
 export const EDUCATION_STANDARDS = [
     "Play Group",
@@ -81,12 +83,7 @@ export const generateProjections = ({
         .reduce((sum, [_, val]) => sum + (parseFloat(val) || 0), 0);
         
     const householdMonthly = hasLedger ? currentYearLedger.household[11] : fallbackHouseholdMonthly;
-    const savingsMonthly = Object.values(expenseCategories.savings || {}).reduce((sum, val) => {
-        if (Array.isArray(val)) {
-            return sum + val.reduce((arrSum, item) => arrSum + (parseFloat(item?.amount !== undefined ? item.amount : item) || 0), 0);
-        }
-        return sum + (parseFloat(val?.amount !== undefined ? val.amount : val) || 0);
-    }, 0);
+    const savingsMonthly = getEffectiveMonthlySavings(expenseCategories);
 
     // --- Insurance Logic ---
     const getMonthly = (item) => {
@@ -112,7 +109,7 @@ export const generateProjections = ({
     ) * 12;
 
     const cashFlowLifeAnnual = Object.values(expenseCategories.insurance?.life || {}).reduce((sum, item) => {
-        return sum + getMonthly(item);
+        return sum + getLifeMemberMonthlyTotal(item);
     }, 0) * 12;
 
     // Find detailed premiums active in startYear to determine unallocated amount
@@ -536,21 +533,7 @@ export const generateProjections = ({
             totalOutflow,
             surplusBeforeSaving,
             savingsAndInvestments,
-            savingsBreakdown: {
-                rdList: Array.isArray(expenseCategories.savings?.rd) 
-                    ? expenseCategories.savings.rd 
-                    : (expenseCategories.savings?.rd ? [expenseCategories.savings.rd] : []),
-                fdList: Array.isArray(expenseCategories.savings?.fd) 
-                    ? expenseCategories.savings.fd 
-                    : (expenseCategories.savings?.fd ? [expenseCategories.savings.fd] : []),
-                rdTotal: (Array.isArray(expenseCategories.savings?.rd) ? expenseCategories.savings.rd : (expenseCategories.savings?.rd ? [expenseCategories.savings.rd] : [])).reduce((sum, item) => sum + (parseFloat(item?.amount !== undefined ? item.amount : item) || 0), 0) * 12,
-                fdTotal: (Array.isArray(expenseCategories.savings?.fd) ? expenseCategories.savings.fd : (expenseCategories.savings?.fd ? [expenseCategories.savings.fd] : [])).reduce((sum, item) => sum + (parseFloat(item?.amount !== undefined ? item.amount : item) || 0), 0) * 12,
-                ppf: (parseFloat(expenseCategories.savings?.ppf?.amount !== undefined ? expenseCategories.savings.ppf.amount : expenseCategories.savings?.ppf) || 0) * 12,
-                nps: (parseFloat(expenseCategories.savings?.nps?.amount !== undefined ? expenseCategories.savings.nps.amount : expenseCategories.savings?.nps) || 0) * 12,
-                savingSchemes: (parseFloat(expenseCategories.savings?.savingSchemes?.amount !== undefined ? expenseCategories.savings.savingSchemes.amount : expenseCategories.savings?.savingSchemes) || 0) * 12,
-                sip: (parseFloat(expenseCategories.savings?.sip?.amount !== undefined ? expenseCategories.savings.sip.amount : expenseCategories.savings?.sip) || 0) * 12,
-                otherSaving: (parseFloat(expenseCategories.savings?.otherSaving?.amount !== undefined ? expenseCategories.savings.otherSaving.amount : expenseCategories.savings?.otherSaving) || 0) * 12
-            },
+            savingsBreakdown: buildSavingsBreakdownAnnual(expenseCategories),
             netInvestibleSurplus,
             yearAllocationsTotal,
             activeAllocations,

@@ -837,7 +837,7 @@ function DetailedFlowLayout() {
             </div>
             <button 
                 className="btn btn-secondary nav-label" 
-                onClick={() => navigate('/summary-report')}
+                onClick={() => navigate('/summary-report/money_story')}
                 style={{ fontSize: '0.85rem', padding: '0.5rem', width: '100%', textAlign: 'center', borderRadius: '8px', border: '1px solid var(--border)' }}
             >
                 &larr; Back to Summary

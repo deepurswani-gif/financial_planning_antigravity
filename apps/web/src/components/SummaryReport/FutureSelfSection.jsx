@@ -63,11 +63,11 @@ const IncomeTooltip = ({ active, payload }) => {
 };
 
 const FutureSelfSection = () => {
-    const { goals, income, expenseCategories, inflationRates } = useFinancialPlan();
+    const { goals, income, expenseCategories, inflationRates, familyMembers } = useFinancialPlan();
 
     const cashFlowResults = useMemo(
-        () => calculateCashFlow(income, expenseCategories),
-        [income, expenseCategories]
+        () => calculateCashFlow(income, expenseCategories, familyMembers),
+        [income, expenseCategories, familyMembers]
     );
 
     const report = useMemo(
