@@ -13,6 +13,311 @@ export const REBATE_87A_MAX = 60000;
 export const REBATE_87A_INCOME_LIMIT = 1200000;
 export const SURCHARGE_THRESHOLDS = [5000000, 10000000, 20000000];
 
+export const SLAB_DEFINITIONS = [
+    {
+        key: 't1',
+        min: 0,
+        max: 400000,
+        rate: 0,
+        rangeLabel: 'Up to ₹4 lakh',
+        plainExplanation: 'The first ₹4 lakh of taxable income is tax-free under the new regime.',
+    },
+    {
+        key: 't2',
+        min: 400000,
+        max: 800000,
+        rate: 0.05,
+        rangeLabel: '₹4 lakh – ₹8 lakh',
+        plainExplanation: 'Income in this band is taxed at 5%.',
+    },
+    {
+        key: 't3',
+        min: 800000,
+        max: 1200000,
+        rate: 0.10,
+        rangeLabel: '₹8 lakh – ₹12 lakh',
+        plainExplanation: 'Income in this band is taxed at 10%.',
+    },
+    {
+        key: 't4',
+        min: 1200000,
+        max: 1600000,
+        rate: 0.15,
+        rangeLabel: '₹12 lakh – ₹16 lakh',
+        plainExplanation: 'Income in this band is taxed at 15%.',
+    },
+    {
+        key: 't5',
+        min: 1600000,
+        max: 2000000,
+        rate: 0.20,
+        rangeLabel: '₹16 lakh – ₹20 lakh',
+        plainExplanation: 'Income in this band is taxed at 20%.',
+    },
+    {
+        key: 't6',
+        min: 2000000,
+        max: 2400000,
+        rate: 0.25,
+        rangeLabel: '₹20 lakh – ₹24 lakh',
+        plainExplanation: 'Income in this band is taxed at 25%.',
+    },
+    {
+        key: 't7',
+        min: 2400000,
+        max: Infinity,
+        rate: 0.30,
+        rangeLabel: 'Above ₹24 lakh',
+        plainExplanation: 'Income above ₹24 lakh is taxed at 30%.',
+    },
+];
+
+export const TAX_BREAKDOWN_COPY = {
+    progressiveTax:
+        'India taxes income in slices. Only the income above each limit is taxed at the higher rate—not your entire salary.',
+    rebate87A:
+        'If taxable income is up to ₹12 lakh, the government reduces your tax by up to ₹60,000—often bringing it to zero.',
+    marginalRelief:
+        'When income is slightly above ₹12 lakh, tax cannot exceed the extra income above ₹12 lakh. This avoids a sudden tax spike.',
+    surcharge:
+        'An extra charge on high incomes: 10%, 15%, or 25% of tax depending on your income level (above ₹50 lakh).',
+    surchargeMarginalRelief:
+        'When income is just above a surcharge threshold, this relief caps the extra tax so it does not exceed the income above that threshold.',
+    cess: '4% Health & Education Cess is added on tax (after rebate and surcharge) to fund public health and education programs.',
+    standardDeduction:
+        'A fixed amount subtracted from salary or pension before tax is calculated (₹75,000 for salaried employees and pensioners).',
+    zeroTaxRebate:
+        'Your taxable income qualifies for the Section 87A rebate, so your slab tax is fully offset and you pay no income tax.',
+    zeroTaxNoIncome: 'No taxable income was calculated from your inputs, so no tax is due.',
+};
+
+function getIncomeInSlab(taxableIncome, min, max) {
+    if (taxableIncome <= min) return 0;
+    const capped = max === Infinity ? taxableIncome : Math.min(taxableIncome, max);
+    return capped - min;
+}
+
+function formatBreakdownAmount(amount) {
+    return new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        maximumFractionDigits: 0,
+    }).format(Math.round(amount));
+}
+
+function buildSlabFormula(incomeInSlab, rate, taxAmount) {
+    if (incomeInSlab <= 0) return '';
+    if (rate === 0) return `${formatBreakdownAmount(incomeInSlab)} × 0% = ${formatBreakdownAmount(taxAmount)}`;
+    const ratePct = `${Math.round(rate * 100)}%`;
+    return `${formatBreakdownAmount(incomeInSlab)} × ${ratePct} = ${formatBreakdownAmount(taxAmount)}`;
+}
+
+export function buildTaxBreakdownPresentation(results) {
+    if (!results) {
+        return {
+            slabBreakdown: [],
+            calculationSteps: [],
+            adjustments: [],
+            insights: {
+                effectiveTaxRate: 0,
+                marginalRate: 0,
+                monthlyTax: 0,
+                summaryNote: '',
+            },
+        };
+    }
+
+    const { taxableIncome = 0, slabs = {}, grossTotalIncome = 0, finalTax = 0 } = results;
+    const incomeLabel = getIncomeLabelForEmployment(results.employmentType);
+
+    const slabBreakdown = SLAB_DEFINITIONS.map((def) => {
+        const incomeInSlab = getIncomeInSlab(taxableIncome, def.min, def.max);
+        const taxAmount = slabs[def.key] || 0;
+        return {
+            ...def,
+            incomeInSlab,
+            taxAmount,
+            formulaText: buildSlabFormula(incomeInSlab, def.rate, taxAmount),
+        };
+    }).filter((row) => row.incomeInSlab > 0 || row.taxAmount > 0);
+
+    let marginalRate = 0;
+    for (let i = slabBreakdown.length - 1; i >= 0; i -= 1) {
+        if (slabBreakdown[i].incomeInSlab > 0 && slabBreakdown[i].rate > 0) {
+            marginalRate = slabBreakdown[i].rate;
+            break;
+        }
+    }
+
+    const effectiveTaxRate = grossTotalIncome > 0 ? finalTax / grossTotalIncome : 0;
+    const monthlyTax = finalTax / 12;
+
+    const calculationSteps = [];
+
+    if (results.annualSalary > 0) {
+        calculationSteps.push({
+            title: incomeLabel,
+            amount: results.annualSalary,
+            note: 'Your main annual income from salary, pension, or business.',
+        });
+    }
+
+    if (results.otherIncomeAnnual > 0) {
+        calculationSteps.push({
+            title: 'Other income',
+            amount: results.otherIncomeAnnual,
+            note: 'Additional annual income such as rent, interest, or freelance earnings.',
+        });
+    }
+
+    if (results.standardDeduction > 0) {
+        calculationSteps.push({
+            title: 'Standard deduction',
+            amount: -results.standardDeduction,
+            note: TAX_BREAKDOWN_COPY.standardDeduction,
+        });
+    }
+
+    if (taxableIncome > 0 || grossTotalIncome > 0) {
+        calculationSteps.push({
+            title: 'Taxable income',
+            amount: taxableIncome,
+            note: 'The amount on which income tax slabs are applied.',
+            isSubtotal: true,
+        });
+    }
+
+    if (taxableIncome > 0) {
+        calculationSteps.push({
+            title: 'Tax from income slabs',
+            amount: results.totalTaxBeforeRebate,
+            note: 'Tax calculated step-by-step across each income band below.',
+        });
+    }
+
+    if (results.rebate87A > 0) {
+        calculationSteps.push({
+            title: 'Section 87A rebate',
+            amount: -results.rebate87A,
+            note: TAX_BREAKDOWN_COPY.rebate87A,
+            isSaving: true,
+        });
+    }
+
+    if (results.marginalRelief > 0) {
+        calculationSteps.push({
+            title: 'Marginal relief',
+            amount: -results.marginalRelief,
+            note: TAX_BREAKDOWN_COPY.marginalRelief,
+            isSaving: true,
+        });
+    }
+
+    if (results.rebate87A > 0 || results.marginalRelief > 0) {
+        calculationSteps.push({
+            title: 'Tax after rebate / relief',
+            amount: results.taxAfterRebate,
+            note: 'Tax remaining after government rebate or marginal relief.',
+            isSubtotal: true,
+        });
+    }
+
+    if (results.surcharge > 0) {
+        calculationSteps.push({
+            title: 'Surcharge',
+            amount: results.surcharge,
+            note: TAX_BREAKDOWN_COPY.surcharge,
+        });
+    }
+
+    if (results.surchargeMarginalRelief > 0) {
+        calculationSteps.push({
+            title: 'Marginal relief on surcharge',
+            amount: -results.surchargeMarginalRelief,
+            note: TAX_BREAKDOWN_COPY.surchargeMarginalRelief,
+            isSaving: true,
+        });
+    }
+
+    if (results.cess > 0) {
+        calculationSteps.push({
+            title: 'Health & Education Cess (4%)',
+            amount: results.cess,
+            note: TAX_BREAKDOWN_COPY.cess,
+        });
+    }
+
+    calculationSteps.push({
+        title: 'Final tax payable',
+        amount: finalTax,
+        note: 'Your estimated annual income tax for FY 2025-26 (new regime).',
+        isTotal: true,
+    });
+
+    const adjustments = [];
+
+    if (results.rebate87A > 0) {
+        adjustments.push({
+            title: 'Section 87A rebate',
+            amount: -results.rebate87A,
+            note: TAX_BREAKDOWN_COPY.rebate87A,
+        });
+    }
+    if (results.marginalRelief > 0) {
+        adjustments.push({
+            title: 'Marginal relief (above ₹12 lakh)',
+            amount: -results.marginalRelief,
+            note: TAX_BREAKDOWN_COPY.marginalRelief,
+        });
+    }
+    if (results.surcharge > 0) {
+        adjustments.push({
+            title: 'Surcharge',
+            amount: results.surcharge,
+            note: TAX_BREAKDOWN_COPY.surcharge,
+        });
+    }
+    if (results.surchargeMarginalRelief > 0) {
+        adjustments.push({
+            title: 'Marginal relief on surcharge',
+            amount: -results.surchargeMarginalRelief,
+            note: TAX_BREAKDOWN_COPY.surchargeMarginalRelief,
+        });
+    }
+    if (results.cess > 0) {
+        adjustments.push({
+            title: 'Health & Education Cess (4%)',
+            amount: results.cess,
+            note: TAX_BREAKDOWN_COPY.cess,
+        });
+    }
+
+    let summaryNote = '';
+    if (taxableIncome <= 0 && grossTotalIncome <= 0) {
+        summaryNote = TAX_BREAKDOWN_COPY.zeroTaxNoIncome;
+    } else if (finalTax === 0 && results.rebate87A > 0) {
+        summaryNote = TAX_BREAKDOWN_COPY.zeroTaxRebate;
+    } else if (finalTax === 0) {
+        summaryNote = 'Based on your inputs, no income tax is payable under the new regime.';
+    } else if (results.marginalRelief > 0) {
+        summaryNote = 'Marginal relief limited your tax because your income is just above ₹12 lakh.';
+    } else if (effectiveTaxRate < 0.05) {
+        summaryNote = `You pay about ${(effectiveTaxRate * 100).toFixed(1)}% of your total income as tax—your effective rate is low because of slab-based taxation and rebates.`;
+    }
+
+    return {
+        slabBreakdown,
+        calculationSteps,
+        adjustments,
+        insights: {
+            effectiveTaxRate,
+            marginalRate,
+            monthlyTax,
+            summaryNote,
+        },
+    };
+}
+
 export function calculateSlabTax(taxableIncome) {
     let taxBase = taxableIncome;
     let t1 = 0;

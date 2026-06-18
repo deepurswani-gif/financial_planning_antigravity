@@ -1,135 +1,475 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
+import { ChevronDown, ChevronUp, Receipt, Percent, Calendar, Calculator } from 'lucide-react';
 import { formatCurrency } from '../CashFlowModule/CashFlowLogic';
-import { getIncomeLabelForEmployment } from './IncomeTaxLogic';
+import {
+    buildTaxBreakdownPresentation,
+    TAX_BREAKDOWN_COPY,
+} from './IncomeTaxLogic';
+
+const formatRate = (rate) => `${Math.round(rate * 100)}%`;
+
+const AccordionSection = ({ title, subtitle, isOpen, onToggle, children }) => (
+    <div className="tax-accordion">
+        <button type="button" className="tax-accordion-header" onClick={onToggle}>
+            <div>
+                <h3>{title}</h3>
+                {subtitle && <p>{subtitle}</p>}
+            </div>
+            {isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+        </button>
+        {isOpen && <div className="tax-accordion-body">{children}</div>}
+    </div>
+);
+
+const StepAmount = ({ step }) => {
+    const isNegative = step.amount < 0;
+    const color = step.isSaving || isNegative ? 'var(--accent)' : 'var(--text-main)';
+    const prefix = isNegative ? '−' : '';
+    return (
+        <span style={{ color, fontWeight: step.isSubtotal || step.isTotal ? 700 : 600 }}>
+            {prefix}{formatCurrency(Math.abs(step.amount))}
+        </span>
+    );
+};
 
 const IncomeTaxOutput = ({ results }) => {
+    const breakdown = useMemo(() => buildTaxBreakdownPresentation(results), [results]);
+    const activeSlabCount = breakdown.slabBreakdown.filter((s) => s.taxAmount > 0).length;
+
+    const [slabOpen, setSlabOpen] = useState(activeSlabCount <= 3);
+    const [adjustmentsOpen, setAdjustmentsOpen] = useState(false);
+
     if (!results) return null;
 
-    const incomeLabel = getIncomeLabelForEmployment(results.employmentType);
-    const showStandardDeduction = results.standardDeduction > 0;
-    const showOtherIncome = results.otherIncomeAnnual > 0;
+    const { insights, calculationSteps, slabBreakdown, adjustments } = breakdown;
 
     return (
         <div className="income-tax-output" style={{ marginTop: '1rem' }}>
-            <div className="summary-card" style={{
-                padding: '1.5rem',
-                background: 'linear-gradient(135deg, var(--bg-card) 0%, var(--bg-main) 100%)',
-                borderRadius: '12px',
-                border: '1px solid var(--border)',
-                marginBottom: '1.5rem',
-            }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <label style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Net Annual Tax Payable</label>
-                    <strong style={{ fontSize: '1.75rem', color: results.finalTax > 0 ? '#ef4444' : 'var(--accent)' }}>
+            <div className="tax-hero-card">
+                <div className="tax-hero-main">
+                    <label>Net Annual Tax Payable</label>
+                    <strong style={{ color: results.finalTax > 0 ? '#ef4444' : 'var(--accent)' }}>
                         {formatCurrency(results.finalTax)}
                     </strong>
                 </div>
+                {insights.summaryNote && (
+                    <p className="tax-hero-note">{insights.summaryNote}</p>
+                )}
             </div>
 
-            <table className="tax-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.95rem' }}>
-                <tbody>
-                    <tr>
-                        <td style={{ padding: '0.75rem 0', color: 'var(--text-muted)' }}>{incomeLabel}</td>
-                        <td style={{ padding: '0.75rem 0', textAlign: 'right', fontWeight: 600 }}>{formatCurrency(results.annualSalary)}</td>
-                    </tr>
-                    {showOtherIncome && (
-                        <tr>
-                            <td style={{ padding: '0.75rem 0', color: 'var(--text-muted)' }}>(+) Other Income (annual)</td>
-                            <td style={{ padding: '0.75rem 0', textAlign: 'right', fontWeight: 600 }}>{formatCurrency(results.otherIncomeAnnual)}</td>
-                        </tr>
-                    )}
-                    {showStandardDeduction && (
-                        <tr>
-                            <td style={{ padding: '0.75rem 0', color: 'var(--text-muted)' }}>(-) Standard Deduction</td>
-                            <td style={{ padding: '0.75rem 0', textAlign: 'right', color: '#ef4444' }}>{formatCurrency(results.standardDeduction)}</td>
-                        </tr>
-                    )}
-                    <tr style={{ borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
-                        <td style={{ padding: '1rem 0', fontWeight: 700 }}>Taxable Income</td>
-                        <td style={{ padding: '1rem 0', textAlign: 'right', fontWeight: 700 }}>{formatCurrency(results.taxableIncome)}</td>
-                    </tr>
+            <div className="tax-metrics-row">
+                <div className="tax-metric-card">
+                    <div className="tax-metric-icon"><Percent size={20} /></div>
+                    <div>
+                        <span>Effective tax rate</span>
+                        <strong>{formatRate(insights.effectiveTaxRate)}</strong>
+                        <small>of total income</small>
+                    </div>
+                </div>
+                <div className="tax-metric-card">
+                    <div className="tax-metric-icon"><Calendar size={20} /></div>
+                    <div>
+                        <span>Monthly tax</span>
+                        <strong>{formatCurrency(insights.monthlyTax)}</strong>
+                        <small>annual tax ÷ 12</small>
+                    </div>
+                </div>
+                <div className="tax-metric-card">
+                    <div className="tax-metric-icon"><Calculator size={20} /></div>
+                    <div>
+                        <span>Taxable income</span>
+                        <strong>{formatCurrency(results.taxableIncome)}</strong>
+                        <small>after deductions</small>
+                    </div>
+                </div>
+                {insights.marginalRate > 0 && (
+                    <div className="tax-metric-card">
+                        <div className="tax-metric-icon"><Receipt size={20} /></div>
+                        <div>
+                            <span>Marginal rate</span>
+                            <strong>{formatRate(insights.marginalRate)}</strong>
+                            <small>on your top income slice</small>
+                        </div>
+                    </div>
+                )}
+            </div>
 
-                    <tr>
-                        <td colSpan="2" style={{ padding: '1rem 0 0.5rem 0', fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--primary)', letterSpacing: '0.5px' }}>
-                            Slab-wise Breakdown
-                        </td>
-                    </tr>
-                    <tr className="slab-row">
-                        <td style={{ padding: '0.5rem 0', fontSize: '0.85rem' }}>0 - 4L (0%)</td>
-                        <td style={{ padding: '0.5rem 0', textAlign: 'right' }}>₹0</td>
-                    </tr>
-                    <tr className="slab-row">
-                        <td style={{ padding: '0.5rem 0', fontSize: '0.85rem' }}>4L - 8L (5%)</td>
-                        <td style={{ padding: '0.5rem 0', textAlign: 'right' }}>{formatCurrency(results.slabs.t2)}</td>
-                    </tr>
-                    <tr className="slab-row">
-                        <td style={{ padding: '0.5rem 0', fontSize: '0.85rem' }}>8L - 12L (10%)</td>
-                        <td style={{ padding: '0.5rem 0', textAlign: 'right' }}>{formatCurrency(results.slabs.t3)}</td>
-                    </tr>
-                    {results.taxableIncome > 1200000 && (
-                        <>
-                            <tr className="slab-row">
-                                <td style={{ padding: '0.5rem 0', fontSize: '0.85rem' }}>12L - 16L (15%)</td>
-                                <td style={{ padding: '0.5rem 0', textAlign: 'right' }}>{formatCurrency(results.slabs.t4)}</td>
-                            </tr>
-                            <tr className="slab-row">
-                                <td style={{ padding: '0.5rem 0', fontSize: '0.85rem' }}>16L - 20L (20%)</td>
-                                <td style={{ padding: '0.5rem 0', textAlign: 'right' }}>{formatCurrency(results.slabs.t5)}</td>
-                            </tr>
-                            <tr className="slab-row">
-                                <td style={{ padding: '0.5rem 0', fontSize: '0.85rem' }}>20L - 24L (25%)</td>
-                                <td style={{ padding: '0.5rem 0', textAlign: 'right' }}>{formatCurrency(results.slabs.t6)}</td>
-                            </tr>
-                            <tr className="slab-row">
-                                <td style={{ padding: '0.5rem 0', fontSize: '0.85rem' }}>Above 24L (30%)</td>
-                                <td style={{ padding: '0.5rem 0', textAlign: 'right' }}>{formatCurrency(results.slabs.t7)}</td>
-                            </tr>
-                        </>
-                    )}
+            <div className="tax-breakdown-card">
+                <h2>How your tax was calculated</h2>
+                <p className="tax-progressive-note">{TAX_BREAKDOWN_COPY.progressiveTax}</p>
 
-                    <tr style={{ borderTop: '2px solid var(--border)' }}>
-                        <td style={{ padding: '1rem 0' }}>Total Tax (Before Rebate)</td>
-                        <td style={{ padding: '1rem 0', textAlign: 'right', fontWeight: 600 }}>{formatCurrency(results.totalTaxBeforeRebate)}</td>
-                    </tr>
-                    {results.rebate87A > 0 && (
-                        <tr>
-                            <td style={{ padding: '0.75rem 0' }}>(-) Section 87A Rebate</td>
-                            <td style={{ padding: '0.75rem 0', textAlign: 'right', color: 'var(--accent)' }}>{formatCurrency(results.rebate87A)}</td>
-                        </tr>
-                    )}
-                    {results.marginalRelief > 0 && (
-                        <tr>
-                            <td style={{ padding: '0.75rem 0' }}>(-) Marginal Relief (Section 87A)</td>
-                            <td style={{ padding: '0.75rem 0', textAlign: 'right', color: 'var(--accent)' }}>{formatCurrency(results.marginalRelief)}</td>
-                        </tr>
-                    )}
-                    <tr>
-                        <td style={{ padding: '0.75rem 0' }}>Tax After Rebate / Relief</td>
-                        <td style={{ padding: '0.75rem 0', textAlign: 'right', fontWeight: 600 }}>{formatCurrency(results.taxAfterRebate)}</td>
-                    </tr>
-                    {results.surcharge > 0 && (
-                        <tr>
-                            <td style={{ padding: '0.75rem 0' }}>(+) Surcharge</td>
-                            <td style={{ padding: '0.75rem 0', textAlign: 'right' }}>{formatCurrency(results.surcharge)}</td>
-                        </tr>
-                    )}
-                    {results.surchargeMarginalRelief > 0 && (
-                        <tr>
-                            <td style={{ padding: '0.75rem 0' }}>(-) Marginal Relief on Surcharge</td>
-                            <td style={{ padding: '0.75rem 0', textAlign: 'right', color: 'var(--accent)' }}>{formatCurrency(results.surchargeMarginalRelief)}</td>
-                        </tr>
-                    )}
-                    <tr>
-                        <td style={{ padding: '0.75rem 0' }}>(+) 4% Health &amp; Education Cess</td>
-                        <td style={{ padding: '0.75rem 0', textAlign: 'right' }}>{formatCurrency(results.cess)}</td>
-                    </tr>
-                </tbody>
-            </table>
+                <div className="tax-steps">
+                    {calculationSteps.map((step, idx) => (
+                        <div
+                            key={`${step.title}-${idx}`}
+                            className={`tax-step ${step.isSubtotal ? 'is-subtotal' : ''} ${step.isTotal ? 'is-total' : ''}`}
+                        >
+                            <div className="tax-step-left">
+                                <span className="tax-step-num">{idx + 1}</span>
+                                <div>
+                                    <div className="tax-step-title">{step.title}</div>
+                                    <div className="tax-step-note">{step.note}</div>
+                                </div>
+                            </div>
+                            <StepAmount step={step} />
+                        </div>
+                    ))}
+                </div>
+            </div>
 
-            <style jsx>{`
-                .slab-row td {
+            {slabBreakdown.length > 0 && (
+                <AccordionSection
+                    title="Slab-by-slab calculation"
+                    subtitle="See exactly how much income falls in each tax band and how tax is computed"
+                    isOpen={slabOpen}
+                    onToggle={() => setSlabOpen((v) => !v)}
+                >
+                    <div className="slab-table-wrap">
+                        <table className="slab-table">
+                            <thead>
+                                <tr>
+                                    <th>Income slab</th>
+                                    <th>Amount taxed here</th>
+                                    <th>Rate</th>
+                                    <th>Tax</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {slabBreakdown.map((slab) => (
+                                    <tr key={slab.key}>
+                                        <td>
+                                            <div className="slab-range">{slab.rangeLabel}</div>
+                                            <div className="slab-plain">{slab.plainExplanation}</div>
+                                        </td>
+                                        <td>{formatCurrency(slab.incomeInSlab)}</td>
+                                        <td>{formatRate(slab.rate)}</td>
+                                        <td>{formatCurrency(slab.taxAmount)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div className="slab-formulas">
+                        {slabBreakdown.filter((s) => s.formulaText).map((slab) => (
+                            <div key={`formula-${slab.key}`} className="slab-formula-row">
+                                <span>{slab.rangeLabel}</span>
+                                <code>{slab.formulaText}</code>
+                            </div>
+                        ))}
+                    </div>
+                </AccordionSection>
+            )}
+
+            {adjustments.length > 0 && (
+                <AccordionSection
+                    title="Adjustments & extras"
+                    subtitle="Rebates, surcharge, and cess explained in plain language"
+                    isOpen={adjustmentsOpen}
+                    onToggle={() => setAdjustmentsOpen((v) => !v)}
+                >
+                    <div className="adjustments-list">
+                        {adjustments.map((item) => (
+                            <div key={item.title} className="adjustment-item">
+                                <div className="adjustment-header">
+                                    <span>{item.title}</span>
+                                    <span style={{ color: item.amount < 0 ? 'var(--accent)' : 'var(--text-main)' }}>
+                                        {item.amount < 0 ? '−' : '+'}{formatCurrency(Math.abs(item.amount))}
+                                    </span>
+                                </div>
+                                <p>{item.note}</p>
+                            </div>
+                        ))}
+                    </div>
+                </AccordionSection>
+            )}
+
+            <style>{`
+                .tax-hero-card {
+                    padding: 1.5rem;
+                    background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-main) 100%);
+                    border-radius: 12px;
+                    border: 1px solid var(--border);
+                    margin-bottom: 1.5rem;
+                }
+                .tax-hero-main {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    gap: 1rem;
+                }
+                .tax-hero-main label {
                     color: var(--text-muted);
-                    font-style: italic;
+                    font-size: 0.9rem;
+                }
+                .tax-hero-main strong {
+                    font-size: 1.75rem;
+                }
+                .tax-hero-note {
+                    margin: 1rem 0 0;
+                    padding: 0.75rem 1rem;
+                    background: rgba(0, 169, 242, 0.08);
+                    border-radius: 8px;
+                    font-size: 0.85rem;
+                    color: var(--text-main);
+                    line-height: 1.5;
+                }
+                .tax-metrics-row {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+                    gap: 1rem;
+                    margin-bottom: 1.5rem;
+                }
+                .tax-metric-card {
+                    background: var(--bg-card);
+                    border: 1px solid var(--border);
+                    border-radius: 12px;
+                    padding: 1rem;
+                    display: flex;
+                    gap: 0.75rem;
+                    align-items: flex-start;
+                }
+                .tax-metric-icon {
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 8px;
+                    background: rgba(23, 45, 157, 0.08);
+                    color: var(--primary);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    flex-shrink: 0;
+                }
+                .tax-metric-card span {
+                    display: block;
+                    font-size: 0.8rem;
+                    color: var(--text-muted);
+                }
+                .tax-metric-card strong {
+                    display: block;
+                    font-size: 1.1rem;
+                    margin-top: 0.15rem;
+                }
+                .tax-metric-card small {
+                    display: block;
+                    font-size: 0.72rem;
+                    color: var(--text-muted);
+                    margin-top: 0.1rem;
+                }
+                .tax-breakdown-card {
+                    background: var(--bg-card);
+                    border: 1px solid var(--border);
+                    border-radius: 12px;
+                    padding: 1.5rem;
+                    margin-bottom: 1.5rem;
+                }
+                .tax-breakdown-card h2 {
+                    font-size: 1.15rem;
+                    margin: 0 0 0.5rem;
+                }
+                .tax-progressive-note {
+                    font-size: 0.85rem;
+                    color: var(--text-muted);
+                    margin: 0 0 1.25rem;
+                    line-height: 1.5;
+                    padding: 0.75rem 1rem;
+                    background: var(--bg-main);
+                    border-radius: 8px;
+                    border-left: 3px solid var(--primary);
+                }
+                .tax-steps {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0;
+                }
+                .tax-step {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    gap: 1rem;
+                    padding: 0.85rem 0;
+                    border-bottom: 1px dashed var(--border);
+                }
+                .tax-step.is-subtotal {
+                    border-top: 1px solid var(--border);
+                    border-bottom: 1px solid var(--border);
+                    background: rgba(23, 45, 157, 0.03);
+                    padding-left: 0.75rem;
+                    padding-right: 0.75rem;
+                    margin: 0.25rem 0;
+                    border-radius: 8px;
+                }
+                .tax-step.is-total {
+                    border-bottom: none;
+                    border-top: 2px solid var(--border);
+                    padding-top: 1rem;
+                    margin-top: 0.5rem;
+                }
+                .tax-step-left {
+                    display: flex;
+                    gap: 0.75rem;
+                    align-items: flex-start;
+                    flex: 1;
+                    min-width: 0;
+                }
+                .tax-step-num {
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 50%;
+                    background: var(--primary);
+                    color: white;
+                    font-size: 0.75rem;
+                    font-weight: 700;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    flex-shrink: 0;
+                }
+                .tax-step-title {
+                    font-weight: 600;
+                    font-size: 0.95rem;
+                }
+                .tax-step-note {
+                    font-size: 0.8rem;
+                    color: var(--text-muted);
+                    margin-top: 0.2rem;
+                    line-height: 1.4;
+                }
+                .tax-accordion {
+                    background: var(--bg-card);
+                    border: 1px solid var(--border);
+                    border-radius: 12px;
+                    margin-bottom: 1rem;
+                    overflow: hidden;
+                }
+                .tax-accordion-header {
+                    width: 100%;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    gap: 1rem;
+                    padding: 1rem 1.25rem;
+                    background: none;
+                    border: none;
+                    cursor: pointer;
+                    text-align: left;
+                    color: var(--text-main);
+                }
+                .tax-accordion-header h3 {
+                    margin: 0;
+                    font-size: 1rem;
+                }
+                .tax-accordion-header p {
+                    margin: 0.25rem 0 0;
+                    font-size: 0.8rem;
+                    color: var(--text-muted);
+                }
+                .tax-accordion-body {
+                    padding: 0 1.25rem 1.25rem;
+                    border-top: 1px solid var(--border);
+                }
+                .slab-table-wrap {
+                    overflow-x: auto;
+                    margin-top: 1rem;
+                }
+                .slab-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 0.9rem;
+                    min-width: 480px;
+                }
+                .slab-table th {
+                    text-align: left;
+                    padding: 0.6rem 0.5rem;
+                    font-size: 0.75rem;
+                    text-transform: uppercase;
+                    letter-spacing: 0.4px;
+                    color: var(--text-muted);
+                    border-bottom: 1px solid var(--border);
+                }
+                .slab-table th:not(:first-child),
+                .slab-table td:not(:first-child) {
+                    text-align: right;
+                }
+                .slab-table td {
+                    padding: 0.75rem 0.5rem;
+                    border-bottom: 1px dashed var(--border);
+                    vertical-align: top;
+                }
+                .slab-range {
+                    font-weight: 600;
+                    font-size: 0.9rem;
+                }
+                .slab-plain {
+                    font-size: 0.78rem;
+                    color: var(--text-muted);
+                    margin-top: 0.2rem;
+                    line-height: 1.35;
+                }
+                .slab-formulas {
+                    margin-top: 1rem;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.5rem;
+                }
+                .slab-formula-row {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    gap: 1rem;
+                    padding: 0.6rem 0.75rem;
+                    background: var(--bg-main);
+                    border-radius: 8px;
+                    font-size: 0.85rem;
+                }
+                .slab-formula-row span {
+                    color: var(--text-muted);
+                    flex-shrink: 0;
+                }
+                .slab-formula-row code {
+                    font-family: inherit;
+                    font-weight: 600;
+                    color: var(--text-main);
+                    text-align: right;
+                }
+                .adjustments-list {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1rem;
+                    margin-top: 1rem;
+                }
+                .adjustment-item {
+                    padding: 1rem;
+                    background: var(--bg-main);
+                    border-radius: 8px;
+                }
+                .adjustment-header {
+                    display: flex;
+                    justify-content: space-between;
+                    font-weight: 600;
+                    margin-bottom: 0.5rem;
+                }
+                .adjustment-item p {
+                    margin: 0;
+                    font-size: 0.85rem;
+                    color: var(--text-muted);
+                    line-height: 1.5;
+                }
+                @media (max-width: 480px) {
+                    .tax-hero-main {
+                        flex-direction: column;
+                        align-items: flex-start;
+                    }
+                    .tax-step {
+                        flex-direction: column;
+                        align-items: flex-start;
+                    }
+                    .slab-formula-row {
+                        flex-direction: column;
+                        align-items: flex-start;
+                    }
+                    .slab-formula-row code {
+                        text-align: left;
+                    }
                 }
             `}</style>
         </div>

@@ -6,6 +6,7 @@ import {
     calculateSurcharge,
     calculateIncomeTaxFromInput,
     showInHandSalaryEstimateNote,
+    buildTaxBreakdownPresentation,
 } from './IncomeTaxLogic';
 import { buildTaxInput, computeAnnualSalaryFromTaxSlip } from '../DetailedFlow/incomeDetailSync';
 
@@ -200,5 +201,64 @@ describe('IncomeTaxLogic', () => {
         expect(showInHandSalaryEstimateNote({ needTaxPlanning: false }, 'Private Sector')).toBe(true);
         expect(showInHandSalaryEstimateNote({ needTaxPlanning: true }, 'Private Sector')).toBe(false);
         expect(showInHandSalaryEstimateNote({ needTaxPlanning: false }, 'Business Owner')).toBe(false);
+    });
+
+    it('builds slab breakdown with income in slab and formula text', () => {
+        const result = calculateIncomeTaxFromInput({
+            grossTotalIncome: 1264000,
+            annualSalary: 1204000,
+            otherIncomeAnnual: 60000,
+            standardDeduction: 75000,
+            taxableIncome: 1189000,
+            usedTaxSlip: false,
+            employmentType: 'Private Sector',
+        });
+        const breakdown = buildTaxBreakdownPresentation(result);
+
+        expect(breakdown.slabBreakdown).toHaveLength(3);
+        expect(breakdown.slabBreakdown[1].incomeInSlab).toBe(400000);
+        expect(breakdown.slabBreakdown[1].taxAmount).toBe(20000);
+        expect(breakdown.slabBreakdown[2].incomeInSlab).toBe(389000);
+        expect(breakdown.slabBreakdown[2].taxAmount).toBe(38900);
+        expect(breakdown.slabBreakdown[2].formulaText).toContain('10%');
+        expect(breakdown.insights.effectiveTaxRate).toBe(0);
+        expect(breakdown.insights.marginalRate).toBe(0.10);
+        expect(breakdown.insights.summaryNote).toContain('Section 87A');
+    });
+
+    it('builds marginal relief summary for income just above 12 lakh', () => {
+        const result = calculateIncomeTaxFromInput({
+            grossTotalIncome: 1275000,
+            annualSalary: 1275000,
+            otherIncomeAnnual: 0,
+            standardDeduction: 0,
+            taxableIncome: 1210000,
+            usedTaxSlip: false,
+            employmentType: 'Private Sector',
+        });
+        const breakdown = buildTaxBreakdownPresentation(result);
+
+        expect(result.marginalRelief).toBeGreaterThan(0);
+        expect(result.taxAfterRebate).toBe(10000);
+        expect(breakdown.insights.summaryNote).toContain('Marginal relief');
+        expect(breakdown.adjustments.some((a) => a.title.includes('Marginal relief'))).toBe(true);
+    });
+
+    it('includes surcharge and cess in adjustments for high income', () => {
+        const result = calculateIncomeTaxFromInput({
+            grossTotalIncome: 5100000,
+            annualSalary: 5100000,
+            otherIncomeAnnual: 0,
+            standardDeduction: 0,
+            taxableIncome: 5100000,
+            usedTaxSlip: false,
+            employmentType: 'Private Sector',
+        });
+        const breakdown = buildTaxBreakdownPresentation(result);
+
+        expect(breakdown.adjustments.some((a) => a.title === 'Surcharge')).toBe(true);
+        expect(breakdown.adjustments.some((a) => a.title.includes('Cess'))).toBe(true);
+        expect(breakdown.insights.effectiveTaxRate).toBeGreaterThan(0);
+        expect(breakdown.insights.marginalRate).toBe(0.30);
     });
 });
