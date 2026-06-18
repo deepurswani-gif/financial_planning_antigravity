@@ -112,7 +112,43 @@ export function reconcileMemberIncome(summaryAmount, detail, employmentType) {
     return reconcileAmounts(summaryTotal, getMemberDetailMonthlyTotal(detail, employmentType));
 }
 
-/** Preserve summary in-hand amounts separately from synced flat keys. */
+/** Summary total anchor for display + reconciliation — not overwritten by detail edits. */
+export function getSummaryIncomeTarget(income = {}, memberKey = 'self') {
+    if (memberKey === 'self') {
+        return income.summarySelfInHand ?? income.self ?? '';
+    }
+    return income.summarySpouseInHand ?? income.spouse ?? '';
+}
+
+/** @deprecated Use getSummaryIncomeTarget */
+export function getSummaryInHandDisplay(income = {}, memberKey = 'self') {
+    return getSummaryIncomeTarget(income, memberKey);
+}
+
+/** True when detail has passive, bonus, or other income beyond the primary field. */
+export function hasIncomeBreakdown(detail, employmentType) {
+    const legacy = syncLegacyFromDetail(detail, employmentType);
+    return (parseFloat(legacy.passive) || 0) > 0
+        || (parseFloat(legacy.other) || 0) > 0
+        || (parseFloat(legacy.bonus) || 0) > 0;
+}
+
+/** Update detail primary field when summary total changes and no breakdown exists yet. */
+export function syncSummaryAmountToDetailPrimary(detail, amount, employmentType) {
+    const next = { ...createEmptyIncomeDetail(), ...detail };
+    if (isSalariedEmployment(employmentType)) {
+        next.inHandSalary = amount;
+    } else if (isBusinessEmployment(employmentType)) {
+        next.takeHomeProfit = amount;
+    } else if (isPensionerEmployment(employmentType)) {
+        next.netPension = amount;
+    } else {
+        next.inHandSalary = amount;
+    }
+    return next;
+}
+
+/** Preserve summary total anchors separately from detail-synced flat keys. */
 export function initializeIncomeSnapshots(income = {}) {
     const loaded = income || {};
     let summarySelfInHand = loaded.summarySelfInHand ?? '';
@@ -185,4 +221,104 @@ export function applyDetailSyncToIncome(income, selfEmploymentType, spouseEmploy
         spousePassive: spouseLegacy.passive,
         spouseOther: spouseLegacy.other,
     };
+}
+
+const parseAmount = (value) => parseFloat(value) || 0;
+
+/** Main-screen other income is monthly; annualize for tax. */
+export function sumOtherIncomeAnnual(otherIncome = []) {
+    return otherIncome.reduce((sum, item) => sum + parseAmount(item?.amount) * 12, 0);
+}
+
+const TAX_SLIP_MONTHLY_KEYS = ['basicPay', 'dearnessAllowance', 'houseRentAllowance', 'allowances'];
+
+export function hasTaxSlipEarnings(detail) {
+    const earnings = detail?.taxPlanning?.earnings || {};
+    if (TAX_SLIP_MONTHLY_KEYS.some((key) => parseAmount(earnings[key]) > 0)) return true;
+    if (parseAmount(earnings.other?.amount) > 0) return true;
+    if (parseAmount(earnings.performanceBonus) > 0) return true;
+    if (parseAmount(earnings.bonus) > 0) return true;
+    return parseAmount(earnings.leaveEncashment) > 0;
+}
+
+/** Step 1 — annual salary from tax slip (monthly components × 12 + annual extras). */
+export function computeAnnualSalaryFromTaxSlip(detail, employmentType) {
+    const earnings = detail?.taxPlanning?.earnings || {};
+    const monthlyComponents = TAX_SLIP_MONTHLY_KEYS.reduce(
+        (sum, key) => sum + parseAmount(earnings[key]),
+        0,
+    );
+    let annualExtras = parseAmount(earnings.other?.amount);
+    if (isGovernmentSector(employmentType)) {
+        annualExtras += parseAmount(earnings.bonus) + parseAmount(earnings.leaveEncashment);
+    } else {
+        annualExtras += parseAmount(earnings.performanceBonus);
+    }
+    return (monthlyComponents * 12) + annualExtras;
+}
+
+export const STANDARD_DEDUCTION = 75000;
+
+/**
+ * Build taxable-income inputs for FY 2025-26 new-regime tax calculation.
+ * Returns null when there is no usable income data.
+ */
+export function buildTaxInput(detail, employmentType) {
+    const d = { ...createEmptyIncomeDetail(), ...detail };
+    const otherIncomeAnnual = sumOtherIncomeAnnual(d.otherIncome);
+
+    if (isSalariedEmployment(employmentType)) {
+        const usedTaxSlip = d.needTaxPlanning === true && hasTaxSlipEarnings(d);
+        const annualSalary = usedTaxSlip
+            ? computeAnnualSalaryFromTaxSlip(d, employmentType)
+            : parseAmount(d.inHandSalary) * 12;
+        const incomeFromSalary = Math.max(0, annualSalary - STANDARD_DEDUCTION);
+        const taxableIncome = incomeFromSalary + otherIncomeAnnual;
+
+        return {
+            annualSalary,
+            incomeFromSalary,
+            otherIncomeAnnual,
+            standardDeduction: STANDARD_DEDUCTION,
+            taxableIncome,
+            grossTotalIncome: annualSalary + otherIncomeAnnual,
+            usedTaxSlip,
+            employmentType,
+        };
+    }
+
+    if (isBusinessEmployment(employmentType)) {
+        const businessAnnual = (parseAmount(d.takeHomeProfit) + parseAmount(d.passiveIncome)) * 12;
+        const taxableIncome = businessAnnual + otherIncomeAnnual;
+
+        return {
+            annualSalary: businessAnnual,
+            incomeFromSalary: businessAnnual,
+            otherIncomeAnnual,
+            standardDeduction: 0,
+            taxableIncome,
+            grossTotalIncome: taxableIncome,
+            usedTaxSlip: false,
+            employmentType,
+        };
+    }
+
+    if (isPensionerEmployment(employmentType)) {
+        const pensionAnnual = parseAmount(d.netPension) * 12;
+        const incomeFromSalary = Math.max(0, pensionAnnual - STANDARD_DEDUCTION);
+        const taxableIncome = incomeFromSalary + otherIncomeAnnual;
+
+        return {
+            annualSalary: pensionAnnual,
+            incomeFromSalary,
+            otherIncomeAnnual,
+            standardDeduction: STANDARD_DEDUCTION,
+            taxableIncome,
+            grossTotalIncome: pensionAnnual + otherIncomeAnnual,
+            usedTaxSlip: false,
+            employmentType,
+        };
+    }
+
+    return null;
 }

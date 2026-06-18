@@ -174,7 +174,7 @@ const DetailedProgressiveLayout = ({
             'spouse-details', 'spouse-employment', 'children',
             'recap-household', 'household-breakup', 'recap-emi', 'emi-loans',
             'savings-snapshot', 'savings-breakdown',
-            'wealth-recap', 'legacy-assets', 'income-assets', 'retirement-assets', 'custom-assets', 'liabilities', 'custom-liabilities',
+            'wealth-recap', 'assets-breakdown', 'custom-assets', 'liabilities', 'custom-liabilities',
             'goals-intro', 'goals-catalog', 'goals-review',
         ];
         const prevIdx = stepOrder.indexOf(currentQuestionId);

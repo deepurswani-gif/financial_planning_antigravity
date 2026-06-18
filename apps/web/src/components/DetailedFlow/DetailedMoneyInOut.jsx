@@ -13,6 +13,7 @@ import {
     applyDetailSyncToIncome,
     reconcileMemberIncome,
     getMemberDetailMonthlyTotal,
+    getSummaryIncomeTarget,
 } from './incomeDetailSync';
 import ReconciliationStatus from './ReconciliationStatus';
 import ReconciliationStickyPanel from './ReconciliationStickyPanel';
@@ -205,11 +206,11 @@ const DetailedMoneyInOut = () => {
                 <CurrencyField label="Allowances (All)" value={e.allowances} onChange={(v) => updateTaxField(memberKey, 'earnings', 'allowances', v)} />
                 {isGov ? (
                     <>
-                        <CurrencyField label="Leave Encashment" value={e.leaveEncashment} onChange={(v) => updateTaxField(memberKey, 'earnings', 'leaveEncashment', v)} />
-                        <CurrencyField label="Bonus" value={e.bonus} onChange={(v) => updateTaxField(memberKey, 'earnings', 'bonus', v)} />
+                        <CurrencyField label="Leave Encashment (Annual)" value={e.leaveEncashment} onChange={(v) => updateTaxField(memberKey, 'earnings', 'leaveEncashment', v)} />
+                        <CurrencyField label="Annual Bonus" value={e.bonus} onChange={(v) => updateTaxField(memberKey, 'earnings', 'bonus', v)} />
                     </>
                 ) : (
-                    <CurrencyField label="Performance Bonus" value={e.performanceBonus} onChange={(v) => updateTaxField(memberKey, 'earnings', 'performanceBonus', v)} />
+                    <CurrencyField label="Annual Performance Bonus" value={e.performanceBonus} onChange={(v) => updateTaxField(memberKey, 'earnings', 'performanceBonus', v)} />
                 )}
                 <input
                     type="text"
@@ -221,7 +222,7 @@ const DetailedMoneyInOut = () => {
                 <CurrencyField
                     value={e.other?.amount}
                     onChange={(v) => updateTaxField(memberKey, 'earnings', 'other', { ...e.other, amount: v })}
-                    placeholder="Other earning amount"
+                    placeholder="Annual amount"
                 />
             </>
         );
@@ -270,9 +271,7 @@ const DetailedMoneyInOut = () => {
         const isBiz = isBusinessEmployment(employmentType);
         const isPen = isPensionerEmployment(employmentType);
         const showTaxSlip = isSal && detail.needTaxPlanning === true;
-        const summaryAmount = memberKey === 'self'
-            ? (income.summarySelfInHand || income.self)
-            : (income.summarySpouseInHand || income.spouse);
+        const summaryAmount = getSummaryIncomeTarget(income, memberKey);
         const memberReconciliation = reconcileMemberIncome(summaryAmount, detail, employmentType);
         const detailTotal = getMemberDetailMonthlyTotal(detail, employmentType);
 
@@ -283,8 +282,8 @@ const DetailedMoneyInOut = () => {
                 {parseFloat(summaryAmount) > 0 && (
                     <ReconciliationStickyPanel>
                         <div className="reconciliation-sticky-panel__title">Summary vs detailed income</div>
-                        <div>Summary in-hand: <strong>{formatInr(summaryAmount)}</strong> / month</div>
-                        <div>Your detailed total: <strong style={{ color: 'var(--primary)' }}>{formatInr(detailTotal)}</strong> / month</div>
+                        <div>Summary total: <strong>{formatInr(summaryAmount)}</strong> / month</div>
+                        <div>Detailed total: <strong style={{ color: 'var(--primary)' }}>{formatInr(detailTotal)}</strong> / month</div>
                         <div style={{ marginTop: '0.35rem' }}>
                             <ReconciliationStatus reconciliation={memberReconciliation} matchLabel="Matches summary" />
                         </div>
@@ -439,8 +438,8 @@ const DetailedMoneyInOut = () => {
     };
 
     useEffect(() => {
-        setRecapSelf(income.summarySelfInHand || income.self || '');
-        setRecapSpouse(income.summarySpouseInHand || income.spouse || '');
+        setRecapSelf(getSummaryIncomeTarget(income, 'self'));
+        setRecapSpouse(getSummaryIncomeTarget(income, 'spouse'));
     }, [income.summarySelfInHand, income.summarySpouseInHand, income.self, income.spouse]);
 
     const {
@@ -480,15 +479,15 @@ const DetailedMoneyInOut = () => {
                         {!editingRecap ? (
                             <>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                                    <h3 style={{ margin: 0, fontSize: '1rem', color: 'var(--primary)' }}>Summary in-hand amounts</h3>
+                                    <h3 style={{ margin: 0, fontSize: '1rem', color: 'var(--primary)' }}>Summary income totals</h3>
                                     <button type="button" className="btn btn-secondary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.85rem' }} onClick={() => setEditingRecap(true)}>
                                         <Pencil size={14} style={{ marginRight: '0.35rem' }} /> Edit
                                     </button>
                                 </div>
                                 <div style={{ display: 'grid', gap: '0.5rem', fontSize: '0.95rem' }}>
-                                    <div><strong>{selfMember.name || 'Self'}:</strong> {formatInr(income.summarySelfInHand || income.self)} / month</div>
+                                    <div><strong>{selfMember.name || 'Self'}:</strong> {formatInr(getSummaryIncomeTarget(income, 'self'))} / month</div>
                                     {includeSpouse && (
-                                        <div><strong>{spouseMember?.name || 'Spouse'}:</strong> {formatInr(income.summarySpouseInHand || income.spouse)} / month</div>
+                                        <div><strong>{spouseMember?.name || 'Spouse'}:</strong> {formatInr(getSummaryIncomeTarget(income, 'spouse'))} / month</div>
                                     )}
                                     <div style={{ marginTop: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                                         Employment: {selfEmploymentType}{includeSpouse ? ` · Spouse: ${spouseEmploymentType}` : ''}

@@ -1,22 +1,48 @@
 import React from 'react';
 import ProgressiveQuestionLayout from './ProgressiveQuestionLayout';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
+import {
+    getSummaryIncomeTarget,
+    hasIncomeBreakdown,
+    prefillDetailFromSummaryAmount,
+} from '../DetailedFlow/incomeDetailSync';
+import { guessEmploymentTypeFromSummaryOccupation } from '../DetailedFlow/employmentTypeSync';
 
 const SummaryCashFlow = () => {
     const { 
-        income, setIncome, 
+        income, setIncome,
+        familyMembers,
         expenseCategories, setExpenseCategories,
         hasEMI, setHasEMI,
         hasSpouseIncome, setHasSpouseIncome
     } = useFinancialPlan();
 
     const handleIncomeChange = (field, value) => {
-        setIncome(prev => ({
-            ...prev,
-            [field]: value,
-            ...(field === 'self' ? { summarySelfInHand: value } : {}),
-            ...(field === 'spouse' ? { summarySpouseInHand: value } : {}),
-        }));
+        setIncome(prev => {
+            const selfMember = familyMembers.find(m => m.relation === 'Self') || {};
+            const spouseMember = familyMembers.find(m => m.relation === 'Spouse');
+            const selfType = selfMember.employmentType
+                || guessEmploymentTypeFromSummaryOccupation(selfMember.occupation)
+                || 'Private Sector';
+            const spouseType = spouseMember?.employmentType
+                || guessEmploymentTypeFromSummaryOccupation(spouseMember?.occupation)
+                || 'Private Sector';
+            const detailKey = field === 'self' ? 'selfDetail' : 'spouseDetail';
+            const employmentType = field === 'self' ? selfType : spouseType;
+            const detail = prev[detailKey];
+
+            const next = {
+                ...prev,
+                [field]: value,
+                ...(field === 'self' ? { summarySelfInHand: value } : { summarySpouseInHand: value }),
+            };
+
+            if (!hasIncomeBreakdown(detail, employmentType)) {
+                next[detailKey] = prefillDetailFromSummaryAmount(detail, value, employmentType);
+            }
+
+            return next;
+        });
     };
 
     const handleExpenseChange = (category, field, value) => {
@@ -58,12 +84,12 @@ const SummaryCashFlow = () => {
                                 type="number"
                                 className="conversational-input"
                                 placeholder="e.g. 100000"
-                                value={income.self || ''}
+                                value={getSummaryIncomeTarget(income, 'self')}
                                 onChange={(e) => handleIncomeChange('self', e.target.value)}
                             />
                         </div>
-                        {income.self && (
-                            <div className="currency-display">{formatInr(income.self)} / month</div>
+                        {getSummaryIncomeTarget(income, 'self') && (
+                            <div className="currency-display">{formatInr(getSummaryIncomeTarget(income, 'self'))} / month</div>
                         )}
 
                         <div style={{ marginTop: '1.5rem' }}>
@@ -100,12 +126,12 @@ const SummaryCashFlow = () => {
                                         type="number"
                                         className="conversational-input"
                                         placeholder="e.g. 75000"
-                                        value={income.spouse || ''}
+                                        value={getSummaryIncomeTarget(income, 'spouse')}
                                         onChange={(e) => handleIncomeChange('spouse', e.target.value)}
                                     />
                                 </div>
-                                {income.spouse && (
-                                    <div className="currency-display">{formatInr(income.spouse)} / month</div>
+                                {getSummaryIncomeTarget(income, 'spouse') && (
+                                    <div className="currency-display">{formatInr(getSummaryIncomeTarget(income, 'spouse'))} / month</div>
                                 )}
                             </div>
                         </div>

@@ -6,18 +6,12 @@ import {
     getSummaryAssetTotal,
     getSummaryLiabilityTotal,
     getAssetAmount,
-    reconcileWealthBuckets,
-    reconcileLiabilityBuckets,
-    getPortfolioBreakdownTotal,
-    getLiquidBreakdownTotal,
-    getLegacyHighValueBreakdownTotal,
     getTotalAssetBreakdownTotal,
-    getOutstandingLoansBreakdownTotal,
-    getCreditCardBreakdownTotal,
-    getOtherPayablesBreakdownTotal,
     getTotalLiabilityBreakdownTotal,
 } from './wealthDetailSync';
+import { reconcileAmounts } from './detailReconcile';
 import ReconciliationStatus from './ReconciliationStatus';
+import ReconciliationStickyPanel from './ReconciliationStickyPanel';
 
 const formatInr = (val) => {
     if (!val || isNaN(val)) return '₹0';
@@ -221,73 +215,90 @@ export function useWealthSnapshotQuestions() {
 
     const summaryAssetTotal = getSummaryAssetTotal(assetCategories);
     const summaryLiabilityTotal = getSummaryLiabilityTotal(liabilityCategories, hasEMI);
-    const wealthReconciliation = reconcileWealthBuckets(assetCategories);
-    const liabilityReconciliation = reconcileLiabilityBuckets(liabilityCategories, hasEMI);
     const assetBreakdownTotal = getTotalAssetBreakdownTotal(assetCategories);
     const liabilityBreakdownTotal = getTotalLiabilityBreakdownTotal(liabilityCategories, hasEMI);
+    const assetReconciliation = reconcileAmounts(summaryAssetTotal, assetBreakdownTotal);
+    const liabilityReconciliation = reconcileAmounts(summaryLiabilityTotal, liabilityBreakdownTotal);
 
-    const renderWealthReconciliationPanel = () => (
-        <div style={{
-            maxWidth: '480px',
-            margin: '1.5rem auto 0',
-            padding: '1rem',
-            borderRadius: '8px',
-            border: '1px solid var(--border)',
-            background: 'var(--bg-card)',
-            textAlign: 'left',
-            fontSize: '0.85rem',
-            color: 'var(--text-muted)',
-            lineHeight: 1.55,
-        }}>
-            <div style={{ fontWeight: 600, color: 'var(--primary)', marginBottom: '0.75rem' }}>
-                Summary vs detailed totals
+    const renderAssetReconciliationPanel = () => (
+        summaryAssetTotal > 0 ? (
+            <ReconciliationStickyPanel>
+                <div className="reconciliation-sticky-panel__title">Summary vs detailed assets</div>
+                <div>Summary assets total: <strong>{formatInr(summaryAssetTotal)}</strong></div>
+                <div>Detailed assets total: <strong style={{ color: 'var(--primary)' }}>{formatInr(assetBreakdownTotal)}</strong></div>
+                <div style={{ marginTop: '0.35rem' }}>
+                    <ReconciliationStatus reconciliation={assetReconciliation} />
+                </div>
+            </ReconciliationStickyPanel>
+        ) : null
+    );
+
+    const renderLiabilityReconciliationPanel = () => (
+        summaryLiabilityTotal > 0 ? (
+            <ReconciliationStickyPanel>
+                <div className="reconciliation-sticky-panel__title">Summary vs detailed liabilities</div>
+                <div>Summary liabilities total: <strong>{formatInr(summaryLiabilityTotal)}</strong></div>
+                <div>Detailed liabilities total: <strong style={{ color: 'var(--primary)' }}>{formatInr(liabilityBreakdownTotal)}</strong></div>
+                <div style={{ marginTop: '0.35rem' }}>
+                    <ReconciliationStatus reconciliation={liabilityReconciliation} />
+                </div>
+            </ReconciliationStickyPanel>
+        ) : null
+    );
+
+    const renderFixedDepositSection = () => (
+        <div style={{ maxWidth: '480px', margin: '1.5rem auto 0', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-card)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <label style={{ fontSize: '0.82rem', fontWeight: 600, margin: 0 }}>Fixed Deposits (FD)</label>
+                <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ fontSize: '0.78rem', padding: '0.35rem 0.65rem' }}
+                    onClick={() => handleAssetChange('investments', 'fixedDeposit', [...fdArray, ''])}
+                >
+                    <Plus size={13} style={{ marginRight: '0.25rem', verticalAlign: 'middle' }} /> Add FD
+                </button>
             </div>
-            {getAssetAmount(assetCategories.summaryPortfolioValue) > 0 && (
-                <div style={{ marginBottom: '0.65rem' }}>
-                    <div><strong>Portfolio:</strong> summary {formatInr(assetCategories.summaryPortfolioValue)} · detailed {formatInr(getPortfolioBreakdownTotal(assetCategories))}</div>
-                    <ReconciliationStatus reconciliation={wealthReconciliation.portfolio} />
-                </div>
+            {fdArray.length === 0 && (
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontStyle: 'italic', margin: 0 }}>
+                    No Fixed Deposits added.
+                </p>
             )}
-            {getAssetAmount(assetCategories.summaryLiquidCash) > 0 && (
-                <div style={{ marginBottom: '0.65rem' }}>
-                    <div><strong>Liquid cash:</strong> summary {formatInr(assetCategories.summaryLiquidCash)} · detailed {formatInr(getLiquidBreakdownTotal(assetCategories))}</div>
-                    <ReconciliationStatus reconciliation={wealthReconciliation.liquid} />
-                </div>
-            )}
-            {getAssetAmount(assetCategories.summaryRealEstateAssets) > 0 && (
-                <div style={{ marginBottom: '0.65rem' }}>
-                    <div><strong>Real estate / high-value:</strong> summary {formatInr(assetCategories.summaryRealEstateAssets)} · detailed {formatInr(getLegacyHighValueBreakdownTotal(assetCategories))}</div>
-                    <ReconciliationStatus reconciliation={wealthReconciliation.legacy} />
-                </div>
-            )}
-            {summaryAssetTotal > 0 && assetBreakdownTotal > 0 && (
-                <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border)' }}>
-                    <div>Assets combined: summary {formatInr(summaryAssetTotal)} · detailed {formatInr(assetBreakdownTotal)}</div>
-                </div>
-            )}
-            {hasEMI && getAssetAmount(liabilityCategories.summaryOutstandingLoans) > 0 && (
-                <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border)' }}>
-                    <div><strong>Outstanding loans:</strong> summary {formatInr(liabilityCategories.summaryOutstandingLoans)} · detailed {formatInr(getOutstandingLoansBreakdownTotal(liabilityCategories))}</div>
-                    <ReconciliationStatus reconciliation={liabilityReconciliation.outstandingLoans} />
-                </div>
-            )}
-            {getAssetAmount(liabilityCategories.summaryCreditCardDues) > 0 && (
-                <div style={{ marginTop: '0.65rem' }}>
-                    <div><strong>Credit card:</strong> summary {formatInr(liabilityCategories.summaryCreditCardDues)} · detailed {formatInr(getCreditCardBreakdownTotal(liabilityCategories))}</div>
-                    <ReconciliationStatus reconciliation={liabilityReconciliation.creditCard} />
-                </div>
-            )}
-            {getAssetAmount(liabilityCategories.summaryOtherPayables) > 0 && (
-                <div style={{ marginTop: '0.65rem' }}>
-                    <div><strong>Other payables:</strong> summary {formatInr(liabilityCategories.summaryOtherPayables)} · detailed {formatInr(getOtherPayablesBreakdownTotal(liabilityCategories))}</div>
-                    <ReconciliationStatus reconciliation={liabilityReconciliation.otherPayables} />
-                </div>
-            )}
-            {summaryLiabilityTotal > 0 && liabilityBreakdownTotal > 0 && (
-                <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border)' }}>
-                    <div>Liabilities combined: summary {formatInr(summaryLiabilityTotal)} · detailed {formatInr(liabilityBreakdownTotal)}</div>
-                </div>
-            )}
+            {fdArray.map((fdItem, fdIndex) => {
+                const isConfigured = fdItem !== null && typeof fdItem === 'object' && fdItem.amount > 0;
+                const displayValue = isConfigured ? fdItem.amount : fdItem;
+                return (
+                    <div key={`fd-${fdIndex}`} style={{ marginBottom: fdIndex < fdArray.length - 1 ? '0.85rem' : 0, padding: '0.85rem', border: '1px solid var(--border)', borderRadius: '8px', background: 'var(--bg-main)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--primary)' }}>FD #{fdIndex + 1}</span>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveFdModal({ index: fdIndex })}
+                                    style={{ background: 'transparent', border: 'none', color: isConfigured ? 'var(--success)' : 'var(--primary)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', padding: 0 }}
+                                >
+                                    {isConfigured ? '✓ Configured' : '⚙ Configure'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const newFds = fdArray.filter((_, i) => i !== fdIndex);
+                                        handleAssetChange('investments', 'fixedDeposit', newFds.length > 0 ? newFds : '');
+                                    }}
+                                    style={{ background: 'transparent', border: 'none', color: 'var(--negative)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', padding: 0 }}
+                                >
+                                    <Trash2 size={13} style={{ verticalAlign: 'middle' }} /> Remove
+                                </button>
+                            </div>
+                        </div>
+                        <CurrencyField
+                            value={displayValue || ''}
+                            readOnly
+                            onClick={() => setActiveFdModal({ index: fdIndex })}
+                        />
+                    </div>
+                );
+            })}
         </div>
     );
 
@@ -376,99 +387,41 @@ export function useWealthSnapshotQuestions() {
         }];
 
         list.push({
-            id: 'legacy-assets',
+            id: 'assets-breakdown',
             content: (
                 <div className="question-container">
                     <p className="question-narrative">
-                        Every asset tells a story of hard work, discipline, and dreams fulfilled.
+                        Every asset tells a story of hard work, discipline, and dreams fulfilled. Let&apos;s break them down.
                     </p>
-                    <h2 className="question-title">Legacy assets</h2>
-                    <p className="question-helper">Property, vehicles, and valuables typically passed to the next generation.</p>
-                    {renderFieldGrid(LEGACY_FIELDS, handleAssetChange)}
-                </div>
-            ),
-        });
+                    <h2 className="question-title">Your assets</h2>
+                    {renderAssetReconciliationPanel()}
+                    <div style={{ maxWidth: '480px', margin: '0 auto' }}>
+                        <h3 style={{ fontSize: '1rem', color: 'var(--primary)', margin: '0 0 0.35rem', textAlign: 'left' }}>Legacy assets</h3>
+                        <p className="question-helper" style={{ margin: '0 0 1rem', textAlign: 'left' }}>
+                            Property, vehicles, and valuables typically passed to the next generation.
+                        </p>
+                        {renderFieldGrid(LEGACY_FIELDS, handleAssetChange)}
 
-        list.push({
-            id: 'income-assets',
-            content: (
-                <div className="question-container">
-                    <p className="question-narrative">These are assets that can generate income or be liquidated when needed.</p>
-                    <h2 className="question-title">Income assets</h2>
-                    {renderFieldGrid(INCOME_FIELDS, handleAssetChange)}
-
-                    <div style={{ maxWidth: '480px', margin: '1.5rem auto 0', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-card)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                            <label style={{ fontSize: '0.82rem', fontWeight: 600, margin: 0 }}>Fixed Deposits (FD)</label>
-                            <button
-                                type="button"
-                                className="btn btn-secondary"
-                                style={{ fontSize: '0.78rem', padding: '0.35rem 0.65rem' }}
-                                onClick={() => handleAssetChange('investments', 'fixedDeposit', [...fdArray, ''])}
-                            >
-                                <Plus size={13} style={{ marginRight: '0.25rem', verticalAlign: 'middle' }} /> Add FD
-                            </button>
+                        <h3 style={{ fontSize: '1rem', color: 'var(--primary)', margin: '2rem 0 0.35rem', textAlign: 'left' }}>Income assets</h3>
+                        <p className="question-helper" style={{ margin: '0 0 1rem', textAlign: 'left' }}>
+                            Assets that can generate income or be liquidated when needed.
+                        </p>
+                        {renderFieldGrid(INCOME_FIELDS, handleAssetChange)}
+                        {renderFixedDepositSection()}
+                        <div style={{ marginTop: '1.25rem' }}>
+                            <CurrencyField
+                                label="Fund Value of ULIP Policies"
+                                value={assetCategories.insurance?.ulip || ''}
+                                onChange={(v) => handleAssetChange('insurance', 'ulip', v)}
+                            />
                         </div>
-                        {fdArray.length === 0 && (
-                            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontStyle: 'italic', margin: 0 }}>
-                                No Fixed Deposits added.
-                            </p>
-                        )}
-                        {fdArray.map((fdItem, fdIndex) => {
-                            const isConfigured = fdItem !== null && typeof fdItem === 'object' && fdItem.amount > 0;
-                            const displayValue = isConfigured ? fdItem.amount : fdItem;
-                            return (
-                                <div key={`fd-${fdIndex}`} style={{ marginBottom: fdIndex < fdArray.length - 1 ? '0.85rem' : 0, padding: '0.85rem', border: '1px solid var(--border)', borderRadius: '8px', background: 'var(--bg-main)' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                                        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--primary)' }}>FD #{fdIndex + 1}</span>
-                                        <div style={{ display: 'flex', gap: '8px' }}>
-                                            <button
-                                                type="button"
-                                                onClick={() => setActiveFdModal({ index: fdIndex })}
-                                                style={{ background: 'transparent', border: 'none', color: isConfigured ? 'var(--success)' : 'var(--primary)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', padding: 0 }}
-                                            >
-                                                {isConfigured ? '✓ Configured' : '⚙ Configure'}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    const newFds = fdArray.filter((_, i) => i !== fdIndex);
-                                                    handleAssetChange('investments', 'fixedDeposit', newFds.length > 0 ? newFds : '');
-                                                }}
-                                                style={{ background: 'transparent', border: 'none', color: 'var(--negative)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', padding: 0 }}
-                                            >
-                                                <Trash2 size={13} style={{ verticalAlign: 'middle' }} /> Remove
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <CurrencyField
-                                        value={displayValue || ''}
-                                        readOnly
-                                        onClick={() => setActiveFdModal({ index: fdIndex })}
-                                    />
-                                </div>
-                            );
-                        })}
-                    </div>
 
-                    <div style={{ maxWidth: '480px', margin: '1.25rem auto 0' }}>
-                        <CurrencyField
-                            label="Fund Value of ULIP Policies"
-                            value={assetCategories.insurance?.ulip || ''}
-                            onChange={(v) => handleAssetChange('insurance', 'ulip', v)}
-                        />
+                        <h3 style={{ fontSize: '1rem', color: 'var(--primary)', margin: '2rem 0 0.35rem', textAlign: 'left' }}>Retirement assets</h3>
+                        <p className="question-helper" style={{ margin: '0 0 1rem', textAlign: 'left' }}>
+                            Retirement accounts form the backbone of your long-term security.
+                        </p>
+                        {renderFieldGrid(RETIREMENT_FIELDS, handleAssetChange)}
                     </div>
-                </div>
-            ),
-        });
-
-        list.push({
-            id: 'retirement-assets',
-            content: (
-                <div className="question-container">
-                    <p className="question-narrative">Retirement accounts form the backbone of your long-term security.</p>
-                    <h2 className="question-title">Retirement assets</h2>
-                    {renderFieldGrid(RETIREMENT_FIELDS, handleAssetChange)}
                 </div>
             ),
         });
@@ -479,6 +432,7 @@ export function useWealthSnapshotQuestions() {
                 <div className="question-container">
                     <h2 className="question-title">Any other assets?</h2>
                     <p className="question-helper">Add anything not covered above.</p>
+                    {renderAssetReconciliationPanel()}
                     <div className="question-fields" style={{ maxWidth: '480px', margin: '0 auto', gap: '1rem' }}>
                         {(assetCategories.custom || []).map((field, index) => (
                             <div key={`asset-custom-${index}`} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '0.75rem', alignItems: 'end' }}>
@@ -518,6 +472,7 @@ export function useWealthSnapshotQuestions() {
                         Every liability reflects a commitment you&apos;ve made for your family&apos;s future. Let&apos;s take a closer look at the responsibilities that come with it.
                     </p>
                     <h2 className="question-title">Liabilities</h2>
+                    {renderLiabilityReconciliationPanel()}
                     <div className="question-fields" style={{ maxWidth: '480px', margin: '0 auto', gap: '1.25rem' }}>
                         {LIABILITY_FIELDS.map(({ key, label }) => (
                             <CurrencyField
@@ -537,6 +492,7 @@ export function useWealthSnapshotQuestions() {
             content: (
                 <div className="question-container">
                     <h2 className="question-title">Any other liabilities?</h2>
+                    {renderLiabilityReconciliationPanel()}
                     <div className="question-fields" style={{ maxWidth: '480px', margin: '0 auto', gap: '1rem' }}>
                         {(liabilityCategories.custom || []).map((field, index) => (
                             <div key={`liab-custom-${index}`} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '0.75rem', alignItems: 'end' }}>
@@ -564,7 +520,6 @@ export function useWealthSnapshotQuestions() {
                             <Plus size={14} style={{ marginRight: '0.35rem' }} /> Add More Liability
                         </button>
                     </div>
-                    {renderWealthReconciliationPanel()}
                 </div>
             ),
         });
@@ -573,7 +528,7 @@ export function useWealthSnapshotQuestions() {
     }, [
         editingRecap, assetCategories, liabilityCategories, hasEMI,
         summaryAssetTotal, summaryLiabilityTotal, assetBreakdownTotal, liabilityBreakdownTotal,
-        wealthReconciliation, liabilityReconciliation,
+        assetReconciliation, liabilityReconciliation,
         editPortfolio, editLiquidCash, editRealEstate, editLoans, editCreditCard, editOtherPayables,
         fdArray, handleAssetChange, handleLiabilityChange,
         startRecapEdit, saveRecapEdits,
