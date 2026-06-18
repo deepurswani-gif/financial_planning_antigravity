@@ -99,7 +99,7 @@ const IncomeTaxOutput = ({ results }) => {
                     )}
                     {results.marginalRelief > 0 && (
                         <tr>
-                            <td style={{ padding: '0.75rem 0' }}>(-) Marginal Relief</td>
+                            <td style={{ padding: '0.75rem 0' }}>(-) Marginal Relief (Section 87A)</td>
                             <td style={{ padding: '0.75rem 0', textAlign: 'right', color: 'var(--accent)' }}>{formatCurrency(results.marginalRelief)}</td>
                         </tr>
                     )}
@@ -111,6 +111,12 @@ const IncomeTaxOutput = ({ results }) => {
                         <tr>
                             <td style={{ padding: '0.75rem 0' }}>(+) Surcharge</td>
                             <td style={{ padding: '0.75rem 0', textAlign: 'right' }}>{formatCurrency(results.surcharge)}</td>
+                        </tr>
+                    )}
+                    {results.surchargeMarginalRelief > 0 && (
+                        <tr>
+                            <td style={{ padding: '0.75rem 0' }}>(-) Marginal Relief on Surcharge</td>
+                            <td style={{ padding: '0.75rem 0', textAlign: 'right', color: 'var(--accent)' }}>{formatCurrency(results.surchargeMarginalRelief)}</td>
                         </tr>
                     )}
                     <tr>

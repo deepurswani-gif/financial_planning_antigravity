@@ -106,7 +106,77 @@ describe('IncomeTaxLogic', () => {
             employmentType: 'Private Sector',
         });
         expect(result.surcharge).toBeGreaterThan(0);
-        expect(result.cess).toBeCloseTo((result.taxAfterRebate + result.surcharge) * 0.04, 0);
+        const taxPlusSurcharge = result.taxAfterRebate + result.surcharge - result.surchargeMarginalRelief;
+        expect(result.cess).toBeCloseTo(taxPlusSurcharge * 0.04, 0);
+    });
+
+    it('applies marginal relief on surcharge at 51 lakh (ClearTax reference)', () => {
+        const result = calculateIncomeTaxFromInput({
+            grossTotalIncome: 5100000,
+            annualSalary: 5100000,
+            otherIncomeAnnual: 0,
+            standardDeduction: 0,
+            taxableIncome: 5100000,
+            usedTaxSlip: false,
+            employmentType: 'Private Sector',
+        });
+        expect(result.surchargeMarginalRelief).toBe(41000);
+        expect(result.finalTax).toBe(1227200);
+    });
+
+    it('applies marginal relief on surcharge at 1.01 crore (new regime)', () => {
+        const result = calculateIncomeTaxFromInput({
+            grossTotalIncome: 10100000,
+            annualSalary: 10100000,
+            otherIncomeAnnual: 0,
+            standardDeduction: 0,
+            taxableIncome: 10100000,
+            usedTaxSlip: false,
+            employmentType: 'Private Sector',
+        });
+        expect(result.surchargeMarginalRelief).toBe(63500);
+        expect(result.finalTax).toBe(3055520);
+    });
+
+    it('does not apply surcharge marginal relief well above 50 lakh', () => {
+        const result = calculateIncomeTaxFromInput({
+            grossTotalIncome: 5500000,
+            annualSalary: 5500000,
+            otherIncomeAnnual: 0,
+            standardDeduction: 0,
+            taxableIncome: 5500000,
+            usedTaxSlip: false,
+            employmentType: 'Private Sector',
+        });
+        expect(result.surchargeMarginalRelief).toBe(0);
+    });
+
+    it('does not apply surcharge at exactly 50 lakh threshold', () => {
+        const result = calculateIncomeTaxFromInput({
+            grossTotalIncome: 5000000,
+            annualSalary: 5000000,
+            otherIncomeAnnual: 0,
+            standardDeduction: 0,
+            taxableIncome: 5000000,
+            usedTaxSlip: false,
+            employmentType: 'Private Sector',
+        });
+        expect(result.surcharge).toBe(0);
+        expect(result.surchargeMarginalRelief).toBe(0);
+    });
+
+    it('applies surcharge marginal relief when crossing 2 crore threshold', () => {
+        const result = calculateIncomeTaxFromInput({
+            grossTotalIncome: 20100000,
+            annualSalary: 20100000,
+            otherIncomeAnnual: 0,
+            standardDeduction: 0,
+            taxableIncome: 20100000,
+            usedTaxSlip: false,
+            employmentType: 'Private Sector',
+        });
+        expect(result.surchargeMarginalRelief).toBe(495500);
+        expect(result.finalTax).toBe(6777680);
     });
 
     it('annualizes government tax slip components correctly', () => {

@@ -11,6 +11,7 @@ import {
 
 export const REBATE_87A_MAX = 60000;
 export const REBATE_87A_INCOME_LIMIT = 1200000;
+export const SURCHARGE_THRESHOLDS = [5000000, 10000000, 20000000];
 
 export function calculateSlabTax(taxableIncome) {
     let taxBase = taxableIncome;
@@ -87,6 +88,38 @@ export function calculateSurcharge(taxAfterRebate, taxableIncome) {
     return taxAfterRebate * 0.25;
 }
 
+export function getSurchargeThreshold(taxableIncome) {
+    if (taxableIncome <= SURCHARGE_THRESHOLDS[0]) return null;
+    if (taxableIncome <= SURCHARGE_THRESHOLDS[1]) return SURCHARGE_THRESHOLDS[0];
+    if (taxableIncome <= SURCHARGE_THRESHOLDS[2]) return SURCHARGE_THRESHOLDS[1];
+    return SURCHARGE_THRESHOLDS[2];
+}
+
+export function computeTaxPlusSurchargeBeforeCess(taxableIncome) {
+    const { totalTax } = calculateSlabTax(taxableIncome);
+    const { taxAfterRebate } = applyRebateAndMarginalRelief(totalTax, taxableIncome);
+    const surcharge = calculateSurcharge(taxAfterRebate, taxableIncome);
+    return taxAfterRebate + surcharge;
+}
+
+export function applySurchargeMarginalRelief(taxAfterRebate, taxableIncome, nominalSurcharge) {
+    const threshold = getSurchargeThreshold(taxableIncome);
+    if (!threshold) {
+        return { surchargeMarginalRelief: 0 };
+    }
+
+    const taxAtActual = taxAfterRebate + nominalSurcharge;
+    const taxAtThreshold = computeTaxPlusSurchargeBeforeCess(threshold);
+    const excessIncome = taxableIncome - threshold;
+    const additionalTax = taxAtActual - taxAtThreshold;
+
+    const surchargeMarginalRelief = additionalTax > excessIncome
+        ? additionalTax - excessIncome
+        : 0;
+
+    return { surchargeMarginalRelief };
+}
+
 export function calculateIncomeTaxFromInput(taxInput) {
     if (!taxInput || taxInput.taxableIncome <= 0) {
         return {
@@ -100,6 +133,7 @@ export function calculateIncomeTaxFromInput(taxInput) {
             marginalRelief: 0,
             taxAfterRebate: 0,
             surcharge: 0,
+            surchargeMarginalRelief: 0,
             cess: 0,
             finalTax: 0,
             slabs: { t1: 0, t2: 0, t3: 0, t4: 0, t5: 0, t6: 0, t7: 0 },
@@ -114,8 +148,14 @@ export function calculateIncomeTaxFromInput(taxInput) {
         taxInput.taxableIncome,
     );
     const surcharge = calculateSurcharge(taxAfterRebate, taxInput.taxableIncome);
-    const cess = (taxAfterRebate + surcharge) * 0.04;
-    const finalTax = taxAfterRebate + surcharge + cess;
+    const { surchargeMarginalRelief } = applySurchargeMarginalRelief(
+        taxAfterRebate,
+        taxInput.taxableIncome,
+        surcharge,
+    );
+    const taxPlusSurcharge = taxAfterRebate + surcharge - surchargeMarginalRelief;
+    const cess = taxPlusSurcharge * 0.04;
+    const finalTax = taxPlusSurcharge + cess;
 
     return {
         grossTotalIncome: taxInput.grossTotalIncome,
@@ -128,6 +168,7 @@ export function calculateIncomeTaxFromInput(taxInput) {
         marginalRelief,
         taxAfterRebate,
         surcharge,
+        surchargeMarginalRelief,
         cess,
         finalTax,
         slabs,
