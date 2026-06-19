@@ -1,7 +1,63 @@
-import { calculateIncomeTax } from '../IncomeTaxModule/IncomeTaxLogic';
+import { calculateProjectedMemberTax } from '../IncomeTaxModule/IncomeTaxLogic';
+import { resolveEmploymentType } from '../DetailedFlow/employmentTypeSync';
+import {
+    getMemberDetailForProjection,
+    getMemberDetailMonthlyTotal,
+    getMemberFlatMonthlyIncome,
+    getFlatHouseholdMonthlyIncome,
+    shouldIncludeSpouseIncome,
+} from '../DetailedFlow/incomeDetailSync';
 import { hasConfiguredLoan } from '../DetailedFlow/expenseDetailSync';
 import { getLifeMemberMonthlyTotal } from '../DetailedFlow/insuranceDetailSync';
 import { getEffectiveMonthlySavings, buildSavingsBreakdownAnnual } from '../DetailedFlow/savingsDetailSync';
+
+const resolveAnnualInflowBases = ({
+    income,
+    selfDetail,
+    spouseDetail,
+    selfEmploymentType,
+    spouseEmploymentType,
+    includeSpouse,
+    currentYearLedger,
+}) => {
+    const activeSpouseDetail = includeSpouse && spouseDetail ? spouseDetail : null;
+    const activeSpouseType = includeSpouse ? spouseEmploymentType : '';
+
+    let selfInHandAnnual = getMemberDetailMonthlyTotal(selfDetail, selfEmploymentType) * 12;
+    let spouseInHandAnnual = activeSpouseDetail
+        ? getMemberDetailMonthlyTotal(activeSpouseDetail, activeSpouseType) * 12
+        : 0;
+
+    const detailInflowAnnual = selfInHandAnnual + spouseInHandAnnual;
+    const fallbackInflowAnnual = getFlatHouseholdMonthlyIncome(income) * 12;
+
+    const ledgerMonthlyIncome = parseFloat(currentYearLedger?.income?.[11]) || 0;
+    const hasActiveIncomeLedger = ledgerMonthlyIncome > 0;
+
+    if (hasActiveIncomeLedger) {
+        const baselineInflowAnnual = ledgerMonthlyIncome * 12;
+        if (detailInflowAnnual > 0) {
+            const ledgerScale = baselineInflowAnnual / detailInflowAnnual;
+            selfInHandAnnual *= ledgerScale;
+            spouseInHandAnnual *= ledgerScale;
+        } else if (fallbackInflowAnnual > 0) {
+            const selfFlatAnnual = getMemberFlatMonthlyIncome(income, 'self') * 12;
+            const selfRatio = selfFlatAnnual / fallbackInflowAnnual;
+            selfInHandAnnual = baselineInflowAnnual * selfRatio;
+            spouseInHandAnnual = baselineInflowAnnual * (1 - selfRatio);
+        } else {
+            selfInHandAnnual = baselineInflowAnnual;
+            spouseInHandAnnual = 0;
+        }
+    } else if (detailInflowAnnual <= 0) {
+        const selfFlatAnnual = getMemberFlatMonthlyIncome(income, 'self') * 12;
+        const selfRatio = fallbackInflowAnnual > 0 ? selfFlatAnnual / fallbackInflowAnnual : 1;
+        selfInHandAnnual = fallbackInflowAnnual * selfRatio;
+        spouseInHandAnnual = fallbackInflowAnnual * (1 - selfRatio);
+    }
+
+    return { selfInHandAnnual, spouseInHandAnnual };
+};
 
 export const EDUCATION_STANDARDS = [
     "Play Group",
@@ -33,7 +89,8 @@ export const generateProjections = ({
     journeyAdjustments = [], 
     investmentAllocations = [],
     loanProposals = [],
-    currentYearLedger
+    currentYearLedger,
+    hasSpouseIncome = false,
 }) => {
     let cumulativeNetInvestibleSurplus = 0; // Tracks running cash flow balance month-by-month across all years
     
@@ -55,34 +112,32 @@ export const generateProjections = ({
     const yearsToProject = retirementYear - startYear + 1;
     if (yearsToProject <= 0) return [];
 
-    const hasLedger = currentYearLedger && currentYearLedger.income && currentYearLedger.income.length === 12;
+    const selfEmploymentType = resolveEmploymentType(selfMember);
+    const spouseEmploymentType = spouseMember ? resolveEmploymentType(spouseMember) : '';
+    const includeSpouse = shouldIncludeSpouseIncome(spouseMember, hasSpouseIncome, income);
 
-    const fallbackIncomeAnnual = (
-        (parseFloat(income.self) || 0) + 
-        (parseFloat(income.selfBonus) || 0) + 
-        (parseFloat(income.selfPassive) || 0) + 
-        (parseFloat(income.selfOther) || 0) +
-        (parseFloat(income.spouse) || 0) + 
-        (parseFloat(income.spouseBonus) || 0) + 
-        (parseFloat(income.spousePassive) || 0) + 
-        (parseFloat(income.spouseOther) || 0)
-    ) * 12;
+    const selfDetail = getMemberDetailForProjection(income, 'self', selfEmploymentType);
+    const spouseDetail = includeSpouse
+        ? getMemberDetailForProjection(income, 'spouse', spouseEmploymentType)
+        : null;
 
-    const baselineIncomeAnnual = hasLedger ? (currentYearLedger.income[11] * 12) : fallbackIncomeAnnual;
-
-    const selfRatio = fallbackIncomeAnnual > 0 
-        ? (((parseFloat(income.self) || 0) + (parseFloat(income.selfBonus) || 0) + (parseFloat(income.selfPassive) || 0) + (parseFloat(income.selfOther) || 0)) * 12) / fallbackIncomeAnnual
-        : 1;
-    const spouseRatio = 1 - selfRatio;
-
-    const selfAnnualBase = baselineIncomeAnnual * selfRatio;
-    const spouseAnnualBase = baselineIncomeAnnual * spouseRatio;
+    const { selfInHandAnnual, spouseInHandAnnual } = resolveAnnualInflowBases({
+        income,
+        selfDetail,
+        spouseDetail,
+        selfEmploymentType,
+        spouseEmploymentType,
+        includeSpouse,
+        currentYearLedger,
+    });
 
     const fallbackHouseholdMonthly = Object.entries(expenseCategories.household || {})
         .filter(([key]) => key !== 'education')
         .reduce((sum, [_, val]) => sum + (parseFloat(val) || 0), 0);
-        
-    const householdMonthly = hasLedger ? currentYearLedger.household[11] : fallbackHouseholdMonthly;
+
+    const ledgerMonthlyHousehold = parseFloat(currentYearLedger?.household?.[11]) || 0;
+    const hasActiveHouseholdLedger = ledgerMonthlyHousehold > 0;
+    const householdMonthly = hasActiveHouseholdLedger ? ledgerMonthlyHousehold : fallbackHouseholdMonthly;
     const savingsMonthly = getEffectiveMonthlySavings(expenseCategories);
 
     // --- Insurance Logic ---
@@ -134,21 +189,27 @@ export const generateProjections = ({
 
     for (let i = 0; i < yearsToProject; i++) {
         const year = startYear + i;
-        // Income with Increment
-        let selfInflated = selfAnnualBase * Math.pow(1 + (incomeIncrement / 100), i);
-        let spouseInflated = spouseAnnualBase * Math.pow(1 + (incomeIncrement / 100), i);
-        let annualInflow = selfInflated + spouseInflated;
+        const growthFactor = Math.pow(1 + (incomeIncrement / 100), i);
+        const annualInflow = (selfInHandAnnual + spouseInHandAnnual) * growthFactor;
 
         let householdOutflow = (householdMonthly * 12) * Math.pow(1 + (householdInflation / 100), i);
 
-        // Removed exact ledger summation override to ensure pure annual representation
+        // --- Income Tax Calculation (Step 8 logic on scaled income detail) ---
+        const selfTaxRes = calculateProjectedMemberTax(
+            selfDetail,
+            selfEmploymentType,
+            i,
+            incomeIncrement,
+        );
 
-        // --- Income Tax Calculation ---
-        const selfTaxRes = calculateIncomeTax({ salary: selfInflated / 12, bonus: 0, passive: 0, other: 0 }, selfMember.occupation);
-        
         let spouseTax = 0;
-        if (spouseMember && spouseMember.occupation?.toLowerCase() !== 'housewife') {
-            const spouseTaxRes = calculateIncomeTax({ salary: spouseInflated / 12, bonus: 0, passive: 0, other: 0 }, spouseMember.occupation);
+        if (spouseDetail && spouseMember && includeSpouse) {
+            const spouseTaxRes = calculateProjectedMemberTax(
+                spouseDetail,
+                spouseEmploymentType,
+                i,
+                incomeIncrement,
+            );
             spouseTax = spouseTaxRes.finalTax;
         }
 

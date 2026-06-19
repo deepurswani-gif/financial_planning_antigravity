@@ -2,7 +2,9 @@ import React, { createContext, useContext, useState, useEffect, useMemo, useCall
 import { useAuth } from './AuthContext';
 import { createFinancialPlan, getActivePlan, updateFinancialPlan, markSummaryReportGenerated } from '../services/financialPlanService';
 import { generateProjections } from '../components/JourneyModule/ProjectionLogic';
-import { normalizeIncomeState } from '../components/DetailedFlow/incomeDetailSync';
+import { normalizeIncomeState, getHouseholdMonthlyInflow } from '../components/DetailedFlow/incomeDetailSync';
+import { resolveEmploymentType } from '../components/DetailedFlow/employmentTypeSync';
+import { syncLedgerFromMonthlyTotals } from '../components/CashFlowModule/CashFlowLogic';
 import { initializeExpenseSnapshots, hasAnyEmiCommitment } from '../components/DetailedFlow/expenseDetailSync';
 import { initializeSavingsSnapshots } from '../components/DetailedFlow/savingsDetailSync';
 import { migrateInsuranceBlock } from '../components/DetailedFlow/insuranceDetailSync';
@@ -116,6 +118,18 @@ export const FinancialPlanProvider = ({ children }) => {
       });
     }
   }, [familyMembers]);
+
+  // Keep ledger in sync with detailed in-hand income and household expenses (summary + detailed flows).
+  useEffect(() => {
+    if (loading) return;
+
+    const monthlyIncome = getHouseholdMonthlyInflow(income, familyMembers, hasSpouseIncome, resolveEmploymentType);
+    const monthlyHousehold = Object.entries(expenseCategories.household || {})
+      .filter(([key]) => key !== 'education')
+      .reduce((sum, [_, val]) => sum + (parseFloat(val) || 0), 0);
+
+    setCurrentYearLedger((prev) => syncLedgerFromMonthlyTotals(prev, monthlyIncome, monthlyHousehold));
+  }, [loading, income, familyMembers, hasSpouseIncome, expenseCategories.household]);
 
   const resetState = () => {
     setPlanId(null);
@@ -435,8 +449,8 @@ export const FinancialPlanProvider = ({ children }) => {
 
   const journeyProjections = useMemo(() => {
     if (!familyMembers.find(m => m.relation?.toLowerCase() === 'self')) return [];
-    return generateProjections({ familyMembers, income, expenseCategories, goals: goals, inflationRates, journeyAdjustments, investmentAllocations, loanProposals, policies, planStartMonth, currentYearLedger });
-  }, [familyMembers, income, expenseCategories, goals, inflationRates, journeyAdjustments, investmentAllocations, loanProposals, policies, planStartMonth, currentYearLedger]);
+    return generateProjections({ familyMembers, income, expenseCategories, goals: goals, inflationRates, journeyAdjustments, investmentAllocations, loanProposals, policies, planStartMonth, currentYearLedger, hasSpouseIncome });
+  }, [familyMembers, income, expenseCategories, goals, inflationRates, journeyAdjustments, investmentAllocations, loanProposals, policies, planStartMonth, currentYearLedger, hasSpouseIncome]);
 
   const proposedSIPs = useMemo(() => investmentAllocations.filter(a => a.type === 'SIP'), [investmentAllocations]);
   const proposedLumpsums = useMemo(() => investmentAllocations.filter(a => a.type === 'Lumpsum' || a.type === 'Lump Sum'), [investmentAllocations]);

@@ -11,7 +11,13 @@ import {
     buildTaxInput,
     computeAnnualSalaryFromTaxSlip,
     sumOtherIncomeAnnual,
+    scaleIncomeDetail,
+    getMemberAnnualGrossFromDetail,
+    getMemberDetailForProjection,
+    shouldIncludeSpouseIncome,
+    getHouseholdMonthlyInflow,
 } from './incomeDetailSync';
+import { resolveEmploymentType } from './employmentTypeSync';
 
 describe('incomeDetailSync', () => {
     it('initializeIncomeSnapshots migrates legacy self into summarySelfInHand', () => {
@@ -129,5 +135,55 @@ describe('incomeDetailSync', () => {
             taxPlanning: { earnings: { basicPay: '80000', performanceBonus: '120000' } },
         }, 'Private Sector');
         expect(annual).toBe(1080000);
+    });
+
+    it('scaleIncomeDetail scales primary income and tax slip components', () => {
+        const scaled = scaleIncomeDetail({
+            inHandSalary: '100000',
+            otherIncome: [{ amount: '5000' }],
+            taxPlanning: {
+                earnings: { basicPay: '80000', performanceBonus: '120000' },
+            },
+        }, 1.1);
+
+        expect(scaled.inHandSalary).toBe('110000');
+        expect(scaled.otherIncome[0].amount).toBe('5500');
+        expect(scaled.taxPlanning.earnings.basicPay).toBe('88000');
+        expect(scaled.taxPlanning.earnings.performanceBonus).toBe('132000');
+    });
+
+    it('getMemberAnnualGrossFromDetail uses tax slip gross when enabled', () => {
+        const gross = getMemberAnnualGrossFromDetail({
+            needTaxPlanning: true,
+            inHandSalary: '50000',
+            taxPlanning: { earnings: { basicPay: '70000' } },
+        }, 'Private Sector');
+        expect(gross).toBe(840000);
+    });
+
+    it('getMemberDetailForProjection falls back to legacy self income', () => {
+        const detail = getMemberDetailForProjection({ self: '85000', selfPassive: '5000' }, 'self', 'Private Sector');
+        expect(detail.inHandSalary).toBe('85000');
+        expect(detail.passiveIncome).toBe('5000');
+    });
+
+    it('shouldIncludeSpouseIncome follows isSpouseWorking and hasSpouseIncome flags', () => {
+        const spouse = { relation: 'Spouse', isSpouseWorking: true };
+        expect(shouldIncludeSpouseIncome(spouse, false, {})).toBe(true);
+        expect(shouldIncludeSpouseIncome({ relation: 'Spouse' }, true, {})).toBe(true);
+        expect(shouldIncludeSpouseIncome({ relation: 'Spouse' }, false, { spouse: '50000' })).toBe(true);
+        expect(shouldIncludeSpouseIncome({ relation: 'Spouse' }, false, {})).toBe(false);
+    });
+
+    it('getHouseholdMonthlyInflow sums detailed in-hand totals for self and spouse', () => {
+        const familyMembers = [
+            { relation: 'Self', employmentType: 'Private Sector' },
+            { relation: 'Spouse', employmentType: 'Private Sector', isSpouseWorking: true },
+        ];
+        const income = {
+            selfDetail: { inHandSalary: '100000', otherIncome: [{ amount: '' }] },
+            spouseDetail: { inHandSalary: '50000', otherIncome: [{ amount: '' }] },
+        };
+        expect(getHouseholdMonthlyInflow(income, familyMembers, false, resolveEmploymentType)).toBe(150000);
     });
 });

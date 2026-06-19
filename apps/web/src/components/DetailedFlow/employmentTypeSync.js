@@ -28,6 +28,13 @@ export function guessEmploymentTypeFromSummaryOccupation(occupation) {
     return '';
 }
 
+/** Same employment-type resolution used in Step 8 Income Tax and projections. */
+export function resolveEmploymentType(member) {
+    return member?.employmentType
+        || guessEmploymentTypeFromSummaryOccupation(member?.occupation)
+        || 'Private Sector';
+}
+
 export function createEmptySpouseMember() {
     return {
         name: '',

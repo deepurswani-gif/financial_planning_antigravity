@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, HelpCircle } from 'lucide-react';
-import { convertToMonthly } from './CashFlowLogic';
+import { convertToMonthly, syncLedgerFromMonthlyTotals } from './CashFlowLogic';
 import LoanDetailsModal from './LoanDetailsModal';
 import InvestmentDetailsModal from './InvestmentDetailsModal';
 import DocumentUploadButton from '../common/DocumentUploadButton';
-import CurrencyInput from '../common/CurrencyInput';
+import { getHouseholdMonthlyInflow } from '../DetailedFlow/incomeDetailSync';
+import { resolveEmploymentType } from '../DetailedFlow/employmentTypeSync';
 
-const CashFlowInput = ({ familyMembers, income, setIncome, expenseCategories, setExpenseCategories, currentYearLedger, setCurrentYearLedger, subStep, planStartMonth = 0 }) => {
+const CashFlowInput = ({ familyMembers, income, setIncome, expenseCategories, setExpenseCategories, currentYearLedger, setCurrentYearLedger, subStep, planStartMonth = 0, hasSpouseIncome = false }) => {
     const [activeModal, setActiveModal] = useState(null);
     const [activeInvModal, setActiveInvModal] = useState(null);
     const [policyDocs, setPolicyDocs] = useState({});
@@ -98,7 +99,7 @@ const CashFlowInput = ({ familyMembers, income, setIncome, expenseCategories, se
     
     const isSpouseHousewife = spouseMember?.occupation?.toLowerCase() === 'housewife';
 
-    const totalHouseholdIncome = (parseFloat(income.self) || 0) + (parseFloat(income.selfBonus) || 0) + (parseFloat(income.selfPassive) || 0) + (parseFloat(income.selfOther) || 0) + (parseFloat(income.spouse) || 0) + (parseFloat(income.spouseBonus) || 0) + (parseFloat(income.spousePassive) || 0) + (parseFloat(income.spouseOther) || 0);
+    const totalHouseholdIncome = getHouseholdMonthlyInflow(income, familyMembers, hasSpouseIncome, resolveEmploymentType);
 
     const totalHouseholdExpenses = Object.entries(expenseCategories.household || {})
         .filter(([key]) => key !== 'education')
@@ -106,30 +107,10 @@ const CashFlowInput = ({ familyMembers, income, setIncome, expenseCategories, se
 
     // Auto-sync Baseline Scalars into the 12-Month Array
     React.useEffect(() => {
-        const currentMonth = new Date().getMonth();
         const activeIncomeSum = Math.round(totalHouseholdIncome);
         const activeHouseholdSum = Math.round(totalHouseholdExpenses);
 
-        setCurrentYearLedger(prev => {
-            const newIncome = [...(prev.income || Array(12).fill(0))];
-            const newHH = [...(prev.household || Array(12).fill(0))];
-            let changed = false;
-
-            // Only overwrite active and future months. Historical locked months remain untouched.
-            for (let i = currentMonth; i < 12; i++) {
-                if (newIncome[i] !== activeIncomeSum) {
-                    newIncome[i] = activeIncomeSum;
-                    changed = true;
-                }
-                if (newHH[i] !== activeHouseholdSum) {
-                    newHH[i] = activeHouseholdSum;
-                    changed = true;
-                }
-            }
-
-            if (changed) return { income: newIncome, household: newHH };
-            return prev;
-        });
+        setCurrentYearLedger(prev => syncLedgerFromMonthlyTotals(prev, activeIncomeSum, activeHouseholdSum));
     }, [totalHouseholdIncome, totalHouseholdExpenses, setCurrentYearLedger]);
 
     return (

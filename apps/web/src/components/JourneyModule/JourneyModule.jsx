@@ -12,7 +12,7 @@ import adjustmentTypeImage from '../../assets/adjustment_type.png';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 
 const JourneyModule = ({ onNext, onBack }) => {
-    const { familyMembers, income, expenseCategories, goals, inflationRates, setInflationRates, journeyAdjustments, setJourneyAdjustments, policies, journeyProjections: passedProjections } = useFinancialPlan();
+    const { familyMembers, income, expenseCategories, goals, inflationRates, setInflationRates, journeyAdjustments, setJourneyAdjustments, policies, journeyProjections: passedProjections, currentYearLedger, hasSpouseIncome } = useFinancialPlan();
     const { user } = useAuth();
     
     const currentYear = new Date().getFullYear();
@@ -28,9 +28,11 @@ const JourneyModule = ({ onNext, onBack }) => {
             goals,
             inflationRates,
             journeyAdjustments,
-            policies
+            policies,
+            currentYearLedger,
+            hasSpouseIncome,
         });
-    }, [passedProjections, familyMembers, income, expenseCategories, goals, inflationRates, journeyAdjustments, policies]);
+    }, [passedProjections, familyMembers, income, expenseCategories, goals, inflationRates, journeyAdjustments, policies, currentYearLedger, hasSpouseIncome]);
 
     useEffect(() => {
         if (!projections.some(p => p.yearHasDeficit)) {

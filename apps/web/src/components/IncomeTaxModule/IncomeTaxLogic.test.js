@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     calculateIncomeTaxFromDetail,
+    calculateProjectedMemberTax,
     calculateSlabTax,
     applyRebateAndMarginalRelief,
     calculateSurcharge,
@@ -260,5 +261,22 @@ describe('IncomeTaxLogic', () => {
         expect(breakdown.adjustments.some((a) => a.title.includes('Cess'))).toBe(true);
         expect(breakdown.insights.effectiveTaxRate).toBeGreaterThan(0);
         expect(breakdown.insights.marginalRate).toBe(0.30);
+    });
+
+    it('calculateProjectedMemberTax matches year 0 with calculateIncomeTaxFromDetail', () => {
+        const detail = {
+            inHandSalary: '100000',
+            otherIncome: [{ amount: '5000' }],
+        };
+        const yearZero = calculateProjectedMemberTax(detail, 'Private Sector', 0, 10);
+        const direct = calculateIncomeTaxFromDetail(detail, 'Private Sector');
+        expect(yearZero.finalTax).toBe(direct.finalTax);
+    });
+
+    it('calculateProjectedMemberTax increases tax when income grows above rebate threshold', () => {
+        const detail = { inHandSalary: '95000' };
+        const yearZero = calculateProjectedMemberTax(detail, 'Private Sector', 0, 10);
+        const yearFive = calculateProjectedMemberTax(detail, 'Private Sector', 5, 10);
+        expect(yearFive.finalTax).toBeGreaterThanOrEqual(yearZero.finalTax);
     });
 });

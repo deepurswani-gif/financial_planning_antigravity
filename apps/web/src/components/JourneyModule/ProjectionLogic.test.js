@@ -96,4 +96,113 @@ describe('ProjectionLogic', () => {
         // household 20k*12 = 240k, emi 10k*12 = 120k, education 50k = 410k. total = 410k.
         expect(results[0].totalOutflow).toBe(410000);
     });
+
+    it('uses Step 8 tax logic with selfDetail and standard deduction', () => {
+        const params = {
+            ...mockParams,
+            familyMembers: [
+                { relation: 'Self', age: 30, retirementAge: 62, dob: '1996-01-01', employmentType: 'Private Sector' },
+            ],
+            income: {
+                self: '100000',
+                selfDetail: {
+                    inHandSalary: '100000',
+                    needTaxPlanning: false,
+                    otherIncome: [{ amount: '' }],
+                },
+            },
+            inflationRates: { incomeIncrement: 0, householdInflation: 0, educationInflation: 0 },
+            startYear: 2026,
+        };
+        const results = generateProjections(params);
+        // Taxable = 12L - 75k = 11.25L => rebate zeros tax
+        expect(results[0].approxTax).toBe(0);
+        expect(results[0].annualInflow).toBe(1200000);
+    });
+
+    it('applies pensioner standard deduction in projections', () => {
+        const params = {
+            ...mockParams,
+            familyMembers: [
+                { relation: 'Self', age: 60, retirementAge: 65, dob: '1966-01-01', employmentType: 'Pensioner' },
+            ],
+            income: {
+                selfDetail: {
+                    netPension: '80000',
+                    otherIncome: [{ amount: '' }],
+                },
+            },
+            inflationRates: { incomeIncrement: 0, householdInflation: 0, educationInflation: 0 },
+            startYear: 2026,
+        };
+        const results = generateProjections(params);
+        expect(results[0].annualInflow).toBe(960000);
+        expect(results[0].approxTax).toBe(0);
+    });
+});
+
+describe('ProjectionLogic tax with cash-flow ledger', () => {
+    const baseParams = {
+        familyMembers: [
+            { relation: 'Self', age: 35, retirementAge: 60, dob: '1991-01-01', employmentType: 'Private Sector', occupation: 'Salaried' },
+            { relation: 'Spouse', age: 33, retirementAge: 60, dob: '1993-01-01', employmentType: 'Private Sector', occupation: 'Salaried' },
+        ],
+        income: {
+            self: '',
+            spouse: '150000',
+            selfDetail: {
+                needTaxPlanning: true,
+                inHandSalary: '',
+                otherIncome: [{ amount: '' }],
+                taxPlanning: {
+                    earnings: {
+                        basicPay: '70000',
+                        dearnessAllowance: '20000',
+                        houseRentAllowance: '5000',
+                        allowances: '5000',
+                        performanceBonus: '0',
+                    },
+                },
+            },
+            spouseDetail: {
+                needTaxPlanning: false,
+                inHandSalary: '150000',
+                otherIncome: [{ amount: '' }],
+            },
+        },
+        expenseCategories: {
+            household: { rent: 20000 },
+            insurance: { life: {} },
+            emi: {},
+            savings: {},
+        },
+        goals: [],
+        inflationRates: { incomeIncrement: 10, householdInflation: 6, educationInflation: 8 },
+        startYear: 2026,
+        currentYearLedger: {
+            income: [...Array(11).fill(0), 150000],
+            household: [...Array(12).fill(20000)],
+        },
+    };
+
+    it('does not shrink tax base when ledger inflow is lower than gross detail income', () => {
+        const results = generateProjections(baseParams);
+
+        expect(results[0].annualInflow).toBe(1800000);
+        expect(results[0].approxTax).toBe(150800);
+        expect(results[1].approxTax).toBe(235040);
+    });
+
+    it('uses detail in-hand inflow when ledger exists but is all zeros', () => {
+        const results = generateProjections({
+            ...baseParams,
+            currentYearLedger: {
+                income: Array(12).fill(0),
+                household: Array(12).fill(0),
+            },
+        });
+
+        expect(results[0].annualInflow).toBe(1800000);
+        expect(results[0].approxTax).toBe(150800);
+    });
 });

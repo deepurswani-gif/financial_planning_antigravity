@@ -7,6 +7,7 @@ import {
     createEmptyIncomeDetail,
     isPensionerEmployment,
     isSalariedEmployment,
+    scaleIncomeDetail,
 } from '../DetailedFlow/incomeDetailSync';
 
 export const REBATE_87A_MAX = 60000;
@@ -485,6 +486,13 @@ export function calculateIncomeTaxFromInput(taxInput) {
 export function calculateIncomeTaxFromDetail(detail, employmentType) {
     const taxInput = buildTaxInput(detail, employmentType);
     return calculateIncomeTaxFromInput(taxInput);
+}
+
+/** Project member tax for a future year using Step 8 logic on scaled income detail. */
+export function calculateProjectedMemberTax(detail, employmentType, yearIndex, incomeIncrementPercent = 0) {
+    const factor = Math.pow(1 + (incomeIncrementPercent / 100), yearIndex);
+    const scaledDetail = scaleIncomeDetail(detail, factor);
+    return calculateIncomeTaxFromDetail(scaledDetail, employmentType);
 }
 
 /** Legacy entry point for cash-flow / projection callers using flat monthly keys. */

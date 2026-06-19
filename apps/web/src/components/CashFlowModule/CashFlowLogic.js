@@ -11,6 +11,32 @@ import {
     hasConfiguredSavings,
 } from '../DetailedFlow/savingsDetailSync';
 
+/** Sync active/future ledger months from monthly income and household totals. */
+export function syncLedgerFromMonthlyTotals(ledger, monthlyIncome, monthlyHousehold) {
+    const currentMonth = new Date().getMonth();
+    const incomeSum = Math.round(monthlyIncome) || 0;
+    const householdSum = Math.round(monthlyHousehold) || 0;
+    const prevIncome = ledger?.income || Array(12).fill(0);
+    const prevHousehold = ledger?.household || Array(12).fill(0);
+    const newIncome = [...prevIncome];
+    const newHH = [...prevHousehold];
+    let changed = false;
+
+    for (let i = currentMonth; i < 12; i++) {
+        if (newIncome[i] !== incomeSum) {
+            newIncome[i] = incomeSum;
+            changed = true;
+        }
+        if (newHH[i] !== householdSum) {
+            newHH[i] = householdSum;
+            changed = true;
+        }
+    }
+
+    if (!changed) return ledger;
+    return { income: newIncome, household: newHH };
+}
+
 export const convertToMonthly = (value, frequency) => {
     const val = parseFloat(value) || 0;
     switch (frequency) {

@@ -6,6 +6,9 @@ import {
     reconcileMemberLifePremiumSummary,
     sumPolicySumAssured,
     sumHealthPolicyCover,
+    deriveLifeMemberTotals,
+    applyLifeEntryUpdate,
+    getLifeMemberMonthlyTotal,
 } from './insuranceDetailSync';
 
 describe('insuranceDetailSync cover reconciliation', () => {
@@ -66,5 +69,56 @@ describe('insuranceDetailSync cover reconciliation', () => {
         });
         expect(result.status).toBe('under');
         expect(result.delta).toBe(1000);
+    });
+});
+
+describe('deriveLifeMemberTotals frequency preservation', () => {
+    it('preserves half-yearly amount and frequency for a single policy', () => {
+        const result = deriveLifeMemberTotals({
+            premiums: [{ amount: '18000', frequency: 'Half Yearly' }],
+        });
+        expect(result).toEqual({ value: '18000', frequency: 'Half Yearly' });
+        expect(getLifeMemberMonthlyTotal({ ...result, premiums: [{ amount: '18000', frequency: 'Half Yearly' }] })).toBe(3000);
+    });
+
+    it('preserves annual amount and frequency for a single policy', () => {
+        const result = deriveLifeMemberTotals({
+            premiums: [{ amount: '30000', frequency: 'Annual' }],
+        });
+        expect(result).toEqual({ value: '30000', frequency: 'Annual' });
+    });
+
+    it('sums amounts when multiple policies share the same frequency', () => {
+        const result = deriveLifeMemberTotals({
+            premiums: [
+                { amount: '12000', frequency: 'Annual' },
+                { amount: '6000', frequency: 'Annual' },
+            ],
+        });
+        expect(result).toEqual({ value: '18000', frequency: 'Annual' });
+    });
+
+    it('falls back to monthly total when policies have mixed frequencies', () => {
+        const result = deriveLifeMemberTotals({
+            premiums: [
+                { amount: '12000', frequency: 'Annual' },
+                { amount: '6000', frequency: 'Half Yearly' },
+            ],
+        });
+        expect(result.frequency).toBe('Monthly');
+        expect(result.value).toBe('2000');
+    });
+
+    it('applyLifeEntryUpdate preserves half-yearly in legacy scalar fields', () => {
+        const updated = applyLifeEntryUpdate(
+            { policyCount: 0, premiums: [] },
+            {
+                policyCount: 1,
+                premiums: [{ amount: '18000', frequency: 'Half Yearly' }],
+            },
+        );
+        expect(updated.value).toBe('18000');
+        expect(updated.frequency).toBe('Half Yearly');
+        expect(updated.premiums[0]).toEqual({ amount: '18000', frequency: 'Half Yearly' });
     });
 });

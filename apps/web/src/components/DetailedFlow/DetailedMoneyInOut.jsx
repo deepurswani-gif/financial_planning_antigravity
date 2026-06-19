@@ -14,6 +14,7 @@ import {
     reconcileMemberIncome,
     getMemberDetailMonthlyTotal,
     getSummaryIncomeTarget,
+    shouldIncludeSpouseIncome,
 } from './incomeDetailSync';
 import ReconciliationStatus from './ReconciliationStatus';
 import ReconciliationStickyPanel from './ReconciliationStickyPanel';
@@ -68,7 +69,7 @@ const DetailedMoneyInOut = () => {
     const spouseEmploymentType = spouseMember?.employmentType
         || guessEmploymentTypeFromSummaryOccupation(spouseMember?.occupation)
         || 'Private Sector';
-    const includeSpouse = spouseMember?.isSpouseWorking === true || hasSpouseIncome === true;
+    const includeSpouse = shouldIncludeSpouseIncome(spouseMember, hasSpouseIncome, income);
 
     const selfDetail = income.selfDetail || createEmptyIncomeDetail();
     const spouseDetail = income.spouseDetail || createEmptyIncomeDetail();
@@ -81,7 +82,7 @@ const DetailedMoneyInOut = () => {
             const spouseType = spouseMember?.employmentType
                 || guessEmploymentTypeFromSummaryOccupation(spouseMember?.occupation)
                 || 'Private Sector';
-            const working = spouseMember?.isSpouseWorking === true || hasSpouseIncome === true;
+            const working = shouldIncludeSpouseIncome(spouseMember, hasSpouseIncome, prev);
             if (prev.selfDetail?.inHandSalary || prev.selfDetail?.takeHomeProfit || prev.selfDetail?.netPension) {
                 return prev;
             }

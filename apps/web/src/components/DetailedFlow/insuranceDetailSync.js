@@ -27,7 +27,7 @@ export function normalizeToPolicyFrequency(freq) {
 }
 
 export function emptyLifeEntry() {
-    return { policyCount: 0, premiums: [], value: '', frequency: 'Monthly' };
+    return { policyCount: 0, premiums: [], value: '', frequency: 'Annual' };
 }
 
 export function getLifeMemberMonthlyTotal(entry) {
@@ -41,12 +41,40 @@ export function getLifeMemberMonthlyTotal(entry) {
     return convertToMonthly(entry.value, entry.frequency);
 }
 
+/**
+ * Derive legacy cash-flow scalar fields (value + frequency) from detailed premiums.
+ * Preserves the user's entered amount and frequency when all active policies share
+ * the same frequency; falls back to a monthly total only when frequencies differ.
+ */
 export function deriveLifeMemberTotals(entry) {
-    const monthly = getLifeMemberMonthlyTotal(entry);
-    if (monthly <= 0) {
-        return { value: '', frequency: 'Monthly' };
+    const premiums = entry?.premiums;
+    if (Array.isArray(premiums) && premiums.length > 0) {
+        const active = premiums.filter((p) => parseFloat(p.amount) > 0);
+        if (active.length === 0) {
+            return { value: '', frequency: 'Annual' };
+        }
+        const frequencies = [...new Set(
+            active.map((p) => normalizeToCashFlowFrequency(p.frequency)),
+        )];
+        if (frequencies.length === 1) {
+            const total = active.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+            return {
+                value: String(Math.round(total)),
+                frequency: frequencies[0],
+            };
+        }
+        const monthly = getLifeMemberMonthlyTotal(entry);
+        return { value: String(Math.round(monthly)), frequency: 'Monthly' };
     }
-    return { value: String(Math.round(monthly)), frequency: 'Monthly' };
+
+    const val = parseFloat(entry?.value) || 0;
+    if (val <= 0) {
+        return { value: '', frequency: 'Annual' };
+    }
+    return {
+        value: entry.value,
+        frequency: normalizeToCashFlowFrequency(entry.frequency),
+    };
 }
 
 export function migrateLifeEntry(entry) {
@@ -79,7 +107,7 @@ export function migrateLifeEntry(entry) {
         policyCount,
         premiums: resizePremiums([], policyCount),
         value: '',
-        frequency: 'Monthly',
+        frequency: 'Annual',
     };
 }
 
