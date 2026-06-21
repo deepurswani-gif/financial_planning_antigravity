@@ -15,6 +15,8 @@ import {
     getMemberDetailMonthlyTotal,
     getSummaryIncomeTarget,
     shouldIncludeSpouseIncome,
+    TDS_ASSUMPTION_NOTE,
+    TDS_ALREADY_DEDUCTED_NOTE,
 } from './incomeDetailSync';
 import ReconciliationStatus from './ReconciliationStatus';
 import ReconciliationStickyPanel from './ReconciliationStickyPanel';
@@ -35,7 +37,7 @@ const formatInr = (val) => {
     }).format(val);
 };
 
-const CurrencyField = ({ label, value, onChange, placeholder = '0' }) => (
+const CurrencyField = ({ label, value, onChange, placeholder = '0', readOnly = false }) => (
     <div>
         {label && (
             <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.4rem', display: 'block' }}>
@@ -49,9 +51,30 @@ const CurrencyField = ({ label, value, onChange, placeholder = '0' }) => (
                 className="conversational-input"
                 placeholder={placeholder}
                 value={value || ''}
-                onChange={(e) => onChange(e.target.value)}
+                readOnly={readOnly}
+                onChange={(e) => !readOnly && onChange(e.target.value)}
+                style={readOnly ? {
+                    background: 'var(--bg-main)',
+                    color: 'var(--text-muted)',
+                    cursor: 'default',
+                } : undefined}
             />
         </div>
+    </div>
+);
+
+const AssumptionNote = ({ children }) => (
+    <div style={{
+        padding: '0.75rem 1rem',
+        background: '#f0f9ff',
+        borderLeft: '4px solid #0284c7',
+        borderRadius: '4px',
+        marginTop: '0.75rem',
+        fontSize: '0.82rem',
+        color: '#0c4a6e',
+        textAlign: 'left',
+    }}>
+        <strong>Assumption:</strong> {children}
     </div>
 );
 
@@ -240,6 +263,11 @@ const DetailedMoneyInOut = () => {
                     value={d.employeePF}
                     onChange={(v) => updateTaxField(memberKey, 'deductions', 'employeePF', v)}
                 />
+                <CurrencyField
+                    label="Income Tax (TDS)"
+                    value={d.incomeTax}
+                    onChange={(v) => updateTaxField(memberKey, 'deductions', 'incomeTax', v)}
+                />
                 {isGov ? (
                     <>
                         <CurrencyField label="Group Insurance" value={d.groupInsurance} onChange={(v) => updateTaxField(memberKey, 'deductions', 'groupInsurance', v)} />
@@ -272,6 +300,7 @@ const DetailedMoneyInOut = () => {
         const isBiz = isBusinessEmployment(employmentType);
         const isPen = isPensionerEmployment(employmentType);
         const showTaxSlip = isSal && detail.needTaxPlanning === true;
+        const showSimpleSalaried = isSal && detail.needTaxPlanning === false;
         const summaryAmount = getSummaryIncomeTarget(income, memberKey);
         const memberReconciliation = reconcileMemberIncome(summaryAmount, detail, employmentType);
         const detailTotal = getMemberDetailMonthlyTotal(detail, employmentType);
@@ -299,45 +328,9 @@ const DetailedMoneyInOut = () => {
                     }}
                 >
                     {isSal && (
-                        <>
-                            <CurrencyField
-                                label="Gross Salary"
-                                value={detail.grossSalary}
-                                onChange={(v) => updateDetail(memberKey, { grossSalary: v })}
-                            />
-                            <CurrencyField
-                                label="In-hand-salary"
-                                value={detail.inHandSalary}
-                                onChange={(v) => updateDetail(memberKey, { inHandSalary: v })}
-                            />
-                        </>
-                    )}
-                    {isBiz && (
-                        <>
-                            <CurrencyField
-                                label="Take-home-profit"
-                                value={detail.takeHomeProfit}
-                                onChange={(v) => updateDetail(memberKey, { takeHomeProfit: v })}
-                            />
-                            <CurrencyField
-                                label="Passive Income like rent"
-                                value={detail.passiveIncome}
-                                onChange={(v) => updateDetail(memberKey, { passiveIncome: v })}
-                            />
-                        </>
-                    )}
-                    {isPen && (
-                        <CurrencyField
-                            label="Net Pension Received"
-                            value={detail.netPension}
-                            onChange={(v) => updateDetail(memberKey, { netPension: v })}
-                        />
-                    )}
-                    {otherIncomeFields(memberKey, detail)}
-                    {isSal && (
-                        <div style={{ marginTop: '0.5rem' }}>
+                        <div>
                             <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.75rem', display: 'block' }}>
-                                I need Tax planning
+                                Do you need Tax planning
                             </label>
                             {yesNoToggle(
                                 detail.needTaxPlanning === true ? true : detail.needTaxPlanning === false ? false : null,
@@ -346,16 +339,22 @@ const DetailedMoneyInOut = () => {
                             )}
                         </div>
                     )}
+
+                    {showSimpleSalaried && (
+                        <>
+                            <CurrencyField
+                                label="In-hand-salary"
+                                value={detail.inHandSalary}
+                                onChange={(v) => updateDetail(memberKey, { inHandSalary: v })}
+                            />
+                            {otherIncomeFields(memberKey, detail)}
+                            <AssumptionNote>{TDS_ALREADY_DEDUCTED_NOTE}</AssumptionNote>
+                        </>
+                    )}
+
                     {showTaxSlip && (
-                        <div
-                            style={{
-                                marginTop: '1.25rem',
-                                paddingTop: '1.25rem',
-                                borderTop: '1px solid var(--border)',
-                                textAlign: 'left',
-                            }}
-                        >
-                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem', textAlign: 'center' }}>
+                        <>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.25rem', textAlign: 'center' }}>
                                 Break down your earnings and deductions — like filling a salary slip.
                             </p>
                             <div
@@ -396,7 +395,45 @@ const DetailedMoneyInOut = () => {
                                     {buildTaxDeductionsFields(memberKey, detail, employmentType)}
                                 </div>
                             </div>
-                        </div>
+                            <CurrencyField
+                                label="Gross Salary"
+                                value={detail.grossSalary}
+                                readOnly
+                            />
+                            <CurrencyField
+                                label="In-hand-salary"
+                                value={detail.inHandSalary}
+                                readOnly
+                            />
+                            {otherIncomeFields(memberKey, detail)}
+                            <AssumptionNote>{TDS_ASSUMPTION_NOTE}</AssumptionNote>
+                        </>
+                    )}
+
+                    {isBiz && (
+                        <>
+                            <CurrencyField
+                                label="Take-home-profit"
+                                value={detail.takeHomeProfit}
+                                onChange={(v) => updateDetail(memberKey, { takeHomeProfit: v })}
+                            />
+                            <CurrencyField
+                                label="Passive Income like rent"
+                                value={detail.passiveIncome}
+                                onChange={(v) => updateDetail(memberKey, { passiveIncome: v })}
+                            />
+                            {otherIncomeFields(memberKey, detail)}
+                        </>
+                    )}
+                    {isPen && (
+                        <>
+                            <CurrencyField
+                                label="Net Pension Received"
+                                value={detail.netPension}
+                                onChange={(v) => updateDetail(memberKey, { netPension: v })}
+                            />
+                            {otherIncomeFields(memberKey, detail)}
+                        </>
                     )}
                 </div>
             </div>

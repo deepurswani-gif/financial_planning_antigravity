@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
     reconcileMemberIncome,
+    reconcileSalarySlip,
+    computeMonthlyGrossFromSalarySlip,
+    computeMonthlyDeductionsFromSalarySlip,
+    buildMonthlyTdsArray,
+    syncLedgerTdsFromIncome,
     getMemberDetailMonthlyTotal,
     initializeIncomeSnapshots,
     normalizeIncomeState,
@@ -12,6 +17,7 @@ import {
     computeAnnualSalaryFromTaxSlip,
     sumOtherIncomeAnnual,
     scaleIncomeDetail,
+    applySalarySlipDerivedTotals,
     getMemberAnnualGrossFromDetail,
     getMemberDetailForProjection,
     shouldIncludeSpouseIncome,
@@ -130,6 +136,33 @@ describe('incomeDetailSync', () => {
         expect(input.annualSalary).toBe(900000);
     });
 
+    it('buildTaxInput returns null when salaried tax planning is disabled', () => {
+        expect(buildTaxInput({
+            needTaxPlanning: false,
+            inHandSalary: '100000',
+        }, 'Private Sector')).toBeNull();
+    });
+
+    it('buildTaxInput returns null when tax planning is enabled but salary slip is empty', () => {
+        expect(buildTaxInput({
+            needTaxPlanning: true,
+            inHandSalary: '100000',
+        }, 'Private Sector')).toBeNull();
+    });
+
+    it('applySalarySlipDerivedTotals computes gross and in-hand from salary slip', () => {
+        const detail = applySalarySlipDerivedTotals({
+            needTaxPlanning: true,
+            taxPlanning: {
+                earnings: { basicPay: '70000', dearnessAllowance: '10000', performanceBonus: '120000' },
+                deductions: { employeePF: '12000', incomeTax: '6000' },
+            },
+        }, 'Private Sector');
+
+        expect(detail.grossSalary).toBe('90000');
+        expect(detail.inHandSalary).toBe('72000');
+    });
+
     it('computeAnnualSalaryFromTaxSlip treats performance bonus as annual', () => {
         const annual = computeAnnualSalaryFromTaxSlip({
             taxPlanning: { earnings: { basicPay: '80000', performanceBonus: '120000' } },
@@ -137,12 +170,13 @@ describe('incomeDetailSync', () => {
         expect(annual).toBe(1080000);
     });
 
-    it('scaleIncomeDetail scales primary income and tax slip components', () => {
+    it('scaleIncomeDetail scales primary income, tax slip components, and incomeTax', () => {
         const scaled = scaleIncomeDetail({
             inHandSalary: '100000',
             otherIncome: [{ amount: '5000' }],
             taxPlanning: {
                 earnings: { basicPay: '80000', performanceBonus: '120000' },
+                deductions: { incomeTax: '8000', employeePF: '12000' },
             },
         }, 1.1);
 
@@ -150,6 +184,8 @@ describe('incomeDetailSync', () => {
         expect(scaled.otherIncome[0].amount).toBe('5500');
         expect(scaled.taxPlanning.earnings.basicPay).toBe('88000');
         expect(scaled.taxPlanning.earnings.performanceBonus).toBe('132000');
+        expect(scaled.taxPlanning.deductions.incomeTax).toBe('8800');
+        expect(scaled.taxPlanning.deductions.employeePF).toBe('13200');
     });
 
     it('getMemberAnnualGrossFromDetail uses tax slip gross when enabled', () => {
@@ -159,6 +195,94 @@ describe('incomeDetailSync', () => {
             taxPlanning: { earnings: { basicPay: '70000' } },
         }, 'Private Sector');
         expect(gross).toBe(840000);
+    });
+
+    it('reconcileSalarySlip matches when gross minus deductions equals in-hand salary', () => {
+        const result = reconcileSalarySlip({
+            grossSalary: '100000',
+            inHandSalary: '82000',
+            taxPlanning: {
+                deductions: {
+                    employeePF: '12000',
+                    incomeTax: '6000',
+                },
+            },
+        }, 'Private Sector');
+
+        expect(result.status).toBe('match');
+        expect(result.gross).toBe(100000);
+        expect(result.deductions).toBe(18000);
+        expect(result.computedInHand).toBe(82000);
+    });
+
+    it('reconcileSalarySlip flags partial deductions when only TDS is entered', () => {
+        const result = reconcileSalarySlip({
+            grossSalary: '100000',
+            inHandSalary: '82000',
+            taxPlanning: { deductions: { incomeTax: '6000' } },
+        }, 'Private Sector');
+
+        expect(result.isPartial).toBe(true);
+        expect(result.status).toBe('over');
+    });
+
+    it('buildMonthlyTdsArray repeats the same monthly amount across all months', () => {
+        expect(buildMonthlyTdsArray('7500')).toEqual(Array(12).fill(7500));
+    });
+
+    it('syncLedgerTdsFromIncome populates selfIncomeTax when salary-slip TDS is entered', () => {
+        const familyMembers = [{ relation: 'Self', employmentType: 'Private Sector' }];
+        const income = {
+            selfDetail: {
+                taxPlanning: { deductions: { incomeTax: '5000' } },
+            },
+        };
+        const next = syncLedgerTdsFromIncome(
+            { income: Array(12).fill(0), household: Array(12).fill(0) },
+            income,
+            familyMembers,
+            false,
+            resolveEmploymentType,
+            5,
+        );
+
+        expect(next.selfIncomeTax).toEqual(Array(12).fill(5000));
+    });
+
+    it('syncLedgerTdsFromIncome preserves manual ledger edits until salary-slip TDS changes', () => {
+        const familyMembers = [{ relation: 'Self', employmentType: 'Private Sector' }];
+        const income = {
+            selfDetail: {
+                taxPlanning: { deductions: { incomeTax: '5000' } },
+            },
+        };
+        const ledger = {
+            selfIncomeTax: [...Array(8).fill(5000), 6000, ...Array(3).fill(6000)],
+        };
+
+        const unchanged = syncLedgerTdsFromIncome(
+            ledger,
+            income,
+            familyMembers,
+            false,
+            resolveEmploymentType,
+            5,
+        );
+        expect(unchanged).toBe(ledger);
+
+        const updated = syncLedgerTdsFromIncome(
+            ledger,
+            {
+                selfDetail: {
+                    taxPlanning: { deductions: { incomeTax: '5500' } },
+                },
+            },
+            familyMembers,
+            false,
+            resolveEmploymentType,
+            5,
+        );
+        expect(updated.selfIncomeTax).toEqual(Array(12).fill(5500));
     });
 
     it('getMemberDetailForProjection falls back to legacy self income', () => {

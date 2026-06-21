@@ -7,6 +7,7 @@ import {
     createEmptyIncomeDetail,
     isPensionerEmployment,
     isSalariedEmployment,
+    hasTaxSlipEarnings,
     scaleIncomeDetail,
 } from '../DetailedFlow/incomeDetailSync';
 
@@ -485,6 +486,7 @@ export function calculateIncomeTaxFromInput(taxInput) {
 
 export function calculateIncomeTaxFromDetail(detail, employmentType) {
     const taxInput = buildTaxInput(detail, employmentType);
+    if (!taxInput) return null;
     return calculateIncomeTaxFromInput(taxInput);
 }
 
@@ -492,7 +494,9 @@ export function calculateIncomeTaxFromDetail(detail, employmentType) {
 export function calculateProjectedMemberTax(detail, employmentType, yearIndex, incomeIncrementPercent = 0) {
     const factor = Math.pow(1 + (incomeIncrementPercent / 100), yearIndex);
     const scaledDetail = scaleIncomeDetail(detail, factor);
-    return calculateIncomeTaxFromDetail(scaledDetail, employmentType);
+    const result = calculateIncomeTaxFromDetail(scaledDetail, employmentType);
+    if (!result) return calculateIncomeTaxFromInput(null);
+    return result;
 }
 
 /** Legacy entry point for cash-flow / projection callers using flat monthly keys. */
@@ -516,12 +520,28 @@ export const PENSIONER_STANDARD_DEDUCTION_NOTE =
 export const IN_HAND_SALARY_ESTIMATE_NOTE =
     'Estimated from in-hand salary only. Enable tax planning in Income Details and fill your salary slip for a gross-based calculation.';
 
+export const TAX_PLANNING_DISABLED_NOTE =
+    'Income tax is not estimated because tax planning is disabled. Choose Yes under Tax planning in Income Details and fill your salary slip to calculate tax.';
+
+export const TAX_SLIP_REQUIRED_NOTE =
+    'Fill your salary slip under Income Details to calculate income tax from your gross earnings and deductions.';
+
 export function showPensionerTaxNote(employmentType) {
     return isPensionerEmployment(employmentType);
 }
 
 export function showInHandSalaryEstimateNote(detail, employmentType) {
+    return false;
+}
+
+export function showTaxPlanningDisabledNote(detail, employmentType) {
     return isSalariedEmployment(employmentType) && detail?.needTaxPlanning !== true;
+}
+
+export function showTaxSlipRequiredNote(detail, employmentType) {
+    return isSalariedEmployment(employmentType)
+        && detail?.needTaxPlanning === true
+        && !hasTaxSlipEarnings(detail);
 }
 
 export function getIncomeLabelForEmployment(employmentType) {

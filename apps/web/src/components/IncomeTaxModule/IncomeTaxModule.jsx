@@ -2,9 +2,11 @@ import React from 'react';
 import {
     calculateIncomeTaxFromDetail,
     showPensionerTaxNote,
-    showInHandSalaryEstimateNote,
+    showTaxPlanningDisabledNote,
+    showTaxSlipRequiredNote,
     PENSIONER_STANDARD_DEDUCTION_NOTE,
-    IN_HAND_SALARY_ESTIMATE_NOTE,
+    TAX_PLANNING_DISABLED_NOTE,
+    TAX_SLIP_REQUIRED_NOTE,
 } from './IncomeTaxLogic';
 import IncomeTaxOutput from './IncomeTaxOutput';
 import { guessEmploymentTypeFromSummaryOccupation } from '../DetailedFlow/employmentTypeSync';
@@ -35,7 +37,7 @@ const IncomeTaxModule = ({ familyMembers, income, onNext, onBack, isCalculatorMo
 
     const renderMemberTax = (member, employmentType, detail, taxResults) => (
         <>
-            {showInHandSalaryEstimateNote(detail, employmentType) && (
+            {showTaxPlanningDisabledNote(detail, employmentType) && (
                 <div style={{
                     padding: '0.75rem 1rem',
                     background: '#f0f9ff',
@@ -45,7 +47,20 @@ const IncomeTaxModule = ({ familyMembers, income, onNext, onBack, isCalculatorMo
                     fontSize: '0.85rem',
                     color: '#0c4a6e',
                 }}>
-                    {IN_HAND_SALARY_ESTIMATE_NOTE}
+                    {TAX_PLANNING_DISABLED_NOTE}
+                </div>
+            )}
+            {showTaxSlipRequiredNote(detail, employmentType) && (
+                <div style={{
+                    padding: '0.75rem 1rem',
+                    background: '#fefce8',
+                    borderLeft: '4px solid #ca8a04',
+                    borderRadius: '4px',
+                    marginBottom: '1rem',
+                    fontSize: '0.85rem',
+                    color: '#854d0e',
+                }}>
+                    {TAX_SLIP_REQUIRED_NOTE}
                 </div>
             )}
             {showPensionerTaxNote(employmentType) && (
@@ -61,7 +76,7 @@ const IncomeTaxModule = ({ familyMembers, income, onNext, onBack, isCalculatorMo
                     <strong>Assumption:</strong> {PENSIONER_STANDARD_DEDUCTION_NOTE}
                 </div>
             )}
-            <IncomeTaxOutput results={taxResults} />
+            {taxResults && <IncomeTaxOutput results={taxResults} />}
         </>
     );
 

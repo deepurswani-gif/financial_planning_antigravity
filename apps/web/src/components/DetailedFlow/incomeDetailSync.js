@@ -18,9 +18,16 @@ export const createEmptyTaxPlanning = () => ({
         healthScheme: '',
         groupPersonalAccident: '',
         groupMedicalCoverage: '',
+        incomeTax: '',
         other: { name: '', amount: '' },
     },
 });
+
+export const TDS_ASSUMPTION_NOTE =
+    'For months before you started planning with Finbrella, we assume the same TDS was deducted each month.';
+
+export const TDS_ALREADY_DEDUCTED_NOTE =
+    'It is assumed that Income tax (TDS) has already been deducted from your salary.';
 
 export const createEmptyIncomeDetail = () => ({
     grossSalary: '',
@@ -206,13 +213,25 @@ export function normalizeIncomeState(income = {}) {
 }
 
 export function applyDetailSyncToIncome(income, selfEmploymentType, spouseEmploymentType) {
-    const selfLegacy = syncLegacyFromDetail(income.selfDetail, selfEmploymentType);
+    let selfDetail = { ...createEmptyIncomeDetail(), ...(income.selfDetail || {}) };
+    let spouseDetail = { ...createEmptyIncomeDetail(), ...(income.spouseDetail || {}) };
+
+    if (isSalariedEmployment(selfEmploymentType) && selfDetail.needTaxPlanning === true) {
+        selfDetail = applySalarySlipDerivedTotals(selfDetail, selfEmploymentType);
+    }
+    if (spouseEmploymentType && isSalariedEmployment(spouseEmploymentType) && spouseDetail.needTaxPlanning === true) {
+        spouseDetail = applySalarySlipDerivedTotals(spouseDetail, spouseEmploymentType);
+    }
+
+    const selfLegacy = syncLegacyFromDetail(selfDetail, selfEmploymentType);
     const spouseLegacy = spouseEmploymentType
-        ? syncLegacyFromDetail(income.spouseDetail, spouseEmploymentType)
+        ? syncLegacyFromDetail(spouseDetail, spouseEmploymentType)
         : { primary: '', bonus: '', passive: '', other: '' };
 
     return {
         ...income,
+        selfDetail,
+        spouseDetail,
         self: selfLegacy.primary,
         selfBonus: selfLegacy.bonus,
         selfPassive: selfLegacy.passive,
@@ -269,10 +288,16 @@ export function buildTaxInput(detail, employmentType) {
     const otherIncomeAnnual = sumOtherIncomeAnnual(d.otherIncome);
 
     if (isSalariedEmployment(employmentType)) {
-        const usedTaxSlip = d.needTaxPlanning === true && hasTaxSlipEarnings(d);
-        const annualSalary = usedTaxSlip
-            ? computeAnnualSalaryFromTaxSlip(d, employmentType)
-            : parseAmount(d.inHandSalary) * 12;
+        if (d.needTaxPlanning !== true) {
+            return null;
+        }
+
+        const usedTaxSlip = hasTaxSlipEarnings(d);
+        if (!usedTaxSlip) {
+            return null;
+        }
+
+        const annualSalary = computeAnnualSalaryFromTaxSlip(d, employmentType);
         const incomeFromSalary = Math.max(0, annualSalary - STANDARD_DEDUCTION);
         const taxableIncome = incomeFromSalary + otherIncomeAnnual;
 
@@ -283,7 +308,7 @@ export function buildTaxInput(detail, employmentType) {
             standardDeduction: STANDARD_DEDUCTION,
             taxableIncome,
             grossTotalIncome: annualSalary + otherIncomeAnnual,
-            usedTaxSlip,
+            usedTaxSlip: true,
             employmentType,
         };
     }
@@ -348,7 +373,184 @@ const TAX_SLIP_DEDUCTION_KEYS = [
     'healthScheme',
     'groupPersonalAccident',
     'groupMedicalCoverage',
+    'incomeTax',
 ];
+
+/** Monthly gross derived from salary-slip earnings (including annual extras spread monthly). */
+export function computeDerivedMonthlyGrossFromEarnings(detail, employmentType) {
+    const earnings = detail?.taxPlanning?.earnings || {};
+    const monthlyBase = TAX_SLIP_MONTHLY_KEYS.reduce(
+        (sum, key) => sum + parseAmount(earnings[key]),
+        0,
+    );
+    let monthlyExtras = parseAmount(earnings.other?.amount) / 12;
+    if (isGovernmentSector(employmentType)) {
+        monthlyExtras += (parseAmount(earnings.bonus) + parseAmount(earnings.leaveEncashment)) / 12;
+    } else {
+        monthlyExtras += parseAmount(earnings.performanceBonus) / 12;
+    }
+    return Math.round(monthlyBase + monthlyExtras);
+}
+
+/** Monthly gross for reconciliation helpers — prefers derived earnings, else stored gross salary. */
+export function computeMonthlyGrossFromSalarySlip(detail, employmentType) {
+    const d = { ...createEmptyIncomeDetail(), ...detail };
+    if (hasTaxSlipEarnings(d)) {
+        return computeDerivedMonthlyGrossFromEarnings(d, employmentType);
+    }
+    return parseAmount(d.grossSalary);
+}
+
+/** Monthly in-hand derived from salary-slip gross minus all deductions. */
+export function computeDerivedMonthlyInHandFromSlip(detail, employmentType) {
+    const gross = computeDerivedMonthlyGrossFromEarnings(detail, employmentType);
+    const deductions = computeMonthlyDeductionsFromSalarySlip(detail);
+    return Math.round(gross - deductions);
+}
+
+/** Auto-fill grossSalary and inHandSalary from salary-slip components when tax planning is enabled. */
+export function applySalarySlipDerivedTotals(detail, employmentType) {
+    if (detail?.needTaxPlanning !== true || !isSalariedEmployment(employmentType)) {
+        return detail;
+    }
+
+    const gross = computeDerivedMonthlyGrossFromEarnings(detail, employmentType);
+    const inHand = computeDerivedMonthlyInHandFromSlip(detail, employmentType);
+
+    return {
+        ...detail,
+        grossSalary: gross > 0 ? String(gross) : '',
+        inHandSalary: gross > 0 || inHand !== 0 ? String(inHand) : '',
+    };
+}
+
+/** Sum of all monthly salary-slip deductions, including Income Tax (TDS). */
+export function computeMonthlyDeductionsFromSalarySlip(detail) {
+    const deductions = detail?.taxPlanning?.deductions || {};
+    const fixedTotal = TAX_SLIP_DEDUCTION_KEYS.reduce(
+        (sum, key) => sum + parseAmount(deductions[key]),
+        0,
+    );
+    return fixedTotal + parseAmount(deductions.other?.amount);
+}
+
+/** True when only TDS is entered — PF/insurance may explain any in-hand gap. */
+export function hasPartialSalarySlipDeductions(detail) {
+    const deductions = detail?.taxPlanning?.deductions || {};
+    const incomeTax = parseAmount(deductions.incomeTax);
+    if (incomeTax <= 0) return false;
+
+    const otherDeductions = TAX_SLIP_DEDUCTION_KEYS
+        .filter((key) => key !== 'incomeTax')
+        .reduce((sum, key) => sum + parseAmount(deductions[key]), 0)
+        + parseAmount(deductions.other?.amount);
+
+    return otherDeductions <= 0;
+}
+
+/**
+ * Compare entered in-hand salary with gross minus salary-slip deductions.
+ * Informational only — in-hand is already net of TDS in cash-flow terms.
+ */
+export function reconcileSalarySlip(detail, employmentType) {
+    const gross = computeMonthlyGrossFromSalarySlip(detail, employmentType);
+    const deductions = computeMonthlyDeductionsFromSalarySlip(detail);
+    const computedInHand = gross - deductions;
+    const enteredInHand = parseAmount(detail?.inHandSalary);
+
+    if (gross <= 0 && enteredInHand <= 0) {
+        return {
+            gross,
+            deductions,
+            computedInHand,
+            enteredInHand,
+            isPartial: hasPartialSalarySlipDeductions(detail),
+            status: 'empty',
+            delta: 0,
+        };
+    }
+
+    const reconciliation = reconcileAmounts(enteredInHand, computedInHand);
+
+    return {
+        gross,
+        deductions,
+        computedInHand,
+        enteredInHand,
+        isPartial: hasPartialSalarySlipDeductions(detail),
+        ...reconciliation,
+    };
+}
+
+/** Build a 12-month TDS ledger row from a single monthly amount (same value each month). */
+export function buildMonthlyTdsArray(monthlyAmount) {
+    const amount = Math.round(parseAmount(monthlyAmount));
+    return Array(12).fill(amount);
+}
+
+/**
+ * Sync self/spouse TDS ledger arrays from salary-slip incomeTax fields.
+ * Re-syncs all months when the source incomeTax value changes; preserves manual ledger edits otherwise.
+ */
+export function syncLedgerTdsFromIncome(
+    ledger,
+    income,
+    familyMembers,
+    hasSpouseIncome,
+    resolveEmploymentType,
+    planStartMonth = 0,
+) {
+    const prev = ledger || {};
+    const selfMember = familyMembers?.find((m) => m.relation?.toLowerCase() === 'self');
+    const spouseMember = familyMembers?.find((m) => m.relation?.toLowerCase() === 'spouse');
+    if (!selfMember) return prev;
+
+    const selfType = resolveEmploymentType(selfMember);
+    const spouseType = spouseMember ? resolveEmploymentType(spouseMember) : '';
+    const includeSpouse = shouldIncludeSpouseIncome(spouseMember, hasSpouseIncome, income);
+
+    const selfDetail = { ...createEmptyIncomeDetail(), ...(income.selfDetail || {}) };
+    const spouseDetail = { ...createEmptyIncomeDetail(), ...(income.spouseDetail || {}) };
+
+    const selfAmount = isSalariedEmployment(selfType)
+        ? parseAmount(selfDetail.taxPlanning?.deductions?.incomeTax)
+        : 0;
+    const spouseAmount = includeSpouse && isSalariedEmployment(spouseType)
+        ? parseAmount(spouseDetail.taxPlanning?.deductions?.incomeTax)
+        : 0;
+
+    const anchorMonth = Math.min(Math.max(planStartMonth, 0), 11);
+    const prevSelf = prev.selfIncomeTax || Array(12).fill(0);
+    const prevSpouse = prev.spouseIncomeTax || Array(12).fill(0);
+    const ledgerSelfRef = parseAmount(prevSelf[anchorMonth]);
+    const ledgerSpouseRef = parseAmount(prevSpouse[anchorMonth]);
+
+    let next = { ...prev };
+    let changed = false;
+
+    const shouldResync = (detailAmount, ledgerRef, prevArr) => {
+        if (detailAmount <= 0 && prevArr.every((val) => parseAmount(val) <= 0)) return false;
+        if (detailAmount !== ledgerRef) return true;
+        return prevArr.every((val) => parseAmount(val) <= 0) && detailAmount > 0;
+    };
+
+    if (shouldResync(selfAmount, ledgerSelfRef, prevSelf)) {
+        next.selfIncomeTax = buildMonthlyTdsArray(selfAmount);
+        changed = true;
+    }
+
+    if (includeSpouse) {
+        if (shouldResync(spouseAmount, ledgerSpouseRef, prevSpouse)) {
+            next.spouseIncomeTax = buildMonthlyTdsArray(spouseAmount);
+            changed = true;
+        }
+    } else if (prev.spouseIncomeTax) {
+        next.spouseIncomeTax = Array(12).fill(0);
+        changed = true;
+    }
+
+    return changed ? next : prev;
+}
 
 /** Scale all monetary fields in an income detail for projection years. */
 export function scaleIncomeDetail(detail, factor) {

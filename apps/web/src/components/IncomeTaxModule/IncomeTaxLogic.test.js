@@ -7,6 +7,8 @@ import {
     calculateSurcharge,
     calculateIncomeTaxFromInput,
     showInHandSalaryEstimateNote,
+    showTaxPlanningDisabledNote,
+    showTaxSlipRequiredNote,
     buildTaxBreakdownPresentation,
 } from './IncomeTaxLogic';
 import { buildTaxInput, computeAnnualSalaryFromTaxSlip } from '../DetailedFlow/incomeDetailSync';
@@ -68,10 +70,8 @@ describe('IncomeTaxLogic', () => {
             inHandSalary: '100000',
             otherIncome: [{ amount: '' }],
         };
-        const taxInput = buildTaxInput(detail, 'Private Sector');
-        expect(taxInput.usedTaxSlip).toBe(false);
-        expect(taxInput.annualSalary).toBe(1200000);
-        expect(taxInput.taxableIncome).toBe(1125000);
+        expect(buildTaxInput(detail, 'Private Sector')).toBeNull();
+        expect(calculateIncomeTaxFromDetail(detail, 'Private Sector')).toBeNull();
     });
 
     it('applies standard deduction for pensioner income', () => {
@@ -198,10 +198,19 @@ describe('IncomeTaxLogic', () => {
         expect(annualSalary).toBe((50000 + 10000 + 8000 + 2000) * 12 + 50000 + 30000 + 12000);
     });
 
-    it('shows in-hand salary estimate note for salaried members without tax planning', () => {
-        expect(showInHandSalaryEstimateNote({ needTaxPlanning: false }, 'Private Sector')).toBe(true);
-        expect(showInHandSalaryEstimateNote({ needTaxPlanning: true }, 'Private Sector')).toBe(false);
-        expect(showInHandSalaryEstimateNote({ needTaxPlanning: false }, 'Business Owner')).toBe(false);
+    it('shows tax planning disabled note for salaried members without tax planning', () => {
+        expect(showTaxPlanningDisabledNote({ needTaxPlanning: false }, 'Private Sector')).toBe(true);
+        expect(showTaxPlanningDisabledNote({ needTaxPlanning: true }, 'Private Sector')).toBe(false);
+        expect(showTaxPlanningDisabledNote({ needTaxPlanning: false }, 'Business Owner')).toBe(false);
+        expect(showInHandSalaryEstimateNote({ needTaxPlanning: false }, 'Private Sector')).toBe(false);
+    });
+
+    it('shows tax slip required note when tax planning is enabled without earnings', () => {
+        expect(showTaxSlipRequiredNote({ needTaxPlanning: true }, 'Private Sector')).toBe(true);
+        expect(showTaxSlipRequiredNote({
+            needTaxPlanning: true,
+            taxPlanning: { earnings: { basicPay: '70000' } },
+        }, 'Private Sector')).toBe(false);
     });
 
     it('builds slab breakdown with income in slab and formula text', () => {
@@ -265,8 +274,12 @@ describe('IncomeTaxLogic', () => {
 
     it('calculateProjectedMemberTax matches year 0 with calculateIncomeTaxFromDetail', () => {
         const detail = {
+            needTaxPlanning: true,
             inHandSalary: '100000',
             otherIncome: [{ amount: '5000' }],
+            taxPlanning: {
+                earnings: { basicPay: '100000' },
+            },
         };
         const yearZero = calculateProjectedMemberTax(detail, 'Private Sector', 0, 10);
         const direct = calculateIncomeTaxFromDetail(detail, 'Private Sector');
@@ -274,7 +287,10 @@ describe('IncomeTaxLogic', () => {
     });
 
     it('calculateProjectedMemberTax increases tax when income grows above rebate threshold', () => {
-        const detail = { inHandSalary: '95000' };
+        const detail = {
+            needTaxPlanning: true,
+            taxPlanning: { earnings: { basicPay: '95000' } },
+        };
         const yearZero = calculateProjectedMemberTax(detail, 'Private Sector', 0, 10);
         const yearFive = calculateProjectedMemberTax(detail, 'Private Sector', 5, 10);
         expect(yearFive.finalTax).toBeGreaterThanOrEqual(yearZero.finalTax);

@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useMemo, useCall
 import { useAuth } from './AuthContext';
 import { createFinancialPlan, getActivePlan, updateFinancialPlan, markSummaryReportGenerated } from '../services/financialPlanService';
 import { generateProjections } from '../components/JourneyModule/ProjectionLogic';
-import { normalizeIncomeState, getHouseholdMonthlyInflow } from '../components/DetailedFlow/incomeDetailSync';
+import { normalizeIncomeState, getHouseholdMonthlyInflow, syncLedgerTdsFromIncome } from '../components/DetailedFlow/incomeDetailSync';
 import { resolveEmploymentType } from '../components/DetailedFlow/employmentTypeSync';
 import { syncLedgerFromMonthlyTotals } from '../components/CashFlowModule/CashFlowLogic';
 import { initializeExpenseSnapshots, hasAnyEmiCommitment } from '../components/DetailedFlow/expenseDetailSync';
@@ -100,7 +100,10 @@ export const FinancialPlanProvider = ({ children }) => {
   });
 
   const [currentYearLedger, setCurrentYearLedger] = useState({
-    income: Array(12).fill(0), household: Array(12).fill(0)
+    income: Array(12).fill(0),
+    household: Array(12).fill(0),
+    selfIncomeTax: Array(12).fill(0),
+    spouseIncomeTax: Array(12).fill(0),
   });
   const [cashFlowSubStep, setCashFlowSubStep] = useState(1);
 
@@ -128,8 +131,18 @@ export const FinancialPlanProvider = ({ children }) => {
       .filter(([key]) => key !== 'education')
       .reduce((sum, [_, val]) => sum + (parseFloat(val) || 0), 0);
 
-    setCurrentYearLedger((prev) => syncLedgerFromMonthlyTotals(prev, monthlyIncome, monthlyHousehold));
-  }, [loading, income, familyMembers, hasSpouseIncome, expenseCategories.household]);
+    setCurrentYearLedger((prev) => {
+      const synced = syncLedgerFromMonthlyTotals(prev, monthlyIncome, monthlyHousehold);
+      return syncLedgerTdsFromIncome(
+        synced,
+        income,
+        familyMembers,
+        hasSpouseIncome,
+        resolveEmploymentType,
+        planStartMonth,
+      );
+    });
+  }, [loading, income, familyMembers, hasSpouseIncome, expenseCategories.household, planStartMonth]);
 
   const resetState = () => {
     setPlanId(null);

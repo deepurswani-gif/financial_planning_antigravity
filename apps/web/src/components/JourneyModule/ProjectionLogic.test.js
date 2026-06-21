@@ -165,9 +165,13 @@ describe('ProjectionLogic tax with cash-flow ledger', () => {
                 },
             },
             spouseDetail: {
-                needTaxPlanning: false,
-                inHandSalary: '150000',
+                needTaxPlanning: true,
+                inHandSalary: '',
                 otherIncome: [{ amount: '' }],
+                taxPlanning: {
+                    earnings: { basicPay: '150000' },
+                    deductions: { incomeTax: '10000', employeePF: '18000' },
+                },
             },
         },
         expenseCategories: {
