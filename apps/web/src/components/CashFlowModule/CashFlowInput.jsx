@@ -4,6 +4,7 @@ import { convertToMonthly, syncLedgerFromMonthlyTotals } from './CashFlowLogic';
 import LoanDetailsModal from './LoanDetailsModal';
 import InvestmentDetailsModal from './InvestmentDetailsModal';
 import DocumentUploadButton from '../common/DocumentUploadButton';
+import CurrencyInput from '../common/CurrencyInput';
 import { getHouseholdMonthlyInflow } from '../DetailedFlow/incomeDetailSync';
 import { resolveEmploymentType } from '../DetailedFlow/employmentTypeSync';
 
@@ -759,7 +760,7 @@ const CashFlowInput = ({ familyMembers, income, setIncome, expenseCategories, se
             </div>
             )}
 
-            <style jsx>{`
+            <style>{`
         .monthly-ledger-table input::-webkit-outer-spin-button,
         .monthly-ledger-table input::-webkit-inner-spin-button {
             -webkit-appearance: none;
