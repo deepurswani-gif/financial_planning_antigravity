@@ -92,9 +92,8 @@ describe('ProjectionLogic', () => {
         expect(results[0].insurancePremium).toBe(132000);
         // 120k savings (10k sip * 12) + 132k insurance = 252k
         expect(results[0].savingsAndInvestments).toBe(252000);
-        // Total outflow no longer involves insurance premium.
-        // household 20k*12 = 240k, emi 10k*12 = 120k, education 50k = 410k. total = 410k.
-        expect(results[0].totalOutflow).toBe(410000);
+        // household (20k rent + 5k education) * 12 = 300k, emi 10k*12 = 120k. School fee not double-counted.
+        expect(results[0].totalOutflow).toBe(420000);
     });
 
     it('uses Step 8 tax logic with selfDetail and standard deduction', () => {

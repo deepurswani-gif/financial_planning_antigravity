@@ -15,6 +15,7 @@ import SummaryAssets from './components/SummaryFlow/SummaryAssets';
 import SummaryLiabilities from './components/SummaryFlow/SummaryLiabilities';
 import SummaryGoals from './components/SummaryFlow/SummaryGoals';
 import SummaryReportView from './components/SummaryReport/SummaryReportView';
+import DetailedReportView from './components/DetailedReport/DetailedReportView';
 
 // Detailed Flow Placeholder
 import DetailedFamilyInfo from './components/DetailedFlow/DetailedFamilyInfo';
@@ -58,6 +59,12 @@ function App() {
         <Route path="/summary-report" element={<ProtectedRoute><BlankLayout /></ProtectedRoute>}>
           <Route index element={<Navigate to="money_story" replace />} />
           <Route path=":section" element={<SummaryReportView />} />
+        </Route>
+
+        {/* Detailed Report View */}
+        <Route path="/detailed-report" element={<ProtectedRoute><BlankLayout /></ProtectedRoute>}>
+          <Route index element={<Navigate to="your_money_flow" replace />} />
+          <Route path=":section" element={<DetailedReportView />} />
         </Route>
 
         {/* Legacy Existing App */}

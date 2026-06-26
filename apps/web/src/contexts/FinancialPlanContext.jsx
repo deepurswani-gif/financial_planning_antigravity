@@ -2,7 +2,8 @@ import React, { createContext, useContext, useState, useEffect, useMemo, useCall
 import { useAuth } from './AuthContext';
 import { createFinancialPlan, getActivePlan, updateFinancialPlan, markSummaryReportGenerated } from '../services/financialPlanService';
 import { generateProjections } from '../components/JourneyModule/ProjectionLogic';
-import { normalizeIncomeState, getHouseholdMonthlyInflow, syncLedgerTdsFromIncome } from '../components/DetailedFlow/incomeDetailSync';
+import { normalizeIncomeState } from '../components/DetailedFlow/incomeDetailSync';
+import { getLedgerNetIncomeMonthly, getLedgerHouseholdMonthly, computeTaxAdjustmentArray } from '../components/DetailedReport/moneyFlowLedgerLogic';
 import { resolveEmploymentType } from '../components/DetailedFlow/employmentTypeSync';
 import { syncLedgerFromMonthlyTotals } from '../components/CashFlowModule/CashFlowLogic';
 import { initializeExpenseSnapshots, hasAnyEmiCommitment } from '../components/DetailedFlow/expenseDetailSync';
@@ -102,8 +103,7 @@ export const FinancialPlanProvider = ({ children }) => {
   const [currentYearLedger, setCurrentYearLedger] = useState({
     income: Array(12).fill(0),
     household: Array(12).fill(0),
-    selfIncomeTax: Array(12).fill(0),
-    spouseIncomeTax: Array(12).fill(0),
+    taxAdjustment: Array(12).fill(0),
   });
   const [cashFlowSubStep, setCashFlowSubStep] = useState(1);
 
@@ -122,27 +122,22 @@ export const FinancialPlanProvider = ({ children }) => {
     }
   }, [familyMembers]);
 
-  // Keep ledger in sync with detailed in-hand income and household expenses (summary + detailed flows).
+  // Keep ledger in sync with detailed net inflow, household (incl. education), and tax adjustment.
   useEffect(() => {
     if (loading) return;
 
-    const monthlyIncome = getHouseholdMonthlyInflow(income, familyMembers, hasSpouseIncome, resolveEmploymentType);
-    const monthlyHousehold = Object.entries(expenseCategories.household || {})
-      .filter(([key]) => key !== 'education')
-      .reduce((sum, [_, val]) => sum + (parseFloat(val) || 0), 0);
-
-    setCurrentYearLedger((prev) => {
-      const synced = syncLedgerFromMonthlyTotals(prev, monthlyIncome, monthlyHousehold);
-      return syncLedgerTdsFromIncome(
-        synced,
-        income,
-        familyMembers,
-        hasSpouseIncome,
-        resolveEmploymentType,
-        planStartMonth,
-      );
+    const monthlyIncome = getLedgerNetIncomeMonthly(income, familyMembers, hasSpouseIncome, resolveEmploymentType);
+    const monthlyHousehold = getLedgerHouseholdMonthly(expenseCategories, familyMembers);
+    const { adjustment: taxAdjustment } = computeTaxAdjustmentArray({
+      income,
+      familyMembers,
+      hasSpouseIncome,
+      resolveEmploymentType,
+      calendarYear: new Date().getFullYear(),
     });
-  }, [loading, income, familyMembers, hasSpouseIncome, expenseCategories.household, planStartMonth]);
+
+    setCurrentYearLedger((prev) => syncLedgerFromMonthlyTotals(prev, monthlyIncome, monthlyHousehold, taxAdjustment));
+  }, [loading, income, familyMembers, hasSpouseIncome, expenseCategories, planStartMonth]);
 
   const resetState = () => {
     setPlanId(null);
@@ -186,7 +181,7 @@ export const FinancialPlanProvider = ({ children }) => {
     setCalculatorInputs({
       personal_loan: { amount: 0, rate: 10.5, tenure: 5, events: [] }, home_loan: { amount: 0, rate: 8.5, tenure: 15, events: [] }, car_loan: { amount: 0, rate: 9.5, tenure: 5, events: [] }, two_wheeler_loan: { amount: 0, rate: 11.5, tenure: 3, events: [] }, edu_loan: { amount: 0, rate: 9.0, tenure: 7, events: [] }, lumpsum: { amount: 0, rate: 12, tenure: 10, events: [] }, swp: { amount: 0, withdrawal: 0, rate: 10, tenure: 15, events: [] }, sip: { amount: 0, rate: 12, tenure: 10, increments: [] }, ppf: { rate: 7.10 }, nps: { rate: 10.00, annuity: 40, annuityRate: 6.00 }, fd: { rate: 7.00, frequency: 'Quarterly' }, rd: { rate: 7.00 }, equity: {}
     });
-    setCurrentYearLedger({ income: Array(12).fill(0), household: Array(12).fill(0) });
+    setCurrentYearLedger({ income: Array(12).fill(0), household: Array(12).fill(0), taxAdjustment: Array(12).fill(0) });
     setCashFlowSubStep(1);
     setPlanSyncError(null);
   };
@@ -367,7 +362,11 @@ export const FinancialPlanProvider = ({ children }) => {
         setGoalMappings(loadedMappings);
 
         if (data.calculator_inputs) setCalculatorInputs(data.calculator_inputs);
-        setCurrentYearLedger(data.current_year_ledger || { income: Array(12).fill(0), household: Array(12).fill(0) });
+        setCurrentYearLedger({
+          income: data.current_year_ledger?.income || Array(12).fill(0),
+          household: data.current_year_ledger?.household || Array(12).fill(0),
+          taxAdjustment: data.current_year_ledger?.taxAdjustment || Array(12).fill(0),
+        });
       }
       setLoading(false);
     };

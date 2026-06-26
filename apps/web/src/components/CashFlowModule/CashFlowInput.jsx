@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, HelpCircle } from 'lucide-react';
-import { convertToMonthly, syncLedgerFromMonthlyTotals } from './CashFlowLogic';
+import { convertToMonthly } from './CashFlowLogic';
 import LoanDetailsModal from './LoanDetailsModal';
 import InvestmentDetailsModal from './InvestmentDetailsModal';
 import DocumentUploadButton from '../common/DocumentUploadButton';
 import CurrencyInput from '../common/CurrencyInput';
-import { getHouseholdMonthlyInflow, isSalariedEmployment, shouldIncludeSpouseIncome } from '../DetailedFlow/incomeDetailSync';
-import { resolveEmploymentType } from '../DetailedFlow/employmentTypeSync';
+import { MONTH_LABELS_LONG } from '../DetailedReport/moneyFlowLedgerLogic';
 
 const CashFlowInput = ({ familyMembers, income, setIncome, expenseCategories, setExpenseCategories, currentYearLedger, setCurrentYearLedger, subStep, planStartMonth = 0, hasSpouseIncome = false }) => {
     const [activeModal, setActiveModal] = useState(null);
@@ -97,16 +96,10 @@ const CashFlowInput = ({ familyMembers, income, setIncome, expenseCategories, se
 
     const selfMember = familyMembers.find(m => m.relation?.toLowerCase() === 'self') || { name: 'Self' };
     const spouseMember = familyMembers.find(m => m.relation?.toLowerCase() === 'spouse');
-    
     const isSpouseHousewife = spouseMember?.occupation?.toLowerCase() === 'housewife';
-    const selfEmploymentType = resolveEmploymentType(selfMember);
-    const spouseEmploymentType = spouseMember ? resolveEmploymentType(spouseMember) : '';
-    const includeSpouse = shouldIncludeSpouseIncome(spouseMember, hasSpouseIncome, income);
-    const showSelfTdsRow = isSalariedEmployment(selfEmploymentType);
-    const showSpouseTdsRow = includeSpouse && spouseMember && !isSpouseHousewife && isSalariedEmployment(spouseEmploymentType);
     const currentMonth = new Date().getMonth();
 
-    const renderLedgerAmountRow = ({
+    const renderLedgerReadOnlyRow = ({
         label,
         ledgerKey,
         labelColor = 'var(--text-main)',
@@ -114,53 +107,21 @@ const CashFlowInput = ({ familyMembers, income, setIncome, expenseCategories, se
     }) => (
         <tr style={{ borderBottom }}>
             <td style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: labelColor, fontSize: '0.9rem' }}>{label}</td>
-            {(currentYearLedger[ledgerKey] || Array(12).fill('')).map((val, idx) => {
-                const isLocked = idx !== currentMonth;
-                return (
-                    <td key={`${ledgerKey}-${idx}`} style={{ padding: '0.5rem', background: isLocked ? 'var(--bg-main)' : 'transparent' }}>
-                        <CurrencyInput
-                            value={val || ''}
-                            readOnly={isLocked}
-                            onChange={(e) => {
-                                const newVal = Number(e.target.value);
-                                setCurrentYearLedger((prev) => {
-                                    const arr = [...(prev[ledgerKey] || Array(12).fill(''))];
-                                    for (let j = idx; j < 12; j++) arr[j] = newVal;
-                                    return { ...prev, [ledgerKey]: arr };
-                                });
-                            }}
-                            style={{
-                                minWidth: '100px',
-                                width: '100%',
-                                padding: '0.5rem 0.5rem 0.5rem 2rem',
-                                background: isLocked ? 'var(--bg-main)' : 'var(--bg-card)',
-                                border: isLocked ? 'none' : '1px solid var(--border)',
-                                borderRadius: '4px',
-                                color: isLocked ? 'var(--text-muted)' : 'var(--text-main)',
-                                textAlign: 'left',
-                                fontSize: '0.85rem',
-                                cursor: isLocked ? 'not-allowed' : 'text',
-                            }}
-                        />
-                    </td>
-                );
-            })}
+            {(currentYearLedger[ledgerKey] || Array(12).fill('')).map((val, idx) => (
+                <td
+                    key={`${ledgerKey}-${idx}`}
+                    style={{
+                        padding: '0.65rem 0.5rem',
+                        fontSize: '0.85rem',
+                        background: idx === currentMonth ? 'rgba(37, 99, 235, 0.08)' : 'transparent',
+                        color: parseFloat(val) < 0 ? '#ef4444' : 'var(--text-main)',
+                    }}
+                >
+                    ₹{Math.round(parseFloat(val) || 0).toLocaleString('en-IN')}
+                </td>
+            ))}
         </tr>
     );
-
-    const totalHouseholdIncome = getHouseholdMonthlyInflow(income, familyMembers, hasSpouseIncome, resolveEmploymentType);
-
-    const totalHouseholdExpenses = Object.entries(expenseCategories.household || {})
-        .filter(([key]) => key !== 'education')
-        .reduce((sum, [_, val]) => sum + (parseFloat(val) || 0), 0);
-
-    // Auto-sync Baseline Scalars into the 12-Month Array
-    React.useEffect(() => {
-        const activeIncomeSum = Math.round(totalHouseholdIncome);
-        const activeHouseholdSum = Math.round(totalHouseholdExpenses);
-
-        setCurrentYearLedger(prev => syncLedgerFromMonthlyTotals(prev, activeIncomeSum, activeHouseholdSum));
-    }, [totalHouseholdIncome, totalHouseholdExpenses, setCurrentYearLedger]);
 
     return (
         <div className="cash-flow-input">
@@ -324,28 +285,20 @@ const CashFlowInput = ({ familyMembers, income, setIncome, expenseCategories, se
                                 </tr>
                             </thead>
                             <tbody>
-                                {/* Income Array Row */}
-                                {renderLedgerAmountRow({
+                                {renderLedgerReadOnlyRow({
                                     label: 'Net Income',
                                     ledgerKey: 'income',
                                     labelColor: 'var(--primary)',
                                 })}
 
-                                {showSelfTdsRow && renderLedgerAmountRow({
-                                    label: `${selfMember.name || 'Self'} — Income Tax (TDS)`,
-                                    ledgerKey: 'selfIncomeTax',
-                                    labelColor: '#7c3aed',
-                                })}
-
-                                {showSpouseTdsRow && renderLedgerAmountRow({
-                                    label: `${spouseMember?.name || 'Spouse'} — Income Tax (TDS)`,
-                                    ledgerKey: 'spouseIncomeTax',
+                                {renderLedgerReadOnlyRow({
+                                    label: 'Tax Adjustment',
+                                    ledgerKey: 'taxAdjustment',
                                     labelColor: '#7c3aed',
                                 })}
                                 
-                                {/* Household Expenses Array Row */}
-                                {renderLedgerAmountRow({
-                                    label: 'Household & Lifestyle',
+                                {renderLedgerReadOnlyRow({
+                                    label: 'Household & Lifestyle (incl. education)',
                                     ledgerKey: 'household',
                                     labelColor: 'var(--danger)',
                                     borderBottom: 'none',
@@ -354,7 +307,7 @@ const CashFlowInput = ({ familyMembers, income, setIncome, expenseCategories, se
                         </table>
                     </div>
                     <div style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(37, 99, 235, 0.05)', borderRadius: '8px', borderLeft: '4px solid var(--primary)', fontSize: '0.9rem', color: 'var(--text-main)' }}>
-                        <strong>Note:</strong> Education expenses are not included in income & lifestyle expenses in above table. You can track education expenses in journey module in Total Outflow column. Income Tax (TDS) rows are populated from your salary-slip entry and can be adjusted for future months when actual payslip amounts are available.
+                        <strong>Note:</strong> Net income is in-hand salary / take-home profit plus other income. Household includes education. Tax adjustment (additional tax in {MONTH_LABELS_LONG[5]}, refund in {MONTH_LABELS_LONG[8]}) applies from the next assessment year — current year is ignored as ITR is assumed filed. View the full ledger in Detailed Report → Your Money Flow.
                     </div>
                 </div>
             </div>

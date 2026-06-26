@@ -1,5 +1,6 @@
 import { calculateProjectedMemberTax } from '../IncomeTaxModule/IncomeTaxLogic';
 import { resolveEmploymentType } from '../DetailedFlow/employmentTypeSync';
+import { getEffectiveMonthlyHousehold } from '../DetailedFlow/expenseDetailSync';
 import {
     getMemberDetailForProjection,
     getMemberDetailMonthlyTotal,
@@ -131,9 +132,7 @@ export const generateProjections = ({
         currentYearLedger,
     });
 
-    const fallbackHouseholdMonthly = Object.entries(expenseCategories.household || {})
-        .filter(([key]) => key !== 'education')
-        .reduce((sum, [_, val]) => sum + (parseFloat(val) || 0), 0);
+    const fallbackHouseholdMonthly = getEffectiveMonthlyHousehold(expenseCategories, familyMembers);
 
     const ledgerMonthlyHousehold = parseFloat(currentYearLedger?.household?.[11]) || 0;
     const hasActiveHouseholdLedger = ledgerMonthlyHousehold > 0;
@@ -305,11 +304,14 @@ export const generateProjections = ({
         const annualOutflow = householdOutflow + fixedOutflow;
         
         let totalEducationExpenses = 0;
+        const householdEducationMonthly = parseFloat(expenseCategories.household?.education) || 0;
+        const schoolFeesCapturedInHousehold = householdEducationMonthly > 0;
         
         // 1. School Education
         familyMembers.forEach(member => {
             if (member.relation === 'Child') {
                 if (member.occupation === 'School' || !member.occupation) {
+                    if (schoolFeesCapturedInHousehold) return;
                     const currentStandard = member.standard || '';
                     const baseFee = parseFloat(member.annualSchoolFee)
                         || (parseFloat(member.monthlyEducationExpense) || 0) * 12;

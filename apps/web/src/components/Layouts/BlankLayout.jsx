@@ -7,6 +7,7 @@ import { signOut } from '../../services/authService';
 import finbrellaLogo from '../../assets/finbrella_logo.png';
 import { detailedFlowSteps } from '../DetailedFlow/detailedFlowSteps';
 import { DEFAULT_SUMMARY_REPORT_PATH } from '../SummaryReport/summaryReportSteps';
+import { DEFAULT_DETAILED_REPORT_PATH } from '../DetailedReport/detailedReportSteps';
 import { useBreakpoints } from '../../hooks';
 
 const steps = [
@@ -30,9 +31,11 @@ const BlankLayout = () => {
     const currentPath = location.pathname;
     const isSummaryFlow = currentPath.startsWith('/summary-flow');
     const isSummaryReport = currentPath.startsWith('/summary-report');
+    const isDetailedReport = currentPath.startsWith('/detailed-report');
     const isDetailedFlow = currentPath.startsWith('/detailed-flow') && !currentPath.startsWith('/detailed-flow/existing-app');
+    const isDreamsGoals = currentPath.includes('dreams_goals');
     const isSummaryExperience = isSummaryFlow || isSummaryReport;
-    const isDetailedExperience = isDetailedFlow;
+    const isDetailedExperience = isDetailedFlow || isDetailedReport;
 
     const currentStepIndex = steps.findIndex(s => currentPath.includes(s.id));
     const detailedStepIndex = detailedFlowSteps.findIndex(s => currentPath.includes(s.id));
@@ -68,11 +71,18 @@ const BlankLayout = () => {
         navigate('/', { replace: true });
     };
 
-    const handleViewReport = async () => {
+    const handleViewSummaryReport = async () => {
         if (savePlanData) {
             try { await savePlanData(); } catch (e) { console.error('Save failed on nav', e); }
         }
         navigate(DEFAULT_SUMMARY_REPORT_PATH);
+    };
+
+    const handleViewDetailedReport = async () => {
+        if (savePlanData) {
+            try { await savePlanData(); } catch (e) { console.error('Save failed on nav', e); }
+        }
+        navigate(DEFAULT_DETAILED_REPORT_PATH);
     };
 
     if (!isSummaryExperience && !isDetailedExperience) {
@@ -83,7 +93,7 @@ const BlankLayout = () => {
         );
     }
 
-    const shellClass = isSummaryReport
+    const shellClass = isSummaryReport || isDetailedReport
         ? 'summary-shell summary-shell-report'
         : isDetailedExperience
             ? 'summary-shell summary-shell-detailed'
@@ -96,11 +106,21 @@ const BlankLayout = () => {
                     <img src={finbrellaLogo} alt="Finbrella" />
                 </div>
                 <div className="summary-header-right">
-                    {(isSummaryFlow || isDetailedFlow) && summaryReportGeneratedAt && (
+                    {isDreamsGoals && (
                         <button
                             type="button"
                             className="summary-view-report-btn"
-                            onClick={handleViewReport}
+                            onClick={handleViewDetailedReport}
+                        >
+                            <FileText size={16} />
+                            {lg ? 'View Detailed Report' : 'Report'}
+                        </button>
+                    )}
+                    {(isSummaryFlow || (isDetailedFlow && !isDreamsGoals)) && summaryReportGeneratedAt && (
+                        <button
+                            type="button"
+                            className="summary-view-report-btn"
+                            onClick={handleViewSummaryReport}
                         >
                             <FileText size={16} />
                             {lg ? 'View Summary Report' : 'Report'}
@@ -215,7 +235,7 @@ const BlankLayout = () => {
             )}
 
             <div className="summary-body">
-                <main className={`summary-content-area ${isSummaryReport ? 'summary-content-area-report' : ''}`}>
+                <main className={`summary-content-area ${(isSummaryReport || isDetailedReport) ? 'summary-content-area-report' : ''}`}>
                     <Outlet />
                 </main>
             </div>

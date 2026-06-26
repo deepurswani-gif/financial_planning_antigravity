@@ -1,0 +1,518 @@
+import { calculateIncomeTaxFromDetail } from '../IncomeTaxModule/IncomeTaxLogic';
+import {
+    createEmptyIncomeDetail,
+    getMemberDetailForProjection,
+    getHouseholdMonthlyInflow,
+    shouldIncludeSpouseIncome,
+    isSalariedEmployment,
+    isGovernmentSector,
+    isPensionerEmployment,
+    isBusinessEmployment,
+} from '../DetailedFlow/incomeDetailSync';
+import {
+    getEffectiveMonthlyHousehold,
+    getEffectiveMonthlyEmi,
+} from '../DetailedFlow/expenseDetailSync';
+import { getLifeMemberMonthlyTotal } from '../DetailedFlow/insuranceDetailSync';
+import { getEffectiveMonthlySavings } from '../DetailedFlow/savingsDetailSync';
+import { convertToMonthly } from '../CashFlowModule/CashFlowLogic';
+
+export const MONTH_LABELS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+export const MONTH_LABELS_LONG = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+/** June (0-indexed) — additional tax payment assumed */
+export const TAX_PAYMENT_MONTH = 5;
+/** September — income tax refund assumed */
+export const TAX_REFUND_MONTH = 8;
+
+const parseAmount = (value) => parseFloat(value) || 0;
+
+const sumOtherIncome = (otherIncome = []) => (
+    otherIncome.reduce((sum, item) => sum + parseAmount(item?.amount), 0)
+);
+
+/**
+ * Net inflow for ledger: in-hand / take-home / pension + other income (employment-specific).
+ */
+export function getMemberNetInflowForLedger(detail, employmentType) {
+    const d = { ...createEmptyIncomeDetail(), ...detail };
+    const other = sumOtherIncome(d.otherIncome);
+
+    if (isSalariedEmployment(employmentType)) {
+        return parseAmount(d.inHandSalary) + other;
+    }
+    if (isBusinessEmployment(employmentType)) {
+        return parseAmount(d.takeHomeProfit) + parseAmount(d.passiveIncome) + other;
+    }
+    if (isPensionerEmployment(employmentType)) {
+        return parseAmount(d.netPension) + other;
+    }
+    return parseAmount(d.inHandSalary) + other;
+}
+
+/** Household monthly for ledger — includes education; prefers effective household helper. */
+export function getLedgerHouseholdMonthly(expenseCategories = {}, familyMembers = []) {
+    return Math.round(getEffectiveMonthlyHousehold(expenseCategories, familyMembers));
+}
+
+/** Combined net inflow for all included household earners. */
+export function getLedgerNetIncomeMonthly(income, familyMembers, hasSpouseIncome, resolveEmploymentType) {
+    const selfMember = familyMembers?.find((m) => m.relation?.toLowerCase() === 'self');
+    const spouseMember = familyMembers?.find((m) => m.relation?.toLowerCase() === 'spouse');
+    if (!selfMember) {
+        return Math.round(getHouseholdMonthlyInflow(income, familyMembers, hasSpouseIncome, resolveEmploymentType));
+    }
+
+    const selfType = resolveEmploymentType(selfMember);
+    const spouseType = spouseMember ? resolveEmploymentType(spouseMember) : '';
+    const includeSpouse = shouldIncludeSpouseIncome(spouseMember, hasSpouseIncome, income);
+
+    const selfDetail = getMemberDetailForProjection(income, 'self', selfType);
+    let total = getMemberNetInflowForLedger(selfDetail, selfType);
+
+    if (includeSpouse && spouseMember) {
+        const spouseDetail = getMemberDetailForProjection(income, 'spouse', spouseType);
+        total += getMemberNetInflowForLedger(spouseDetail, spouseType);
+    }
+
+    if (total > 0) return Math.round(total);
+    return Math.round(getHouseholdMonthlyInflow(income, familyMembers, hasSpouseIncome, resolveEmploymentType));
+}
+
+export function usesMarchFebruarySalaryYear(employmentType) {
+    return isGovernmentSector(employmentType) || isPensionerEmployment(employmentType);
+}
+
+/** Annual TDS from salary slip (incomeTax deduction × 12) for one member. */
+export function getMemberAnnualTdsFromSlip(detail, employmentType) {
+    if (!isSalariedEmployment(employmentType)) return 0;
+    const d = { ...createEmptyIncomeDetail(), ...detail };
+    if (d.needTaxPlanning !== true) return 0;
+    const monthlyTds = parseAmount(d.taxPlanning?.deductions?.incomeTax);
+    if (monthlyTds <= 0) return 0;
+    return Math.round(monthlyTds * 12);
+}
+
+/**
+ * Tax adjustment for assessment year after current calendar year.
+ * Current year: ignored (ITR already filed). Next calendar year+: Jun payment or Sep refund.
+ */
+export function computeTaxAdjustmentArray({
+    income,
+    familyMembers,
+    hasSpouseIncome,
+    resolveEmploymentType,
+    calendarYear,
+    asOfYear = new Date().getFullYear(),
+}) {
+    const empty = Array(12).fill(0);
+    const baseMeta = {
+        applies: false,
+        actualTax: 0,
+        tdsTotal: 0,
+        difference: 0,
+        type: null,
+        paymentMonth: TAX_PAYMENT_MONTH,
+        refundMonth: TAX_REFUND_MONTH,
+    };
+
+    if (calendarYear <= asOfYear) {
+        return {
+            adjustment: empty,
+            meta: {
+                ...baseMeta,
+                reason: 'Income tax return for the prior year is assumed filed for the current calendar year. Tax adjustment applies from the next assessment cycle.',
+            },
+        };
+    }
+
+    const selfMember = familyMembers?.find((m) => m.relation?.toLowerCase() === 'self');
+    const spouseMember = familyMembers?.find((m) => m.relation?.toLowerCase() === 'spouse');
+    if (!selfMember) {
+        return { adjustment: empty, meta: { ...baseMeta, reason: 'No profile data for tax adjustment.' } };
+    }
+
+    const selfType = resolveEmploymentType(selfMember);
+    const spouseType = spouseMember ? resolveEmploymentType(spouseMember) : '';
+    const includeSpouse = shouldIncludeSpouseIncome(spouseMember, hasSpouseIncome, income);
+
+    let totalActualTax = 0;
+    let totalTds = 0;
+    let hasTaxData = false;
+
+    const selfDetail = getMemberDetailForProjection(income, 'self', selfType);
+    const selfTax = calculateIncomeTaxFromDetail(selfDetail, selfType);
+    if (selfTax) {
+        totalActualTax += selfTax.finalTax || 0;
+        hasTaxData = true;
+    }
+    totalTds += getMemberAnnualTdsFromSlip(selfDetail, selfType);
+
+    if (includeSpouse && spouseMember) {
+        const spouseDetail = getMemberDetailForProjection(income, 'spouse', spouseType);
+        const spouseTax = calculateIncomeTaxFromDetail(spouseDetail, spouseType);
+        if (spouseTax) {
+            totalActualTax += spouseTax.finalTax || 0;
+            hasTaxData = true;
+        }
+        totalTds += getMemberAnnualTdsFromSlip(spouseDetail, spouseType);
+    }
+
+    if (!hasTaxData || totalTds <= 0) {
+        return {
+            adjustment: empty,
+            meta: {
+                ...baseMeta,
+                reason: 'Tax adjustment requires salary-slip TDS and computed income tax from Income Tax module.',
+            },
+        };
+    }
+
+    const difference = Math.round(totalActualTax - totalTds);
+    if (Math.abs(difference) < 1) {
+        return {
+            adjustment: empty,
+            meta: { ...baseMeta, applies: true, actualTax: totalActualTax, tdsTotal: totalTds, difference: 0, type: 'balanced' },
+        };
+    }
+
+    const adjustment = Array(12).fill(0);
+    let type = null;
+    if (difference > 0) {
+        adjustment[TAX_PAYMENT_MONTH] = -difference;
+        type = 'additional_tax';
+    } else {
+        adjustment[TAX_REFUND_MONTH] = -difference;
+        type = 'refund';
+    }
+
+    return {
+        adjustment,
+        meta: {
+            applies: true,
+            actualTax: totalActualTax,
+            tdsTotal: totalTds,
+            difference,
+            type,
+            paymentMonth: TAX_PAYMENT_MONTH,
+            refundMonth: TAX_REFUND_MONTH,
+            reason: difference > 0
+                ? `Additional tax of ₹${difference.toLocaleString('en-IN')} (actual tax minus TDS deducted) assumed payable in ${MONTH_LABELS_LONG[TAX_PAYMENT_MONTH]}.`
+                : `Refund of ₹${(-difference).toLocaleString('en-IN')} (TDS minus actual tax) assumed received in ${MONTH_LABELS_LONG[TAX_REFUND_MONTH]}.`,
+        },
+    };
+}
+
+/** Sync active/future ledger months from monthly totals. Preserves past months and taxAdjustment. */
+export function syncLedgerFromMonthlyTotals(ledger, monthlyIncome, monthlyHousehold, taxAdjustment) {
+    const currentMonth = new Date().getMonth();
+    const incomeSum = Math.round(monthlyIncome) || 0;
+    const householdSum = Math.round(monthlyHousehold) || 0;
+    const prev = ledger || {};
+    const prevIncome = prev.income || Array(12).fill(0);
+    const prevHousehold = prev.household || Array(12).fill(0);
+    const newIncome = [...prevIncome];
+    const newHH = [...prevHousehold];
+    let changed = false;
+
+    for (let i = currentMonth; i < 12; i++) {
+        if (newIncome[i] !== incomeSum) {
+            newIncome[i] = incomeSum;
+            changed = true;
+        }
+        if (newHH[i] !== householdSum) {
+            newHH[i] = householdSum;
+            changed = true;
+        }
+    }
+
+    const nextAdjustment = taxAdjustment || prev.taxAdjustment || Array(12).fill(0);
+    const adjustmentChanged = JSON.stringify(nextAdjustment) !== JSON.stringify(prev.taxAdjustment || Array(12).fill(0));
+
+    if (!changed && !adjustmentChanged) return prev;
+
+    return {
+        ...prev,
+        income: newIncome,
+        household: newHH,
+        taxAdjustment: nextAdjustment,
+    };
+}
+
+export function getMonthlyInsuranceTotal(expenseCategories = {}) {
+    const insurance = expenseCategories.insurance || {};
+    let total = 0;
+    Object.entries(insurance).forEach(([key, item]) => {
+        if (key === 'life') {
+            total += Object.values(item || {}).reduce(
+                (sum, entry) => sum + getLifeMemberMonthlyTotal(entry),
+                0,
+            );
+            return;
+        }
+        if (key === 'policyDocs' || !item || typeof item !== 'object' || item.value === undefined) return;
+        total += convertToMonthly(item.value, item.frequency);
+    });
+    return Math.round(total);
+}
+
+/** Effective income after tax adjustment for a month index. */
+export function getAdjustedIncomeMonth(incomeArr, taxAdjustmentArr, monthIndex) {
+    return parseAmount(incomeArr?.[monthIndex]) + parseAmount(taxAdjustmentArr?.[monthIndex]);
+}
+
+export const VIEW_MODES = {
+    MONTHLY: 'monthly',
+    QUARTERLY: 'quarterly',
+    ANNUAL: 'annual',
+};
+
+const sumArrayRange = (arr, from, to) => (
+    arr.slice(from, to + 1).reduce((s, v) => s + parseAmount(v), 0)
+);
+
+/** Replace values before plan start with null for display. */
+export function maskValuesForPlanStart(values, planStartMonth) {
+    const start = Math.min(Math.max(planStartMonth, 0), 11);
+    return values.map((v, idx) => (idx < start ? null : parseAmount(v)));
+}
+
+/** YTD sum from plan start through current month (inclusive). */
+export function computeYtdTotal(values, planStartMonth, currentMonth) {
+    const start = Math.min(Math.max(planStartMonth, 0), 11);
+    const end = Math.min(Math.max(currentMonth, 0), 11);
+    if (end < start) return null;
+    return Math.round(sumArrayRange(values, start, end));
+}
+
+export function aggregateToQuarterly(values, planStartMonth) {
+    const start = Math.min(Math.max(planStartMonth, 0), 11);
+    return [0, 1, 2, 3].map((q) => {
+        const monthStart = q * 3;
+        const monthEnd = q * 3 + 2;
+        const activeStart = Math.max(monthStart, start);
+        if (activeStart > monthEnd) return null;
+        return Math.round(sumArrayRange(values, activeStart, monthEnd));
+    });
+}
+
+export function aggregateToAnnual(values, planStartMonth) {
+    const start = Math.min(Math.max(planStartMonth, 0), 11);
+    if (start > 11) return null;
+    return Math.round(sumArrayRange(values, start, 11));
+}
+
+export function getViewColumns(viewMode, currentMonth) {
+    if (viewMode === VIEW_MODES.QUARTERLY) {
+        const currentQuarter = Math.floor(currentMonth / 3);
+        return ['Q1', 'Q2', 'Q3', 'Q4'].map((label, idx) => ({
+            label,
+            idx,
+            isCurrent: idx === currentQuarter,
+        }));
+    }
+    if (viewMode === VIEW_MODES.ANNUAL) {
+        return [{ label: 'Full Year', idx: 0, isCurrent: true }];
+    }
+    return MONTH_LABELS_SHORT.map((label, idx) => ({
+        label,
+        idx,
+        isCurrent: idx === currentMonth,
+    }));
+}
+
+export function getDisplayValues(values, viewMode, planStartMonth) {
+    if (viewMode === VIEW_MODES.QUARTERLY) {
+        return aggregateToQuarterly(values, planStartMonth);
+    }
+    if (viewMode === VIEW_MODES.ANNUAL) {
+        return [aggregateToAnnual(values, planStartMonth)];
+    }
+    return maskValuesForPlanStart(values, planStartMonth);
+}
+
+export function computeMoneyFlowInsights(report) {
+    const { meta, baseline, ledger } = report;
+    const { planStartMonth, currentMonth, currentMonthLabel } = meta;
+    const insights = [];
+
+    if (currentMonth >= planStartMonth) {
+        const adjustedNow = ledger.adjustedIncome[currentMonth] || 0;
+        const freeCashFlow = ledger.unallocatedSurplus[currentMonth] || 0;
+        const householdNow = ledger.household[currentMonth] || 0;
+
+        if (currentMonth > planStartMonth && currentMonth > 0) {
+            const prevMonth = currentMonth - 1;
+            if (prevMonth >= planStartMonth) {
+                const householdPrev = ledger.household[prevMonth] || 0;
+                if (householdPrev > 0 && householdNow !== householdPrev) {
+                    const pctChange = Math.round(((householdNow - householdPrev) / householdPrev) * 100);
+                    const prevLabel = MONTH_LABELS_LONG[prevMonth];
+                    if (pctChange !== 0) {
+                        const direction = pctChange > 0 ? 'increased' : 'decreased';
+                        insights.push({
+                            id: 'household-change',
+                            text: `Household spending ${direction} by ${Math.abs(pctChange)}% from ${prevLabel}.`,
+                            tone: pctChange > 0 ? 'warning' : 'positive',
+                        });
+                    }
+                }
+            }
+        }
+
+        insights.push({
+            id: 'free-cash-flow',
+            text: `Free cash flow is ${formatInsightCurrency(freeCashFlow)}/month.`,
+            tone: freeCashFlow >= 0 ? 'neutral' : 'warning',
+        });
+
+        if (adjustedNow > 0) {
+            const savingsRate = Math.round((baseline.monthlySavings / adjustedNow) * 100);
+            insights.push({
+                id: 'savings-rate',
+                text: `Savings rate is ${savingsRate}%.`,
+                tone: 'neutral',
+            });
+
+            const emiBurden = Math.round((baseline.monthlyEmi / adjustedNow) * 100);
+            insights.push({
+                id: 'emi-burden',
+                text: `EMI burden is ${emiBurden}% of income.`,
+                tone: emiBurden > 40 ? 'warning' : 'neutral',
+            });
+        }
+
+        if (freeCashFlow > 0) {
+            insights.push({
+                id: 'allocate-surplus',
+                text: `Consider allocating unused surplus of ${formatInsightCurrency(freeCashFlow)}.`,
+                tone: 'accent',
+            });
+        }
+    } else {
+        insights.push({
+            id: 'plan-not-started',
+            text: `Your plan starts in ${meta.planStartMonthLabel}. Tracking figures will appear from that month.`,
+            tone: 'neutral',
+        });
+    }
+
+    return insights;
+}
+
+function formatInsightCurrency(value) {
+    return `₹${Math.round(value || 0).toLocaleString('en-IN')}`;
+}
+
+export function buildYourMoneyFlowReport({
+    currentYearLedger,
+    planStartMonth,
+    familyMembers,
+    income,
+    expenseCategories,
+    hasSpouseIncome,
+    resolveEmploymentType,
+    journeyProjections,
+    calendarYear = new Date().getFullYear(),
+    currentMonth = new Date().getMonth(),
+}) {
+    const selfMember = familyMembers?.find((m) => m.relation?.toLowerCase() === 'self') || { name: 'Self' };
+    const spouseMember = familyMembers?.find((m) => m.relation?.toLowerCase() === 'spouse');
+    const selfType = resolveEmploymentType(selfMember);
+    const salaryYearLabel = usesMarchFebruarySalaryYear(selfType)
+        ? 'March – February'
+        : 'April – March';
+
+    const ledgerIncome = currentYearLedger?.income || Array(12).fill(0);
+    const ledgerHousehold = currentYearLedger?.household || Array(12).fill(0);
+    const taxAdjustment = currentYearLedger?.taxAdjustment || Array(12).fill(0);
+
+    const monthlyEmi = Math.round(getEffectiveMonthlyEmi(expenseCategories));
+    const monthlyInsurance = getMonthlyInsuranceTotal(expenseCategories);
+    const monthlySavings = Math.round(getEffectiveMonthlySavings(expenseCategories));
+
+    const baselineNetIncome = getLedgerNetIncomeMonthly(income, familyMembers, hasSpouseIncome, resolveEmploymentType);
+    const baselineHousehold = getLedgerHouseholdMonthly(expenseCategories, familyMembers);
+
+    const adjustedIncome = ledgerIncome.map((val, idx) => getAdjustedIncomeMonth(ledgerIncome, taxAdjustment, idx));
+    const monthlySurplus = adjustedIncome.map((val, idx) => (
+        Math.round(val - parseAmount(ledgerHousehold[idx]) - monthlyEmi - monthlyInsurance)
+    ));
+    const unallocatedSurplus = monthlySurplus.map((val) => Math.round(val - monthlySavings));
+
+    const sumRange = (arr, from, to) => arr.slice(from, to + 1).reduce((s, v) => s + parseAmount(v), 0);
+
+    const ytdEnd = currentMonth;
+    const proratedStart = Math.min(Math.max(planStartMonth, 0), 11);
+    const proratedEnd = 11;
+
+    const year1Projection = journeyProjections?.find((p) => p.year === calendarYear);
+    const year1NetInvestibleSurplus = year1Projection?.netInvestibleSurplus || 0;
+    const remainingMonths = Math.max(1, 12 - proratedStart);
+    const proratedNetInvestibleSurplus = (year1NetInvestibleSurplus / 12) * remainingMonths;
+
+    const { meta: taxMeta } = computeTaxAdjustmentArray({
+        income,
+        familyMembers,
+        hasSpouseIncome,
+        resolveEmploymentType,
+        calendarYear,
+    });
+
+    return {
+        meta: {
+            calendarYear,
+            planStartMonth: proratedStart,
+            planStartMonthLabel: MONTH_LABELS_LONG[proratedStart],
+            currentMonth,
+            currentMonthLabel: MONTH_LABELS_LONG[currentMonth],
+            remainingMonths,
+            salaryYearLabel,
+            assessmentNote:
+                'In FY 2026-27, income of PY 2025-26 is assessed. Tax adjustment applies from the next calendar year after your current ITR is filed.',
+        },
+        members: {
+            selfName: selfMember.name || 'Self',
+            spouseName: spouseMember?.name || 'Spouse',
+        },
+        baseline: {
+            monthlyNetIncome: baselineNetIncome,
+            monthlyHousehold: baselineHousehold,
+            monthlyEmi,
+            monthlyInsurance,
+            monthlySavings,
+        },
+        taxAdjustmentMeta: taxMeta,
+        ledger: {
+            months: MONTH_LABELS_SHORT,
+            income: ledgerIncome.map(parseAmount),
+            taxAdjustment: taxAdjustment.map(parseAmount),
+            adjustedIncome: adjustedIncome.map(Math.round),
+            household: ledgerHousehold.map(parseAmount),
+            emi: Array(12).fill(monthlyEmi),
+            insurance: Array(12).fill(monthlyInsurance),
+            monthlySurplus,
+            savings: Array(12).fill(monthlySavings),
+            unallocatedSurplus,
+        },
+        totals: {
+            ytdAdjustedIncome: sumRange(adjustedIncome, 0, ytdEnd),
+            ytdHousehold: sumRange(ledgerHousehold, 0, ytdEnd),
+            ytdSurplus: sumRange(monthlySurplus, 0, ytdEnd),
+            ytdUnallocated: sumRange(unallocatedSurplus, 0, ytdEnd),
+            proratedAdjustedIncome: sumRange(adjustedIncome, proratedStart, proratedEnd),
+            proratedHousehold: sumRange(ledgerHousehold, proratedStart, proratedEnd),
+            proratedSurplus: sumRange(monthlySurplus, proratedStart, proratedEnd),
+            proratedUnallocated: sumRange(unallocatedSurplus, proratedStart, proratedEnd),
+            fullYearSurplus: sumRange(monthlySurplus, 0, 11),
+            fullYearUnallocated: sumRange(unallocatedSurplus, 0, 11),
+        },
+        journeyLink: {
+            year1NetInvestibleSurplus,
+            proratedNetInvestibleSurplus: Math.round(proratedNetInvestibleSurplus),
+        },
+    };
+}
