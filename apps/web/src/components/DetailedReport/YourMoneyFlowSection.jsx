@@ -1,5 +1,4 @@
 import React, { useMemo, useRef, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
     ArrowDownRight,
     Calendar,
@@ -22,7 +21,10 @@ import {
     getViewColumns,
     VIEW_MODES,
 } from './moneyFlowLedgerLogic';
-import { INVEST_UNALLOCATED_SURPLUS_PATH } from './detailedReportSteps';
+import LifeJourneySection from './LifeJourneySection';
+import YourMoneyFlowVisuals from './YourMoneyFlowVisuals';
+import InvestSurplusReportContent from './InvestSurplusReportContent';
+import ReportAnimatedCounter from './ReportAnimatedCounter';
 
 const TAX_ADJUSTMENT_NOTE =
     "Your previous year's tax return is assumed to be filed this year. Any tax adjustment will be applied from the next assessment year.";
@@ -73,24 +75,16 @@ const ROW_GROUPS = [
     },
 ];
 
-const KpiPill = ({ label, value, tone = 'primary', icon: Icon }) => (
+const KpiPill = ({ label, value, tone = 'primary', icon: Icon, animate = false }) => (
     <div className="ymf-kpi-pill">
         {Icon && <Icon size={20} style={{ opacity: 0.85 }} />}
         <div>
             <span className="ymf-kpi-label">{label}</span>
-            <strong className={`ymf-kpi-value ymf-tone-${tone}`}>{formatCell(value)}</strong>
+            <strong className={`ymf-kpi-value ymf-tone-${tone}`}>
+                {animate ? <ReportAnimatedCounter value={value} /> : formatCell(value)}
+            </strong>
         </div>
     </div>
-);
-
-const InvestSurplusCard = ({ onClick }) => (
-    <button type="button" className="ymf-kpi-pill ymf-invest-card" onClick={onClick}>
-        <ArrowRight size={20} style={{ opacity: 0.85, color: 'var(--primary)' }} />
-        <div>
-            <span className="ymf-kpi-label">Ready to deploy?</span>
-            <strong className="ymf-invest-label">Invest free cash flow</strong>
-        </div>
-    </button>
 );
 
 const GroupHeaderRow = ({ label, colSpan }) => (
@@ -161,7 +155,6 @@ const InsightIcon = ({ tone }) => {
 };
 
 const YourMoneyFlowSection = () => {
-    const navigate = useNavigate();
     const scrollRef = useRef(null);
     const [viewMode, setViewMode] = useState(VIEW_MODES.MONTHLY);
 
@@ -234,8 +227,8 @@ const YourMoneyFlowSection = () => {
                 <div className="ymf-hero-top">
                     <div>
                         <h2 style={{ margin: 0, fontSize: '1.75rem' }}>Your Money Flow</h2>
-                        <p style={{ margin: '0.5rem 0 0', color: 'var(--text-muted)' }}>
-                            Monthly tracking for calendar year {meta.calendarYear}
+                        <p style={{ margin: '0.5rem 0 0', color: 'var(--text-muted)', lineHeight: 1.55 }}>
+                            Let&apos;s understand how money supports your family&apos;s life throughout this year.
                         </p>
                     </div>
                     <div className="ymf-badges">
@@ -250,12 +243,13 @@ const YourMoneyFlowSection = () => {
                 </div>
 
                 <div className="ymf-kpi-grid">
-                    <KpiPill label="Monthly Net Income" value={baseline.monthlyNetIncome} icon={TrendingUp} />
+                    <KpiPill label="Monthly Net Income" value={baseline.monthlyNetIncome} icon={TrendingUp} animate />
                     <KpiPill label="Total Outflow" value={totalOutflow} tone="danger" icon={Wallet} />
-                    <KpiPill label="Free Cash Flow (Now)" value={currentUnallocated} tone="accent" icon={ArrowDownRight} />
-                    <InvestSurplusCard onClick={() => navigate(INVEST_UNALLOCATED_SURPLUS_PATH)} />
+                    <KpiPill label="Free Cash Flow (Now)" value={currentUnallocated} tone="accent" icon={ArrowDownRight} animate />
                 </div>
             </div>
+
+            <YourMoneyFlowVisuals ledger={ledger} meta={meta} baseline={baseline} />
 
             <div className="ymf-table-card card">
                 <div className="ymf-table-header">
@@ -371,7 +365,7 @@ const YourMoneyFlowSection = () => {
                 <div className="card ymf-insights-card">
                     <h4 className="ymf-insights-title">
                         <Lightbulb size={18} />
-                        Insights
+                        Your Money Flow Insights
                     </h4>
                     <ul className="ymf-insights-list">
                         {insights.map((item) => (
@@ -383,6 +377,14 @@ const YourMoneyFlowSection = () => {
                     </ul>
                 </div>
             )}
+
+            <div className="ymf-section-divider" aria-hidden="true">
+                <span className="ymf-section-divider-line" />
+            </div>
+
+            <LifeJourneySection />
+
+            <InvestSurplusReportContent />
 
             <style>{`
                 .ymf-section { display: flex; flex-direction: column; gap: 1.5rem; padding: 0 1rem; }
@@ -461,6 +463,30 @@ const YourMoneyFlowSection = () => {
                 .ymf-insight-positive .ymf-insight-icon { color: #059669; }
                 .ymf-insight-accent .ymf-insight-icon { color: var(--primary); }
                 .ymf-insight-accent { color: var(--primary); font-weight: 500; }
+
+                .dr-reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.65s cubic-bezier(0.16,1,0.3,1), transform 0.65s cubic-bezier(0.16,1,0.3,1); }
+                .dr-reveal.dr-visible { opacity: 1; transform: translateY(0); }
+                .dr-chart-title { margin: 0 0 0.35rem; font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 0.45rem; color: var(--text-main); }
+                .dr-chart-sub { margin: 0 0 1rem; font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; }
+                .dr-chart-wrap { width: 100%; min-height: 200px; }
+                .dr-chart-wrap-sm { min-height: 240px; }
+                .dr-chart-tooltip { background: var(--text-main); color: #fff; padding: 0.55rem 0.85rem; border-radius: 8px; font-size: 0.82rem; line-height: 1.5; }
+                .dr-chart-tooltip-label { font-weight: 700; margin-bottom: 0.25rem; }
+                .dr-chart-legend { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 0.75rem; font-size: 0.78rem; color: var(--text-muted); }
+                .dr-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.35rem; vertical-align: middle; }
+                .dr-dot-income { background: #2563EB; }
+                .dr-dot-outflow { background: #EF4444; }
+                .dr-dot-surplus { background: #7C3AED; }
+                .dr-animated-counter { font-size: inherit; }
+                .ymf-visuals { display: flex; flex-direction: column; gap: 1.25rem; }
+                .ymf-visual-card { padding: 1.25rem; }
+                .ymf-visual-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; }
+                .ymf-section-divider { padding: 0.5rem 1rem; margin-top: 1rem; }
+                .ymf-section-divider-line { display: block; height: 1px; background: linear-gradient(90deg, transparent, var(--border), transparent); }
+                .dr-donut-wrap { position: relative; max-width: 220px; margin: 0 auto; }
+                .dr-donut-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
+                .dr-donut-center strong { font-size: 1.75rem; color: var(--primary); line-height: 1; }
+                .dr-donut-center span { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem; }
             `}</style>
         </div>
     );

@@ -1,4 +1,4 @@
-import { calculateIncomeTaxFromDetail } from '../IncomeTaxModule/IncomeTaxLogic';
+import { calculateIncomeTaxFromDetail, calculateProjectedMemberTax } from '../IncomeTaxModule/IncomeTaxLogic';
 import {
     createEmptyIncomeDetail,
     getMemberDetailForProjection,
@@ -8,6 +8,7 @@ import {
     isGovernmentSector,
     isPensionerEmployment,
     isBusinessEmployment,
+    scaleIncomeDetail,
 } from '../DetailedFlow/incomeDetailSync';
 import {
     getEffectiveMonthlyHousehold,
@@ -94,6 +95,73 @@ export function getMemberAnnualTdsFromSlip(detail, employmentType) {
     const monthlyTds = parseAmount(d.taxPlanning?.deductions?.incomeTax);
     if (monthlyTds <= 0) return 0;
     return Math.round(monthlyTds * 12);
+}
+
+/** TDS for a projection year after income-increment scaling (matches Journey Step 8). */
+export function getProjectedMemberAnnualTds(detail, employmentType, yearIndex, incomeIncrementPercent = 0) {
+    const factor = Math.pow(1 + (incomeIncrementPercent / 100), yearIndex);
+    const scaledDetail = scaleIncomeDetail(detail, factor);
+    return getMemberAnnualTdsFromSlip(scaledDetail, employmentType);
+}
+
+/** Computed tax vs TDS for one member in a projection year. */
+export function computeMemberProjectedTaxReconciliation(
+    detail,
+    employmentType,
+    yearIndex,
+    incomeIncrementPercent = 0,
+) {
+    const taxResult = calculateProjectedMemberTax(detail, employmentType, yearIndex, incomeIncrementPercent);
+    const computedTax = taxResult?.finalTax || 0;
+    const tdsWithheld = getProjectedMemberAnnualTds(detail, employmentType, yearIndex, incomeIncrementPercent);
+    return {
+        computedTax,
+        tdsWithheld,
+        taxReconciliation: computedTax - tdsWithheld,
+    };
+}
+
+/**
+ * Household tax reconciliation for Journey projections — aligned with ledger logic.
+ * Current calendar year: no adjustment (prior-year ITR assumed filed).
+ * Later years: net impact = computed tax − TDS already withheld via salary slip.
+ */
+export function computeHouseholdProjectedTaxReconciliation({
+    selfDetail,
+    selfEmploymentType,
+    spouseDetail,
+    spouseEmploymentType,
+    includeSpouse,
+    yearIndex,
+    incomeIncrementPercent = 0,
+    projectionYear,
+    asOfYear = new Date().getFullYear(),
+}) {
+    const self = computeMemberProjectedTaxReconciliation(
+        selfDetail,
+        selfEmploymentType,
+        yearIndex,
+        incomeIncrementPercent,
+    );
+    let computedTax = self.computedTax;
+    let tdsWithheld = self.tdsWithheld;
+
+    if (includeSpouse && spouseDetail) {
+        const spouse = computeMemberProjectedTaxReconciliation(
+            spouseDetail,
+            spouseEmploymentType,
+            yearIndex,
+            incomeIncrementPercent,
+        );
+        computedTax += spouse.computedTax;
+        tdsWithheld += spouse.tdsWithheld;
+    }
+
+    const taxReconciliation = computedTax - tdsWithheld;
+    const applies = projectionYear > asOfYear;
+    const taxImpact = applies ? taxReconciliation : 0;
+
+    return { computedTax, tdsWithheld, taxReconciliation, taxImpact, applies };
 }
 
 /**
@@ -206,40 +274,54 @@ export function computeTaxAdjustmentArray({
     };
 }
 
+const LEDGER_SYNC_KEYS = ['income', 'household', 'emi', 'insurance', 'savings'];
+
 /** Sync active/future ledger months from monthly totals. Preserves past months and taxAdjustment. */
-export function syncLedgerFromMonthlyTotals(ledger, monthlyIncome, monthlyHousehold, taxAdjustment) {
+export function syncLedgerFromMonthlyTotals(ledger, totals = {}) {
     const currentMonth = new Date().getMonth();
-    const incomeSum = Math.round(monthlyIncome) || 0;
-    const householdSum = Math.round(monthlyHousehold) || 0;
     const prev = ledger || {};
-    const prevIncome = prev.income || Array(12).fill(0);
-    const prevHousehold = prev.household || Array(12).fill(0);
-    const newIncome = [...prevIncome];
-    const newHH = [...prevHousehold];
+    const monthlyTotals = {
+        income: 0,
+        household: 0,
+        emi: 0,
+        insurance: 0,
+        savings: 0,
+        ...totals,
+    };
+
     let changed = false;
+    const next = { ...prev };
 
-    for (let i = currentMonth; i < 12; i++) {
-        if (newIncome[i] !== incomeSum) {
-            newIncome[i] = incomeSum;
-            changed = true;
+    LEDGER_SYNC_KEYS.forEach((key) => {
+        const sum = Math.round(monthlyTotals[key]) || 0;
+        const prevArr = prev[key] || Array(12).fill(0);
+        const newArr = [...prevArr];
+        for (let i = currentMonth; i < 12; i++) {
+            if (newArr[i] !== sum) {
+                newArr[i] = sum;
+                changed = true;
+            }
         }
-        if (newHH[i] !== householdSum) {
-            newHH[i] = householdSum;
-            changed = true;
-        }
-    }
+        next[key] = newArr;
+    });
 
-    const nextAdjustment = taxAdjustment || prev.taxAdjustment || Array(12).fill(0);
+    const nextAdjustment = monthlyTotals.taxAdjustment ?? prev.taxAdjustment ?? Array(12).fill(0);
     const adjustmentChanged = JSON.stringify(nextAdjustment) !== JSON.stringify(prev.taxAdjustment || Array(12).fill(0));
 
     if (!changed && !adjustmentChanged) return prev;
 
     return {
-        ...prev,
-        income: newIncome,
-        household: newHH,
+        ...next,
         taxAdjustment: nextAdjustment,
     };
+}
+
+/** Resolve a 12-month ledger row, falling back to a flat monthly total when missing. */
+export function resolveLedgerMonthlyRow(ledgerArray, fallbackMonthly = 0) {
+    if (Array.isArray(ledgerArray) && ledgerArray.length === 12) {
+        return ledgerArray.map(parseAmount);
+    }
+    return Array(12).fill(Math.round(parseAmount(fallbackMonthly)) || 0);
 }
 
 export function getMonthlyInsuranceTotal(expenseCategories = {}) {
@@ -426,22 +508,26 @@ export function buildYourMoneyFlowReport({
         ? 'March – February'
         : 'April – March';
 
-    const ledgerIncome = currentYearLedger?.income || Array(12).fill(0);
-    const ledgerHousehold = currentYearLedger?.household || Array(12).fill(0);
+    const ledgerIncome = resolveLedgerMonthlyRow(currentYearLedger?.income);
+    const ledgerHousehold = resolveLedgerMonthlyRow(currentYearLedger?.household);
     const taxAdjustment = currentYearLedger?.taxAdjustment || Array(12).fill(0);
 
     const monthlyEmi = Math.round(getEffectiveMonthlyEmi(expenseCategories));
     const monthlyInsurance = getMonthlyInsuranceTotal(expenseCategories);
     const monthlySavings = Math.round(getEffectiveMonthlySavings(expenseCategories));
 
+    const ledgerEmi = resolveLedgerMonthlyRow(currentYearLedger?.emi, monthlyEmi);
+    const ledgerInsurance = resolveLedgerMonthlyRow(currentYearLedger?.insurance, monthlyInsurance);
+    const ledgerSavings = resolveLedgerMonthlyRow(currentYearLedger?.savings, monthlySavings);
+
     const baselineNetIncome = getLedgerNetIncomeMonthly(income, familyMembers, hasSpouseIncome, resolveEmploymentType);
     const baselineHousehold = getLedgerHouseholdMonthly(expenseCategories, familyMembers);
 
     const adjustedIncome = ledgerIncome.map((val, idx) => getAdjustedIncomeMonth(ledgerIncome, taxAdjustment, idx));
     const monthlySurplus = adjustedIncome.map((val, idx) => (
-        Math.round(val - parseAmount(ledgerHousehold[idx]) - monthlyEmi - monthlyInsurance)
+        Math.round(val - ledgerHousehold[idx] - ledgerEmi[idx] - ledgerInsurance[idx])
     ));
-    const unallocatedSurplus = monthlySurplus.map((val) => Math.round(val - monthlySavings));
+    const unallocatedSurplus = monthlySurplus.map((val, idx) => Math.round(val - ledgerSavings[idx]));
 
     const sumRange = (arr, from, to) => arr.slice(from, to + 1).reduce((s, v) => s + parseAmount(v), 0);
 
@@ -488,14 +574,14 @@ export function buildYourMoneyFlowReport({
         taxAdjustmentMeta: taxMeta,
         ledger: {
             months: MONTH_LABELS_SHORT,
-            income: ledgerIncome.map(parseAmount),
+            income: ledgerIncome,
             taxAdjustment: taxAdjustment.map(parseAmount),
             adjustedIncome: adjustedIncome.map(Math.round),
-            household: ledgerHousehold.map(parseAmount),
-            emi: Array(12).fill(monthlyEmi),
-            insurance: Array(12).fill(monthlyInsurance),
+            household: ledgerHousehold,
+            emi: ledgerEmi,
+            insurance: ledgerInsurance,
             monthlySurplus,
-            savings: Array(12).fill(monthlySavings),
+            savings: ledgerSavings,
             unallocatedSurplus,
         },
         totals: {

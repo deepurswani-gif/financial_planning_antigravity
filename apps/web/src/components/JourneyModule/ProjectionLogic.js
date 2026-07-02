@@ -1,13 +1,16 @@
-import { calculateProjectedMemberTax } from '../IncomeTaxModule/IncomeTaxLogic';
 import { resolveEmploymentType } from '../DetailedFlow/employmentTypeSync';
 import { getEffectiveMonthlyHousehold } from '../DetailedFlow/expenseDetailSync';
 import {
     getMemberDetailForProjection,
-    getMemberDetailMonthlyTotal,
     getMemberFlatMonthlyIncome,
     getFlatHouseholdMonthlyIncome,
     shouldIncludeSpouseIncome,
+    prepareMemberDetailForProjection,
 } from '../DetailedFlow/incomeDetailSync';
+import {
+    getMemberNetInflowForLedger,
+    computeHouseholdProjectedTaxReconciliation,
+} from '../DetailedReport/moneyFlowLedgerLogic';
 import { hasConfiguredLoan } from '../DetailedFlow/expenseDetailSync';
 import { getLifeMemberMonthlyTotal } from '../DetailedFlow/insuranceDetailSync';
 import { getEffectiveMonthlySavings, buildSavingsBreakdownAnnual } from '../DetailedFlow/savingsDetailSync';
@@ -24,9 +27,9 @@ const resolveAnnualInflowBases = ({
     const activeSpouseDetail = includeSpouse && spouseDetail ? spouseDetail : null;
     const activeSpouseType = includeSpouse ? spouseEmploymentType : '';
 
-    let selfInHandAnnual = getMemberDetailMonthlyTotal(selfDetail, selfEmploymentType) * 12;
+    let selfInHandAnnual = getMemberNetInflowForLedger(selfDetail, selfEmploymentType) * 12;
     let spouseInHandAnnual = activeSpouseDetail
-        ? getMemberDetailMonthlyTotal(activeSpouseDetail, activeSpouseType) * 12
+        ? getMemberNetInflowForLedger(activeSpouseDetail, activeSpouseType) * 12
         : 0;
 
     const detailInflowAnnual = selfInHandAnnual + spouseInHandAnnual;
@@ -92,6 +95,7 @@ export const generateProjections = ({
     loanProposals = [],
     currentYearLedger,
     hasSpouseIncome = false,
+    planStartMonth = new Date().getMonth(),
 }) => {
     let cumulativeNetInvestibleSurplus = 0; // Tracks running cash flow balance month-by-month across all years
     
@@ -117,9 +121,15 @@ export const generateProjections = ({
     const spouseEmploymentType = spouseMember ? resolveEmploymentType(spouseMember) : '';
     const includeSpouse = shouldIncludeSpouseIncome(spouseMember, hasSpouseIncome, income);
 
-    const selfDetail = getMemberDetailForProjection(income, 'self', selfEmploymentType);
+    const selfDetail = prepareMemberDetailForProjection(
+        getMemberDetailForProjection(income, 'self', selfEmploymentType),
+        selfEmploymentType,
+    );
     const spouseDetail = includeSpouse
-        ? getMemberDetailForProjection(income, 'spouse', spouseEmploymentType)
+        ? prepareMemberDetailForProjection(
+            getMemberDetailForProjection(income, 'spouse', spouseEmploymentType),
+            spouseEmploymentType,
+        )
         : null;
 
     const { selfInHandAnnual, spouseInHandAnnual } = resolveAnnualInflowBases({
@@ -193,28 +203,27 @@ export const generateProjections = ({
 
         let householdOutflow = (householdMonthly * 12) * Math.pow(1 + (householdInflation / 100), i);
 
-        // --- Income Tax Calculation (Step 8 logic on scaled income detail) ---
-        const selfTaxRes = calculateProjectedMemberTax(
+        // --- Tax reconciliation (ledger-aligned: in-hand inflow, TDS already deducted) ---
+        const {
+            computedTax,
+            tdsWithheld,
+            taxReconciliation,
+            taxImpact,
+            applies: taxAdjustmentApplies,
+        } = computeHouseholdProjectedTaxReconciliation({
             selfDetail,
             selfEmploymentType,
-            i,
-            incomeIncrement,
-        );
+            spouseDetail,
+            spouseEmploymentType,
+            includeSpouse,
+            yearIndex: i,
+            incomeIncrementPercent: incomeIncrement,
+            projectionYear: year,
+        });
 
-        let spouseTax = 0;
-        if (spouseDetail && spouseMember && includeSpouse) {
-            const spouseTaxRes = calculateProjectedMemberTax(
-                spouseDetail,
-                spouseEmploymentType,
-                i,
-                incomeIncrement,
-            );
-            spouseTax = spouseTaxRes.finalTax;
-        }
-
-        const approxTax = selfTaxRes.finalTax + spouseTax;
-
-        const netInflowAfterTax = annualInflow - approxTax;
+        /** Amount applied to the waterfall (0 in current calendar year; reconciliation thereafter). */
+        const approxTax = taxImpact;
+        const netInflowAfterTax = annualInflow - taxImpact;
 
         // Outflows logic
         // Extract Cash Flow EMIs accurately resolving Active object parameters vs primitive infinite legacy
@@ -418,8 +427,9 @@ export const generateProjections = ({
         let yearDeficitMonth = null;
         let lowestCumulativeSurplus = null;
 
-        const currentMonthAbsolute = new Date().getMonth() + 1;
-        const startMonthLimit = (i === 0) ? currentMonthAbsolute : 1;
+        // Year 1 cumulative deficit check aligns with Allocation proration window (plan start → Dec).
+        const planStartMonthAbsolute = Math.min(Math.max(planStartMonth, 0), 11) + 1;
+        const startMonthLimit = (i === 0) ? planStartMonthAbsolute : 1;
 
         for (let m = startMonthLimit; m <= 12; m++) {
             let monthlyJourneyDeduction = 0;
@@ -585,6 +595,10 @@ export const generateProjections = ({
         projections.push({
             year,
             annualInflow,
+            computedTax,
+            tdsWithheld,
+            taxReconciliation,
+            taxAdjustmentApplies,
             approxTax,
             netInflowAfterTax,
             householdOutflow,

@@ -5,7 +5,7 @@ import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { signOut } from '../../services/authService';
 import finbrellaLogo from '../../assets/finbrella_logo.png';
-import { detailedFlowSteps } from '../DetailedFlow/detailedFlowSteps';
+import { detailedFlowSteps, GROWTH_EXPECTATIONS_PATH } from '../DetailedFlow/detailedFlowSteps';
 import { DEFAULT_SUMMARY_REPORT_PATH } from '../SummaryReport/summaryReportSteps';
 import { DEFAULT_DETAILED_REPORT_PATH } from '../DetailedReport/detailedReportSteps';
 import { useBreakpoints } from '../../hooks';
@@ -34,11 +34,14 @@ const BlankLayout = () => {
     const isDetailedReport = currentPath.startsWith('/detailed-report');
     const isDetailedFlow = currentPath.startsWith('/detailed-flow') && !currentPath.startsWith('/detailed-flow/existing-app');
     const isDreamsGoals = currentPath.includes('dreams_goals');
+    const isGrowthExpectations = currentPath.includes('growth_expectations');
     const isSummaryExperience = isSummaryFlow || isSummaryReport;
     const isDetailedExperience = isDetailedFlow || isDetailedReport;
 
     const currentStepIndex = steps.findIndex(s => currentPath.includes(s.id));
-    const detailedStepIndex = detailedFlowSteps.findIndex(s => currentPath.includes(s.id));
+    const detailedStepIndex = isGrowthExpectations
+        ? detailedFlowSteps.length
+        : detailedFlowSteps.findIndex(s => currentPath.includes(s.id));
     const isStepCompleted = (stepIndex) => stepIndex < currentStepIndex;
 
     const selfMember = familyMembers?.find(m => m.relation === 'Self');
@@ -82,7 +85,7 @@ const BlankLayout = () => {
         if (savePlanData) {
             try { await savePlanData(); } catch (e) { console.error('Save failed on nav', e); }
         }
-        navigate(DEFAULT_DETAILED_REPORT_PATH);
+        navigate(isGrowthExpectations ? DEFAULT_DETAILED_REPORT_PATH : GROWTH_EXPECTATIONS_PATH);
     };
 
     if (!isSummaryExperience && !isDetailedExperience) {
@@ -106,7 +109,7 @@ const BlankLayout = () => {
                     <img src={finbrellaLogo} alt="Finbrella" />
                 </div>
                 <div className="summary-header-right">
-                    {isDreamsGoals && (
+                    {(isDreamsGoals || isGrowthExpectations) && (
                         <button
                             type="button"
                             className="summary-view-report-btn"

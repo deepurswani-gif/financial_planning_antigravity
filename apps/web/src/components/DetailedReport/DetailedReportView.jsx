@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate, useParams, Navigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import YourMoneyFlowSection from './YourMoneyFlowSection';
+import PutYourMoneyToWorkSection from './PutYourMoneyToWorkSection';
 import {
     DEFAULT_DETAILED_REPORT_PATH,
     detailedReportSlugs,
@@ -10,6 +11,7 @@ import {
 
 const SECTION_BY_SLUG = {
     your_money_flow: YourMoneyFlowSection,
+    put_your_money_to_work: PutYourMoneyToWorkSection,
 };
 
 const DetailedReportView = () => {
@@ -86,7 +88,7 @@ const DetailedReportView = () => {
 
             {ActiveSection ? <ActiveSection /> : (
                 <div className="card" style={{ minHeight: '400px', padding: '2rem', textAlign: 'center' }}>
-                    <h2>{activeStep?.label || 'Invest Unallocated Surplus'}</h2>
+                    <h2>{activeStep?.label || 'Put Your Money to Work'}</h2>
                     <p className="text-muted">This module is coming soon.</p>
                     <button
                         type="button"

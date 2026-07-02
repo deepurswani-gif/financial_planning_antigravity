@@ -1,7 +1,8 @@
 import { useMemo, useState, useCallback, useEffect } from 'react';
 import {
-    Plus, Trash2, GraduationCap, Home, Car, Plane, Heart, Award, Target, PenLine, Check,
+    Plus, Trash2, PenLine, Check,
 } from 'lucide-react';
+import { getGoalIcon } from './goalIcons';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 import { calculateFutureCost } from '../GoalModule/GoalLogic';
 import {
@@ -18,19 +19,6 @@ import ReconciliationStatus from './ReconciliationStatus';
 const formatInr = (val) => {
     if (!val || isNaN(val)) return '₹0';
     return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val);
-};
-
-const getGoalIcon = (goal) => {
-    const name = (goal.name || '').toLowerCase();
-    const id = goal.id || '';
-    if (name.includes('educat') || id.startsWith('edu_')) return GraduationCap;
-    if (name.includes('retire') || id === 'retirement') return Award;
-    if (name.includes('bike')) return Car;
-    if (name.includes('car') || id === 'car') return Car;
-    if (name.includes('tour') || name.includes('vacat') || id.includes('tour')) return Plane;
-    if (name.includes('house') || name.includes('flat') || name.includes('construct') || name.includes('renovat')) return Home;
-    if (name.includes('marriage') || id.startsWith('marriage_')) return Heart;
-    return Target;
 };
 
 const CurrencyField = ({ label, value, onChange, placeholder = '0', readOnly, helperText }) => (

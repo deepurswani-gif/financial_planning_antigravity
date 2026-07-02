@@ -589,6 +589,7 @@ const AllocationModule = ({ onNext, onBack }) => {
                                             ?.filter(a => a.type === type)
                                             .reduce((sum, a) => sum + (a.impactThisYear || 0), 0) || 0;
                                     });
+                                    const monthlyDivisor = idx === 0 ? remainingMonths : 12;
 
                                     return (
                                         <tr key={row.year} style={{ background: idx % 2 === 0 ? 'var(--bg-card)' : 'var(--bg-main)', borderBottom: '1px solid var(--border)' }} className="zebra-row">
@@ -596,7 +597,7 @@ const AllocationModule = ({ onNext, onBack }) => {
                                                 {row.year}
                                             </td>
                                             <td style={{ borderLeft: '1px dashed var(--border)', padding: '0.75rem', textAlign: 'right', fontWeight: 600 }}>{formatCurrency(row.netInvestibleSurplus)}</td>
-                                            <td style={{ padding: '0.75rem', textAlign: 'right', color: 'var(--text-muted)' }}>{formatCurrency(row.netInvestibleSurplus / 12)}</td>
+                                            <td style={{ padding: '0.75rem', textAlign: 'right', color: 'var(--text-muted)' }}>{formatCurrency(row.netInvestibleSurplus / monthlyDivisor)}</td>
                                             
                                             {dynamicColumns.map(type => (
                                                 <td key={type} style={{ borderLeft: '1px dashed var(--border)', padding: '0.75rem', textAlign: 'right', color: allocationsByType[type] > 0 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: allocationsByType[type] > 0 ? 600 : 400 }}>
@@ -608,7 +609,7 @@ const AllocationModule = ({ onNext, onBack }) => {
                                                 {formatCurrency(row.unallocatedSurplus)}
                                             </td>
                                             <td style={{ padding: '0.75rem', textAlign: 'right', color: row.unallocatedSurplus < 0 ? '#ef4444' : 'var(--success)', background: row.unallocatedSurplus < 0 ? 'rgba(239, 68, 68, 0.05)' : 'rgba(16, 185, 129, 0.05)' }}>
-                                                {formatCurrency(row.unallocatedSurplus / 12)}
+                                                {formatCurrency(row.unallocatedSurplus / monthlyDivisor)}
                                             </td>
                                         </tr>
                                     );

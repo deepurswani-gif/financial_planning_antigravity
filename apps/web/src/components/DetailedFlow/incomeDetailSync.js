@@ -408,6 +408,15 @@ export function computeDerivedMonthlyInHandFromSlip(detail, employmentType) {
     return Math.round(gross - deductions);
 }
 
+/** Derive in-hand from salary slip before projections / ledger (does not mutate stored state). */
+export function prepareMemberDetailForProjection(detail, employmentType) {
+    const base = { ...createEmptyIncomeDetail(), ...(detail || {}) };
+    if (isSalariedEmployment(employmentType) && base.needTaxPlanning === true) {
+        return applySalarySlipDerivedTotals(base, employmentType);
+    }
+    return base;
+}
+
 /** Auto-fill grossSalary and inHandSalary from salary-slip components when tax planning is enabled. */
 export function applySalarySlipDerivedTotals(detail, employmentType) {
     if (detail?.needTaxPlanning !== true || !isSalariedEmployment(employmentType)) {

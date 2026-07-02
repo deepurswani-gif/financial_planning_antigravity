@@ -3,9 +3,10 @@ import { useAuth } from './AuthContext';
 import { createFinancialPlan, getActivePlan, updateFinancialPlan, markSummaryReportGenerated } from '../services/financialPlanService';
 import { generateProjections } from '../components/JourneyModule/ProjectionLogic';
 import { normalizeIncomeState } from '../components/DetailedFlow/incomeDetailSync';
-import { getLedgerNetIncomeMonthly, getLedgerHouseholdMonthly, computeTaxAdjustmentArray } from '../components/DetailedReport/moneyFlowLedgerLogic';
+import { getLedgerNetIncomeMonthly, getLedgerHouseholdMonthly, computeTaxAdjustmentArray, getMonthlyInsuranceTotal, syncLedgerFromMonthlyTotals } from '../components/DetailedReport/moneyFlowLedgerLogic';
 import { resolveEmploymentType } from '../components/DetailedFlow/employmentTypeSync';
-import { syncLedgerFromMonthlyTotals } from '../components/CashFlowModule/CashFlowLogic';
+import { getEffectiveMonthlyEmi } from '../components/DetailedFlow/expenseDetailSync';
+import { getEffectiveMonthlySavings } from '../components/DetailedFlow/savingsDetailSync';
 import { initializeExpenseSnapshots, hasAnyEmiCommitment } from '../components/DetailedFlow/expenseDetailSync';
 import { initializeSavingsSnapshots } from '../components/DetailedFlow/savingsDetailSync';
 import { migrateInsuranceBlock } from '../components/DetailedFlow/insuranceDetailSync';
@@ -103,6 +104,9 @@ export const FinancialPlanProvider = ({ children }) => {
   const [currentYearLedger, setCurrentYearLedger] = useState({
     income: Array(12).fill(0),
     household: Array(12).fill(0),
+    emi: Array(12).fill(0),
+    insurance: Array(12).fill(0),
+    savings: Array(12).fill(0),
     taxAdjustment: Array(12).fill(0),
   });
   const [cashFlowSubStep, setCashFlowSubStep] = useState(1);
@@ -128,6 +132,9 @@ export const FinancialPlanProvider = ({ children }) => {
 
     const monthlyIncome = getLedgerNetIncomeMonthly(income, familyMembers, hasSpouseIncome, resolveEmploymentType);
     const monthlyHousehold = getLedgerHouseholdMonthly(expenseCategories, familyMembers);
+    const monthlyEmi = Math.round(getEffectiveMonthlyEmi(expenseCategories));
+    const monthlyInsurance = getMonthlyInsuranceTotal(expenseCategories);
+    const monthlySavings = Math.round(getEffectiveMonthlySavings(expenseCategories));
     const { adjustment: taxAdjustment } = computeTaxAdjustmentArray({
       income,
       familyMembers,
@@ -136,7 +143,14 @@ export const FinancialPlanProvider = ({ children }) => {
       calendarYear: new Date().getFullYear(),
     });
 
-    setCurrentYearLedger((prev) => syncLedgerFromMonthlyTotals(prev, monthlyIncome, monthlyHousehold, taxAdjustment));
+    setCurrentYearLedger((prev) => syncLedgerFromMonthlyTotals(prev, {
+      income: monthlyIncome,
+      household: monthlyHousehold,
+      emi: monthlyEmi,
+      insurance: monthlyInsurance,
+      savings: monthlySavings,
+      taxAdjustment,
+    }));
   }, [loading, income, familyMembers, hasSpouseIncome, expenseCategories, planStartMonth]);
 
   const resetState = () => {
@@ -181,7 +195,14 @@ export const FinancialPlanProvider = ({ children }) => {
     setCalculatorInputs({
       personal_loan: { amount: 0, rate: 10.5, tenure: 5, events: [] }, home_loan: { amount: 0, rate: 8.5, tenure: 15, events: [] }, car_loan: { amount: 0, rate: 9.5, tenure: 5, events: [] }, two_wheeler_loan: { amount: 0, rate: 11.5, tenure: 3, events: [] }, edu_loan: { amount: 0, rate: 9.0, tenure: 7, events: [] }, lumpsum: { amount: 0, rate: 12, tenure: 10, events: [] }, swp: { amount: 0, withdrawal: 0, rate: 10, tenure: 15, events: [] }, sip: { amount: 0, rate: 12, tenure: 10, increments: [] }, ppf: { rate: 7.10 }, nps: { rate: 10.00, annuity: 40, annuityRate: 6.00 }, fd: { rate: 7.00, frequency: 'Quarterly' }, rd: { rate: 7.00 }, equity: {}
     });
-    setCurrentYearLedger({ income: Array(12).fill(0), household: Array(12).fill(0), taxAdjustment: Array(12).fill(0) });
+    setCurrentYearLedger({
+      income: Array(12).fill(0),
+      household: Array(12).fill(0),
+      emi: Array(12).fill(0),
+      insurance: Array(12).fill(0),
+      savings: Array(12).fill(0),
+      taxAdjustment: Array(12).fill(0),
+    });
     setCashFlowSubStep(1);
     setPlanSyncError(null);
   };
@@ -365,6 +386,9 @@ export const FinancialPlanProvider = ({ children }) => {
         setCurrentYearLedger({
           income: data.current_year_ledger?.income || Array(12).fill(0),
           household: data.current_year_ledger?.household || Array(12).fill(0),
+          emi: data.current_year_ledger?.emi || Array(12).fill(0),
+          insurance: data.current_year_ledger?.insurance || Array(12).fill(0),
+          savings: data.current_year_ledger?.savings || Array(12).fill(0),
           taxAdjustment: data.current_year_ledger?.taxAdjustment || Array(12).fill(0),
         });
       }

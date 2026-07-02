@@ -22,6 +22,7 @@ import DetailedFamilyInfo from './components/DetailedFlow/DetailedFamilyInfo';
 import DetailedMoneyInOut from './components/DetailedFlow/DetailedMoneyInOut';
 import DetailedMyWealthSnapshot from './components/DetailedFlow/DetailedMyWealthSnapshot';
 import DetailedDreamsGoals from './components/DetailedFlow/DetailedDreamsGoals';
+import DetailedGrowthExpectations from './components/DetailedFlow/DetailedGrowthExpectations';
 
 // Legacy Existing App Flow
 import DetailedFlowLayout from './DetailedFlowLayout';
@@ -76,6 +77,7 @@ function App() {
           <Route path="money_in_out" element={<DetailedMoneyInOut />} />
           <Route path="mywealth" element={<DetailedMyWealthSnapshot />} />
           <Route path="dreams_goals" element={<DetailedDreamsGoals />} />
+          <Route path="growth_expectations" element={<DetailedGrowthExpectations />} />
           <Route path="expenses_emis" element={<Navigate to="/detailed-flow/money_in_out" replace />} />
           <Route path="*" element={<Navigate to="/detailed-flow/familyinfo" replace />} />
         </Route>

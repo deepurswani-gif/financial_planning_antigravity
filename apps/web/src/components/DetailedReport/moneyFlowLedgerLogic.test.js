@@ -99,16 +99,73 @@ describe('moneyFlowLedgerLogic', () => {
         const prev = {
             income: [100, 100, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0],
             household: [50, 50, 50, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            emi: [20000, 20000, 20000, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            insurance: [1000, 1000, 1000, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            savings: [5000, 5000, 5000, 0, 0, 0, 0, 0, 0, 0, 0, 0],
             taxAdjustment: Array(12).fill(0),
         };
         const currentMonth = new Date().getMonth();
-        const next = syncLedgerFromMonthlyTotals(prev, 90000, 30000, Array(12).fill(0));
+        const next = syncLedgerFromMonthlyTotals(prev, {
+            income: 90000,
+            household: 30000,
+            emi: 25000,
+            insurance: 1500,
+            savings: 8000,
+            taxAdjustment: Array(12).fill(0),
+        });
         expect(next.income[currentMonth]).toBe(90000);
         expect(next.household[currentMonth]).toBe(30000);
+        expect(next.emi[currentMonth]).toBe(25000);
+        expect(next.insurance[currentMonth]).toBe(1500);
+        expect(next.savings[currentMonth]).toBe(8000);
         if (currentMonth > 0) {
             expect(next.income[0]).toBe(100);
+            expect(next.emi[0]).toBe(20000);
+            expect(next.savings[0]).toBe(5000);
         }
         expect(next.taxAdjustment).toEqual(Array(12).fill(0));
+    });
+
+    it('buildYourMoneyFlowReport uses per-month EMI, insurance, and savings from ledger', () => {
+        const currentMonth = new Date().getMonth();
+        const prevMonth = Math.max(0, currentMonth - 1);
+        const emi = Array(12).fill(25000);
+        const savings = Array(12).fill(10000);
+        if (prevMonth !== currentMonth) {
+            emi[prevMonth] = 20000;
+            savings[prevMonth] = 8000;
+        }
+
+        const report = buildYourMoneyFlowReport({
+            currentYearLedger: {
+                income: Array(12).fill(100000),
+                household: Array(12).fill(40000),
+                emi,
+                insurance: Array(12).fill(1000),
+                savings,
+                taxAdjustment: Array(12).fill(0),
+            },
+            planStartMonth: 0,
+            familyMembers: [{ relation: 'Self', name: 'Alex', employmentType: 'Private Sector' }],
+            income: { self: '100000' },
+            expenseCategories: {
+                household: { grocery: '10000', rent: '20000', education: '10000', lifestyle: '', medical: '', travel: '' },
+                emi: { personalLoan: '25000' },
+                insurance: { health: { value: '12000', frequency: 'Annual' }, life: {} },
+                savings: { sip: '10000' },
+            },
+            hasSpouseIncome: false,
+            resolveEmploymentType,
+            journeyProjections: [],
+            currentMonth,
+        });
+
+        if (prevMonth !== currentMonth) {
+            expect(report.ledger.emi[prevMonth]).toBe(20000);
+            expect(report.ledger.emi[currentMonth]).toBe(25000);
+            expect(report.ledger.savings[prevMonth]).toBe(8000);
+            expect(report.ledger.unallocatedSurplus[prevMonth]).not.toBe(report.ledger.unallocatedSurplus[currentMonth]);
+        }
     });
 
     it('buildYourMoneyFlowReport computes surplus and unallocated rows', () => {
@@ -116,6 +173,9 @@ describe('moneyFlowLedgerLogic', () => {
             currentYearLedger: {
                 income: Array(12).fill(100000),
                 household: Array(12).fill(40000),
+                emi: Array(12).fill(5000),
+                insurance: Array(12).fill(1000),
+                savings: Array(12).fill(10000),
                 taxAdjustment: Array(12).fill(0),
             },
             planStartMonth: 3,
@@ -173,6 +233,9 @@ describe('moneyFlowLedgerLogic', () => {
             currentYearLedger: {
                 income: Array(12).fill(100000),
                 household: Array(12).fill(40000),
+                emi: Array(12).fill(5000),
+                insurance: Array(12).fill(1000),
+                savings: Array(12).fill(10000),
                 taxAdjustment: Array(12).fill(0),
             },
             planStartMonth: 0,

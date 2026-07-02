@@ -114,8 +114,10 @@ describe('ProjectionLogic', () => {
             startYear: 2026,
         };
         const results = generateProjections(params);
-        // Taxable = 12L - 75k = 11.25L => rebate zeros tax
+        // Current calendar year: no tax adjustment on in-hand inflow
+        expect(results[0].computedTax).toBe(0);
         expect(results[0].approxTax).toBe(0);
+        expect(results[0].netInflowAfterTax).toBe(1200000);
         expect(results[0].annualInflow).toBe(1200000);
     });
 
@@ -136,7 +138,27 @@ describe('ProjectionLogic', () => {
         };
         const results = generateProjections(params);
         expect(results[0].annualInflow).toBe(960000);
+        expect(results[0].computedTax).toBe(0);
         expect(results[0].approxTax).toBe(0);
+        expect(results[0].netInflowAfterTax).toBe(960000);
+    });
+
+    it('accepts planStartMonth for year-1 cumulative deficit window', () => {
+        const params = {
+            ...mockParams,
+            planStartMonth: 3,
+            investmentAllocations: [{
+                type: 'Lumpsum',
+                amount: 500000,
+                startMonth: 4,
+                startYear: 2026,
+                duration: 1,
+            }],
+        };
+        const results = generateProjections(params);
+        expect(results[0].year).toBe(2026);
+        expect(typeof results[0].yearHasDeficit).toBe('boolean');
+        expect(results[0].yearAllocationsTotal).toBe(500000);
     });
 });
 
@@ -188,12 +210,23 @@ describe('ProjectionLogic tax with cash-flow ledger', () => {
         },
     };
 
-    it('does not shrink tax base when ledger inflow is lower than gross detail income', () => {
+    it('uses in-hand inflow and defers tax adjustment to future projection years', () => {
         const results = generateProjections(baseParams);
 
+        // Ledger anchor ₹1.5L/mo; detail in-hand self ₹1L + spouse ₹1.22L (₹1.5L − PF − TDS)
         expect(results[0].annualInflow).toBe(1800000);
-        expect(results[0].approxTax).toBe(150800);
-        expect(results[1].approxTax).toBe(235040);
+        expect(results[0].computedTax).toBe(150800);
+        expect(results[0].tdsWithheld).toBe(120000);
+        expect(results[0].taxReconciliation).toBe(30800);
+        // Current year: no adjustment applied (ledger-aligned)
+        expect(results[0].approxTax).toBe(0);
+        expect(results[0].netInflowAfterTax).toBe(1800000);
+
+        expect(results[1].computedTax).toBe(235040);
+        expect(results[1].tdsWithheld).toBe(132000);
+        expect(results[1].taxReconciliation).toBe(103040);
+        expect(results[1].approxTax).toBe(103040);
+        expect(results[1].netInflowAfterTax).toBeCloseTo(1876960, 0);
     });
 
     it('uses detail in-hand inflow when ledger exists but is all zeros', () => {
@@ -205,7 +238,20 @@ describe('ProjectionLogic tax with cash-flow ledger', () => {
             },
         });
 
-        expect(results[0].annualInflow).toBe(1800000);
-        expect(results[0].approxTax).toBe(150800);
+        // Self ₹1L + spouse ₹1.22L in-hand × 12
+        expect(results[0].annualInflow).toBe(2664000);
+        expect(results[0].computedTax).toBe(150800);
+        expect(results[0].approxTax).toBe(0);
+    });
+
+    it('derives in-hand from salary slip before projecting surplus', () => {
+        const results = generateProjections({
+            ...baseParams,
+            currentYearLedger: undefined,
+        });
+
+        // Self ₹1L + spouse ₹1.22L in-hand (not ₹1.5L gross) × 12
+        expect(results[0].annualInflow).toBe(2664000);
+        expect(results[0].annualInflow).not.toBe(3000000);
     });
 });

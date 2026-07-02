@@ -6,3 +6,6 @@ export const detailedFlowSteps = [
     { id: 'mywealth', label: 'My Wealth Snapshot', path: '/detailed-flow/mywealth', icon: Wallet },
     { id: 'dreams_goals', label: 'My Dreams & Goals', path: '/detailed-flow/dreams_goals', icon: Target },
 ];
+
+/** Post–Dreams & Goals gate before the detailed report; not shown in step nav. */
+export const GROWTH_EXPECTATIONS_PATH = '/detailed-flow/growth_expectations';

@@ -107,7 +107,14 @@ const JourneyTable = ({ projections }) => {
                             <tr>
                                 <th style={{ textAlign: 'center', position: 'sticky', left: 0, background: 'var(--bg-main)', zIndex: 10 }}>Year</th>
                                 <th>Annual Inflows</th>
-                                <th>Income Tax</th>
+                                <th>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
+                                        Tax Adjustment
+                                        <div style={{ display: 'inline-flex', cursor: 'help' }} title="Extra tax due or refund vs TDS on salary slip. Current year shows ₹0 (prior ITR assumed filed).">
+                                            <HelpCircle size={18} color="var(--primary)" />
+                                        </div>
+                                    </div>
+                                </th>
                                 <th>Net Inflow (After Tax)</th>
                                 <th>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
@@ -165,7 +172,9 @@ const JourneyTable = ({ projections }) => {
                                                 {isCurrentYear && <span style={{ display: 'block', fontSize: '0.6rem', color: 'var(--primary)', marginTop: '-2px' }}>CURRENT</span>}
                                             </td>
                                             <td style={{ color: 'var(--text-main)' }}>{formatCurrency(row.annualInflow)}</td>
-                                            <td style={{ color: '#ef4444' }}>{formatCurrency(row.approxTax)}</td>
+                                            <td style={{ color: row.approxTax < 0 ? '#16a34a' : '#ef4444' }}>
+                                                {formatCurrency(row.approxTax)}
+                                            </td>
                                             <td style={{ fontWeight: 600, color: 'var(--text-main)' }}>{formatCurrency(row.netInflowAfterTax)}</td>
                                             
                                             <td style={{ position: 'relative' }}>
