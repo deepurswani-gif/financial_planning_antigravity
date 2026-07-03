@@ -1332,6 +1332,10 @@ select.conversational-input,
   padding: 0.75rem 1.5rem;
 }
 
+.detailed-report-view {
+  --summary-report-action-bar-offset: 4.75rem;
+}
+
 .summary-report-action-bar-inner {
   max-width: 1400px;
   margin: 0 auto;
@@ -1378,6 +1382,10 @@ select.conversational-input,
 }
 
 @media (max-width: 900px) {
+  .detailed-report-view {
+    --summary-report-action-bar-offset: 9.5rem;
+  }
+
   .summary-report-action-bar-inner {
     flex-direction: column;
     align-items: stretch;
