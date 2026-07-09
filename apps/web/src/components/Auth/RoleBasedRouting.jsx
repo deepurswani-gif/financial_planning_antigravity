@@ -2,12 +2,11 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { supabase } from "../../lib/supabase";
 import AdminDashboard from "../Admin/AdminDashboard";
-import SubscriptionGate from "./SubscriptionGate";
+// FLAG_PAYMENT_DISABLED: import SubscriptionGate from "./SubscriptionGate";
 
 const RoleBasedRouting = ({ children }) => {
   const { user } = useAuth();
   const [userRole, setUserRole] = useState(null);
-  const [subscriptionActive, setSubscriptionActive] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -16,12 +15,14 @@ const RoleBasedRouting = ({ children }) => {
     const fetchUserRole = async () => {
       if (!userId) {
         setUserRole(null);
-        setSubscriptionActive(false);
         setLoading(false);
         return;
       }
 
-      setLoading(true);
+      const shouldShowLoader = userRole === null;
+      if (shouldShowLoader) {
+        setLoading(true);
+      }
 
       try {
         const { data, error } = await supabase
@@ -41,12 +42,9 @@ const RoleBasedRouting = ({ children }) => {
         }
 
         setUserRole(data?.role || "user");
-        // Always mirror DB; otherwise a previous session's true sticks and skips SubscriptionGate
-        setSubscriptionActive(data?.subscription_active === true);
       } catch (error) {
         console.error("Error fetching user profile:", error);
         setUserRole("user");
-        setSubscriptionActive(false);
       } finally {
         setLoading(false);
       }
@@ -102,9 +100,11 @@ const RoleBasedRouting = ({ children }) => {
     return <>{children}</>;
   }
 
+  /* FLAG_PAYMENT_DISABLED:
   if (!subscriptionActive) {
     return <SubscriptionGate onActivate={() => setSubscriptionActive(true)} />;
   }
+  */
 
   return <>{children}</>;
 };

@@ -100,6 +100,7 @@ const InstrumentCardGrid = ({
     instrumentCategories,
     draftAllocations,
     remainingSurplus,
+    getMaxAmountForInstrument,
     onDraftChange,
     onAnalyze,
 }) => (
@@ -119,7 +120,9 @@ const InstrumentCardGrid = ({
                             instrument={instrument}
                             category={category}
                             draftAmount={draftAllocations[instrument.type] || 0}
-                            maxAmount={(draftAllocations[instrument.type] || 0) + Math.max(0, remainingSurplus)}
+                            maxAmount={getMaxAmountForInstrument
+                                ? getMaxAmountForInstrument(instrument.type)
+                                : (draftAllocations[instrument.type] || 0) + Math.max(0, remainingSurplus)}
                             onDraftChange={onDraftChange}
                             onAnalyze={onAnalyze}
                         />

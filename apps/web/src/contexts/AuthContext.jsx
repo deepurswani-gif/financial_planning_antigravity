@@ -40,6 +40,13 @@ export const AuthProvider = ({ children }) => {
     // Listen for auth changes
     const { data: authListener } = onAuthStateChange((event, session) => {
       console.log('Auth event:', event);
+      // Token refresh on tab focus must not replace `user` — that retriggers plan hydration
+      // and flashes the full-page loader even though the account did not change.
+      if (event === 'TOKEN_REFRESHED') {
+        setSession(session);
+        setLoading(false);
+        return;
+      }
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);

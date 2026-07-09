@@ -128,7 +128,8 @@ function allocationsTable(allocations) {
 function buildDocument(plan, clientMeta) {
   const income = plan.income || {};
   const expenseCategories = plan.expense_categories || {};
-  const cash = calculateCashFlow(income, expenseCategories);
+  const family = Array.isArray(plan.family_members) ? plan.family_members : [];
+  const cash = calculateCashFlow(income, expenseCategories, family);
   const nw = calculateNetWorth(plan.asset_categories || {}, plan.liability_categories || {});
 
   const clientName = clientMeta?.full_name || plan.family_members?.[0]?.name || 'Client';
@@ -138,7 +139,6 @@ function buildDocument(plan, clientMeta) {
     timeStyle: 'short',
   });
 
-  const family = Array.isArray(plan.family_members) ? plan.family_members : [];
   const familyHeaders = ['Name', 'Relation', 'DOB', 'Occupation', 'Retirement age', 'Mobile'];
   const familyRows = family.map((m) => [
     escapeHtml(m.name),

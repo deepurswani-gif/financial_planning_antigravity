@@ -291,12 +291,36 @@ describe('incomeDetailSync', () => {
         expect(detail.passiveIncome).toBe('5000');
     });
 
+    it('getMemberDetailForProjection resyncs summary anchor over stale partial detail', () => {
+        const income = {
+            summarySelfInHand: '80000',
+            selfDetail: { inHandSalary: '8', otherIncome: [{ amount: '' }] },
+            summarySpouseInHand: '60000',
+            spouseDetail: { inHandSalary: '6', otherIncome: [{ amount: '' }] },
+        };
+        expect(getMemberDetailForProjection(income, 'self', 'Private Sector').inHandSalary).toBe('80000');
+        expect(getMemberDetailForProjection(income, 'spouse', 'Private Sector').inHandSalary).toBe('60000');
+    });
+
     it('shouldIncludeSpouseIncome follows isSpouseWorking and hasSpouseIncome flags', () => {
         const spouse = { relation: 'Spouse', isSpouseWorking: true };
         expect(shouldIncludeSpouseIncome(spouse, false, {})).toBe(true);
         expect(shouldIncludeSpouseIncome({ relation: 'Spouse' }, true, {})).toBe(true);
         expect(shouldIncludeSpouseIncome({ relation: 'Spouse' }, false, { spouse: '50000' })).toBe(true);
         expect(shouldIncludeSpouseIncome({ relation: 'Spouse' }, false, {})).toBe(false);
+        expect(shouldIncludeSpouseIncome(null, true, {})).toBe(true);
+        expect(shouldIncludeSpouseIncome(null, false, { summarySpouseInHand: '75000' })).toBe(true);
+    });
+
+    it('getHouseholdMonthlyInflow includes spouse income from summary flow without spouse member', () => {
+        const familyMembers = [{ relation: 'Self', employmentType: 'Private Sector' }];
+        const income = {
+            summarySelfInHand: '100000',
+            summarySpouseInHand: '75000',
+            selfDetail: { inHandSalary: '100000', otherIncome: [{ amount: '' }] },
+            spouseDetail: { inHandSalary: '75000', otherIncome: [{ amount: '' }] },
+        };
+        expect(getHouseholdMonthlyInflow(income, familyMembers, true, resolveEmploymentType)).toBe(175000);
     });
 
     it('getHouseholdMonthlyInflow sums detailed in-hand totals for self and spouse', () => {

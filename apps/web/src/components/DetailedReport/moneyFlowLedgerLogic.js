@@ -74,9 +74,13 @@ export function getLedgerNetIncomeMonthly(income, familyMembers, hasSpouseIncome
     const selfDetail = getMemberDetailForProjection(income, 'self', selfType);
     let total = getMemberNetInflowForLedger(selfDetail, selfType);
 
-    if (includeSpouse && spouseMember) {
-        const spouseDetail = getMemberDetailForProjection(income, 'spouse', spouseType);
-        total += getMemberNetInflowForLedger(spouseDetail, spouseType);
+    if (includeSpouse) {
+        const spouseDetail = getMemberDetailForProjection(
+            income,
+            'spouse',
+            spouseMember ? spouseType : 'Private Sector',
+        );
+        total += getMemberNetInflowForLedger(spouseDetail, spouseMember ? spouseType : 'Private Sector');
     }
 
     if (total > 0) return Math.round(total);

@@ -4,7 +4,7 @@ import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 import {
     getSummaryIncomeTarget,
     hasIncomeBreakdown,
-    prefillDetailFromSummaryAmount,
+    syncSummaryAmountToDetailPrimary,
 } from '../DetailedFlow/incomeDetailSync';
 import { guessEmploymentTypeFromSummaryOccupation } from '../DetailedFlow/employmentTypeSync';
 
@@ -38,7 +38,7 @@ const SummaryCashFlow = () => {
             };
 
             if (!hasIncomeBreakdown(detail, employmentType)) {
-                next[detailKey] = prefillDetailFromSummaryAmount(detail, value, employmentType);
+                next[detailKey] = syncSummaryAmountToDetailPrimary(detail, value, employmentType);
             }
 
             return next;

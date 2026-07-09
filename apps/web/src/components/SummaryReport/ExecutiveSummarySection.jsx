@@ -37,6 +37,7 @@ const ExecutiveSummarySection = () => {
         goals,
         inflationRates,
         familyMembers,
+        hasSpouseIncome,
     } = useFinancialPlan();
 
     const report = useMemo(
@@ -51,8 +52,9 @@ const ExecutiveSummarySection = () => {
                 goals,
                 inflationRates,
                 familyMembers,
+                hasSpouseIncome,
             }),
-        [income, expenseCategories, assetCategories, summaryLifeCover, summaryHealthCover, contingencyFund, goals, inflationRates, familyMembers]
+        [income, expenseCategories, assetCategories, summaryLifeCover, summaryHealthCover, contingencyFund, goals, inflationRates, familyMembers, hasSpouseIncome]
     );
 
     const [scenario, setScenario] = useState(report.baseMetrics);

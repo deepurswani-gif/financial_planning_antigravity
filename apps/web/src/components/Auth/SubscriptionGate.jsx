@@ -1,3 +1,4 @@
+/* FLAG_PAYMENT_DISABLED:
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { CreditCard, CheckCircle2, Ticket, Lock, Zap } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -112,7 +113,7 @@ const SubscriptionGate = ({ onActivate }) => {
       </div>
 
       <div className="pricing-grid">
-        {/* Annual Plan Card */}
+        // Annual Plan Card
         <div className="pricing-card premium">
           <div className="popular-badge">Most Popular</div>
           <div className="card-header">
@@ -134,7 +135,7 @@ const SubscriptionGate = ({ onActivate }) => {
           </ul>
         </div>
 
-        {/* Renewal Plan Card */}
+        // Renewal Plan Card
         <div className="pricing-card standard">
           <div className="card-header">
             <h3>Renewal Plan</h3>
@@ -155,7 +156,7 @@ const SubscriptionGate = ({ onActivate }) => {
         </div>
       </div>
 
-      {/* Coupon Bypass Section */}
+      // Coupon Bypass Section
       <div className="coupon-section">
         <div className="coupon-header">
           <Ticket size={24} color="var(--primary)" />
@@ -482,4 +483,7 @@ const SubscriptionGate = ({ onActivate }) => {
   );
 };
 
+export default SubscriptionGate;
+*/
+const SubscriptionGate = () => null;
 export default SubscriptionGate;

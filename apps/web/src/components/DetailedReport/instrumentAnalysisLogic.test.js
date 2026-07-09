@@ -73,4 +73,30 @@ describe('instrumentAnalysisLogic', () => {
         expect(result[0].studioPlanKey).toBe('2026-6');
         expect(result.find((r) => r.type === 'SIP')?.amount).toBe(120000);
     });
+
+    it('enforces 15-year PPF horizon in analysis and plan application', () => {
+        const ppfParams = {
+            ...baseParams,
+            investmentAllocations: [{
+                id: 1,
+                type: 'PPF',
+                name: 'Legacy PPF',
+                amount: 120000,
+                startMonth: 1,
+                startYear: 2026,
+                duration: 30,
+            }],
+        };
+        const analysis = analyzeInstrument('PPF', ppfParams, 5000, 6, 2026);
+        const applied = applyAllocationPlan({
+            investmentAllocations: [],
+            draftAllocations: { ...createEmptyDraftAllocations(), PPF: 5000 },
+            calendarYear: 2026,
+            monthIndex: 6,
+        });
+        const appliedPpf = applied.find((row) => row.type === 'PPF');
+
+        expect(analysis.growthSeries.length).toBeLessThanOrEqual(16);
+        expect(appliedPpf?.duration).toBe(15);
+    });
 });

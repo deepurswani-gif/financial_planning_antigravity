@@ -47,17 +47,7 @@ const DetailedReportView = () => {
         >
             <h1 style={{ textAlign: 'center', marginBottom: '2rem' }}>Detailed Report</h1>
 
-            <div
-                className="tabs-container"
-                style={{
-                    display: 'flex',
-                    gap: '1rem',
-                    borderBottom: '2px solid var(--border)',
-                    marginBottom: '2rem',
-                    flexWrap: 'wrap',
-                    justifyContent: 'center',
-                }}
-            >
+            <div className="tabs-container">
                 {detailedReportSteps.map((step) => (
                     <button
                         key={step.slug}
@@ -66,19 +56,6 @@ const DetailedReportView = () => {
                         onClick={() => {
                             navigate(step.path);
                             window.scrollTo({ top: 0, behavior: 'smooth' });
-                        }}
-                        style={{
-                            padding: '1rem 2rem',
-                            border: 'none',
-                            background: 'transparent',
-                            color: section === step.slug ? 'var(--primary)' : 'var(--text-muted)',
-                            fontWeight: section === step.slug ? 'bold' : 'normal',
-                            borderBottom:
-                                section === step.slug
-                                    ? '3px solid var(--primary)'
-                                    : '3px solid transparent',
-                            cursor: 'pointer',
-                            fontSize: '1rem',
                         }}
                     >
                         {step.label}

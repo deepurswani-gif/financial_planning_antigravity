@@ -33,6 +33,23 @@ import {
     buildEnhancedBriefingLines,
 } from './allocationStudioValidation';
 
+const PPF_ANNUAL_CAP = 150000;
+const PPF_MAX_MONTHLY = 12500;
+const parseAmount = (value) => parseFloat(value) || 0;
+
+const getMonthlyPpfCap = (expenseCategories = {}, investmentAllocations = [], draftAllocations = {}) => {
+    const existingPpfAnnual = parseAmount(expenseCategories?.savings?.ppf?.amount) * 12
+        || parseAmount(expenseCategories?.savings?.ppf) * 12;
+    const proposedPpfAnnual = investmentAllocations
+        .filter((a) => a.type === 'PPF')
+        .reduce((sum, a) => sum + parseAmount(a.amount), 0);
+    const draftPpfAnnual = Object.entries(draftAllocations).reduce((sum, [type, amount]) => (
+        type === 'PPF' ? sum + (parseAmount(amount) * 12) : sum
+    ), 0);
+    const availableAnnual = Math.max(0, PPF_ANNUAL_CAP - existingPpfAnnual - proposedPpfAnnual - draftPpfAnnual);
+    return Math.min(PPF_MAX_MONTHLY, Math.floor(availableAnnual / 12));
+};
+
 const analysisParams = ({
     expenseCategories,
     assetCategories,
@@ -71,6 +88,7 @@ const PutYourMoneyToWorkSection = () => {
         hasSpouseIncome,
         journeyProjections,
         journeyAdjustments,
+        setJourneyAdjustments,
         assetCategories,
         contingencyFund,
         summaryLifeCover,
@@ -114,6 +132,9 @@ const PutYourMoneyToWorkSection = () => {
     const [draftAllocations, setDraftAllocations] = useState(() => createEmptyDraftAllocations());
     const [activeBundleId, setActiveBundleId] = useState(null);
     const [appliedPlanKey, setAppliedPlanKey] = useState(null);
+    const [adjustmentsSaved, setAdjustmentsSaved] = useState(false);
+    const [adjustmentSaveMessage, setAdjustmentSaveMessage] = useState('');
+    const [showInvestmentAvenues, setShowInvestmentAvenues] = useState(false);
     const effectiveMonth = selectedMonthIndex ?? defaultMonth;
 
     const studio = useMemo(
@@ -197,6 +218,15 @@ const PutYourMoneyToWorkSection = () => {
     const totalAllocated = getTotalDraftAllocated(draftAllocations);
     const remaining = (studio.hero?.deployableSurplus || 0) - totalAllocated;
     const allocatedCount = Object.values(draftAllocations).filter((v) => v > 0).length;
+    const ppfMaxByCap = useMemo(
+        () => getMonthlyPpfCap(expenseCategories, investmentAllocations, { ...draftAllocations, PPF: 0 }),
+        [expenseCategories, investmentAllocations, draftAllocations],
+    );
+    const maxForInstrument = useCallback((instrumentType) => {
+        const genericMax = (draftAllocations[instrumentType] || 0) + Math.max(0, remaining);
+        if (instrumentType !== 'PPF') return genericMax;
+        return Math.min(genericMax, ppfMaxByCap);
+    }, [draftAllocations, remaining, ppfMaxByCap]);
 
     const growthPreview = useMemo(() => {
         if (!analysisBase || !studio.meta?.hasData) return null;
@@ -335,21 +365,27 @@ const PutYourMoneyToWorkSection = () => {
     ]);
 
     const handleDraftChange = useCallback((instrumentType, amount) => {
-        const rounded = Math.max(0, Math.round(amount));
+        const requested = Math.max(0, Math.round(amount));
+        const rounded = instrumentType === 'PPF'
+            ? Math.min(requested, maxForInstrument('PPF'))
+            : requested;
         const next = { ...draftAllocations, [instrumentType]: rounded };
         setDraftAllocations(next);
         setActiveBundleId(null);
         setAppliedPlanKey(null);
         persistDraft(next, null);
-    }, [draftAllocations, persistDraft]);
+    }, [draftAllocations, persistDraft, maxForInstrument]);
 
     const handleSelectBundle = useCallback((bundle) => {
         const next = { ...createEmptyDraftAllocations(), ...bundle.allocations };
+        if (next.PPF > 0) {
+            next.PPF = Math.min(Math.max(0, Math.round(next.PPF)), ppfMaxByCap);
+        }
         setDraftAllocations(next);
         setActiveBundleId(bundle.id);
         setAppliedPlanKey(null);
         persistDraft(next, bundle.id);
-    }, [persistDraft]);
+    }, [persistDraft, ppfMaxByCap]);
 
     const handleSaveDraft = useCallback(() => {
         persistDraft(draftAllocations, activeBundleId);
@@ -402,6 +438,24 @@ const PutYourMoneyToWorkSection = () => {
         if (bundle) handleSelectBundle(bundle);
     }, [recommendedBundles, handleSelectBundle]);
 
+    const handleJourneyAdjustmentsChange = useCallback((updater) => {
+        setJourneyAdjustments(updater);
+        setAdjustmentsSaved(false);
+        setShowInvestmentAvenues(false);
+        setAdjustmentSaveMessage('');
+    }, [setJourneyAdjustments]);
+
+    const handleSaveAdjustments = useCallback(() => {
+        setAdjustmentsSaved(true);
+        setAdjustmentSaveMessage('Future financial adjustments saved. You can now proceed.');
+    }, []);
+
+    useEffect(() => {
+        if (!showInvestmentAvenues) {
+            setActivePanelType(null);
+        }
+    }, [showInvestmentAvenues]);
+
     if (!studio.meta?.hasData) {
         return (
             <div className="pymtw-section card pymtw-empty-state">
@@ -416,7 +470,7 @@ const PutYourMoneyToWorkSection = () => {
     return (
         <div className="pymtw-section">
             <AllocationStudioHero
-                briefing={{ ...studio.briefing, lines: enhancedBriefingLines }}
+                briefing={studio.briefing}
                 hero={studio.hero}
                 meta={studio.meta}
                 selectableMonths={studio.selectableMonths}
@@ -424,52 +478,105 @@ const PutYourMoneyToWorkSection = () => {
                 onMonthChange={setSelectedMonthIndex}
             />
 
-            <StudioInsightsRail insights={studioInsights} />
-
-            <RecommendedBundles
-                bundles={recommendedBundles}
-                activeBundleId={activeBundleId}
-                onSelectBundle={handleSelectBundle}
-                deployableSurplus={studio.hero.deployableSurplus}
-            />
-
-            <div className="pymtw-main-grid">
-                <JourneyConstraintsRail journeyConstraints={studio.journeyConstraints} />
-                <InstrumentCardGrid
-                    instrumentCategories={studio.instrumentCategories}
-                    draftAllocations={draftAllocations}
-                    remainingSurplus={remaining}
-                    onDraftChange={handleDraftChange}
-                    onAnalyze={setActivePanelType}
-                />
+            <div className="card pymtw-guidance-card">
+                <p>
+                    Do you have any expenses coming up in the next three months or are you planning to take a loan
+                    for a future goal? Add those details here first. Once they&apos;re mapped, I&apos;ll calculate your
+                    remaining available surplus and help you allocate it in the next step.
+                </p>
             </div>
 
-            <ScenarioComparePanel
-                comparison={scenarioComparison}
-                onUseAiPlan={handleUseAiPlan}
-                activeBundleId={activeBundleId}
+            <JourneyConstraintsRail
+                journeyConstraints={studio.journeyConstraints}
+                journeyAdjustments={journeyAdjustments}
+                setJourneyAdjustments={handleJourneyAdjustmentsChange}
+                defaultStartMonthIndex={effectiveMonth}
+                defaultCalendarYear={studio.meta.calendarYear}
+                onSaveAdjustments={handleSaveAdjustments}
+                adjustmentsSaved={adjustmentsSaved}
+                saveMessage={adjustmentSaveMessage}
             />
 
-            <GrowthPreviewStrip growthPreview={growthPreview} />
+            {adjustmentsSaved && (
+                <div className="card pymtw-recalculated-surplus-card">
+                    <div>
+                        <span className="pymtw-recalculated-label">Recalculated unallocated surplus</span>
+                        <strong>₹{Math.round(studio.hero.deployableSurplus).toLocaleString('en-IN')}</strong>
+                    </div>
+                    <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => setShowInvestmentAvenues(true)}
+                    >
+                        Proceed to Investment Avenues to allocate the surplus
+                    </button>
+                </div>
+            )}
 
-            <OutcomeTheater
-                growthPreview={growthPreview}
-                hero={studio.hero}
-                meta={studio.meta}
-                totalAllocated={totalAllocated}
-            />
+            {!adjustmentsSaved && (
+                <div className="pymtw-proceed-hint">
+                    Save future financial adjustments to unlock investment avenues.
+                </div>
+            )}
 
-            <ApplyPlanBar
-                deployableSurplus={studio.hero.deployableSurplus}
-                totalAllocated={totalAllocated}
-                remaining={remaining}
-                monthLabel={studio.meta.monthLabel}
-                allocatedCount={allocatedCount}
-                validation={validation}
-                onSaveDraft={handleSaveDraft}
-                onApply={handleApply}
-                isApplied={appliedPlanKey === planKey}
-            />
+            {showInvestmentAvenues && (
+                <>
+                    <RecommendedBundles
+                        bundles={recommendedBundles}
+                        activeBundleId={activeBundleId}
+                        onSelectBundle={handleSelectBundle}
+                        deployableSurplus={studio.hero.deployableSurplus}
+                    />
+
+                    <InstrumentCardGrid
+                        instrumentCategories={studio.instrumentCategories}
+                        draftAllocations={draftAllocations}
+                        remainingSurplus={remaining}
+                        getMaxAmountForInstrument={maxForInstrument}
+                        onDraftChange={handleDraftChange}
+                        onAnalyze={setActivePanelType}
+                    />
+
+                    <ScenarioComparePanel
+                        comparison={scenarioComparison}
+                        onUseAiPlan={handleUseAiPlan}
+                        activeBundleId={activeBundleId}
+                    />
+
+                    <GrowthPreviewStrip growthPreview={growthPreview} />
+
+                    <OutcomeTheater
+                        growthPreview={growthPreview}
+                        hero={studio.hero}
+                        meta={studio.meta}
+                        totalAllocated={totalAllocated}
+                    />
+
+                    <div className="card pymtw-analysis-summary">
+                        <h3 className="pymtw-zone-title">{studio.briefing?.headline || 'Allocation Studio analysis'}</h3>
+                        <p className="pymtw-zone-sub">{studio.briefing?.greeting}</p>
+                        <div className="pymtw-briefing-lines">
+                            {enhancedBriefingLines.map((line) => (
+                                <p key={line} className="pymtw-briefing-line">{line}</p>
+                            ))}
+                        </div>
+                    </div>
+
+                    <StudioInsightsRail insights={studioInsights} />
+
+                    <ApplyPlanBar
+                        deployableSurplus={studio.hero.deployableSurplus}
+                        totalAllocated={totalAllocated}
+                        remaining={remaining}
+                        monthLabel={studio.meta.monthLabel}
+                        allocatedCount={allocatedCount}
+                        validation={validation}
+                        onSaveDraft={handleSaveDraft}
+                        onApply={handleApply}
+                        isApplied={appliedPlanKey === planKey}
+                    />
+                </>
+            )}
 
             <InstrumentAnalysisPanel
                 instrumentType={activePanelType}
@@ -477,7 +584,7 @@ const PutYourMoneyToWorkSection = () => {
                 scenarioAnalysis={panelScenario}
                 goalDeltas={panelGoalDeltas}
                 draftAmount={activePanelType ? (draftAllocations[activePanelType] || 0) : 0}
-                maxAmount={(activePanelType ? (draftAllocations[activePanelType] || 0) : 0) + Math.max(0, remaining)}
+                maxAmount={activePanelType ? maxForInstrument(activePanelType) : Math.max(0, remaining)}
                 onAmountChange={(amount) => activePanelType && handleDraftChange(activePanelType, amount)}
                 isOpen={Boolean(activePanelType)}
                 onClose={() => setActivePanelType(null)}
@@ -494,6 +601,63 @@ const PutYourMoneyToWorkSection = () => {
                     padding: 2rem;
                     text-align: center;
                     min-height: 280px;
+                }
+                .pymtw-guidance-card {
+                    padding: 1rem 1.25rem;
+                    border: 1px dashed rgba(124,58,237,0.35);
+                    background: rgba(124,58,237,0.06);
+                    color: var(--text-main);
+                    line-height: 1.55;
+                }
+                .pymtw-guidance-card p { margin: 0; }
+                .pymtw-adjust-save {
+                    margin-top: 1rem;
+                    padding-top: 1rem;
+                    border-top: 1px solid var(--border);
+                    display: flex;
+                    align-items: center;
+                    gap: 0.9rem;
+                    flex-wrap: wrap;
+                }
+                .pymtw-adjust-summary {
+                    margin-top: 1.25rem;
+                    padding-top: 1.1rem;
+                    border-top: 1px solid var(--border);
+                }
+                .pymtw-adjust-saved-msg {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.45rem;
+                    color: #059669;
+                    font-size: 0.88rem;
+                    font-weight: 600;
+                }
+                .pymtw-recalculated-surplus-card {
+                    padding: 1rem 1.25rem;
+                    border: 1px solid rgba(16,185,129,0.35);
+                    background: rgba(16,185,129,0.08);
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    gap: 1rem;
+                    flex-wrap: wrap;
+                }
+                .pymtw-recalculated-label {
+                    display: block;
+                    font-size: 0.76rem;
+                    letter-spacing: 0.04em;
+                    text-transform: uppercase;
+                    color: var(--text-muted);
+                    margin-bottom: 0.3rem;
+                }
+                .pymtw-recalculated-surplus-card strong {
+                    font-size: 1.3rem;
+                    color: #059669;
+                }
+                .pymtw-proceed-hint {
+                    margin-top: -0.5rem;
+                    font-size: 0.85rem;
+                    color: var(--text-muted);
                 }
 
                 .dr-reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.65s cubic-bezier(0.16,1,0.3,1), transform 0.65s cubic-bezier(0.16,1,0.3,1); }
@@ -542,32 +706,17 @@ const PutYourMoneyToWorkSection = () => {
                     font-size: 0.9rem;
                     cursor: pointer;
                 }
-                .pymtw-hero-title { margin: 0; font-size: 1.65rem; }
-                .pymtw-hero-greeting { margin: 0.4rem 0 1rem; color: var(--text-muted); line-height: 1.55; }
-                .pymtw-analysis-sequence { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.25rem; min-height: 120px; }
-                .pymtw-analysis-step {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.6rem;
-                    font-size: 0.88rem;
-                    color: var(--text-muted);
-                    opacity: 0.35;
-                    transition: opacity 0.3s ease, color 0.3s ease;
-                }
-                .pymtw-analysis-step.pymtw-analysis-active { opacity: 1; color: #7C3AED; }
-                .pymtw-analysis-dot {
-                    width: 8px;
-                    height: 8px;
-                    border-radius: 50%;
-                    background: currentColor;
-                    flex-shrink: 0;
-                }
                 .pymtw-briefing-lines { margin-bottom: 1.25rem; }
                 .pymtw-briefing-line {
                     margin: 0 0 0.5rem;
                     font-size: 0.92rem;
                     line-height: 1.6;
                     color: var(--text-main);
+                }
+                .pymtw-analysis-summary {
+                    padding: 1.25rem;
+                    border: 1px solid var(--border);
+                    background: linear-gradient(180deg, rgba(124,58,237,0.04), transparent);
                 }
                 .pymtw-hero-kpis {
                     display: grid;
@@ -749,16 +898,6 @@ const PutYourMoneyToWorkSection = () => {
                 }
                 .pymtw-bundle-amounts span { display: block; color: var(--text-muted); font-size: 0.72rem; }
 
-                .pymtw-main-grid {
-                    display: grid;
-                    grid-template-columns: minmax(280px, 340px) 1fr;
-                    gap: 1.25rem;
-                    align-items: start;
-                }
-                @media (max-width: 960px) {
-                    .pymtw-main-grid { grid-template-columns: 1fr; }
-                }
-
                 .pymtw-zone-title {
                     margin: 0 0 0.5rem;
                     font-size: 1.05rem;
@@ -774,6 +913,51 @@ const PutYourMoneyToWorkSection = () => {
                     line-height: 1.5;
                 }
                 .pymtw-zone-b { padding: 1.25rem; }
+                .pymtw-adjust-head {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 0.75rem;
+                    margin-top: 1.25rem;
+                    padding-top: 1rem;
+                    border-top: 1px solid var(--border);
+                }
+                .pymtw-adjust-add-btn {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.35rem;
+                }
+                .pymtw-adjust-list {
+                    margin-top: 0.9rem;
+                    display: grid;
+                    gap: 0.9rem;
+                }
+                .pymtw-adjust-card {
+                    border: 1px solid var(--border);
+                    border-radius: 10px;
+                    background: var(--bg-main);
+                    padding: 0.9rem;
+                    display: grid;
+                    gap: 0.75rem;
+                    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                }
+                .pymtw-adjust-card .input-group { margin-bottom: 0; }
+                .pymtw-adjust-emi {
+                    grid-column: 1 / -1;
+                    padding: 0.75rem;
+                    border-radius: 8px;
+                    border: 1px solid var(--border);
+                    background: var(--bg-card);
+                    font-size: 0.85rem;
+                    color: var(--text-muted);
+                }
+                .pymtw-adjust-remove-btn {
+                    grid-column: 1 / -1;
+                    width: fit-content;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.35rem;
+                }
                 .pymtw-empty-rail {
                     display: flex;
                     gap: 0.75rem;

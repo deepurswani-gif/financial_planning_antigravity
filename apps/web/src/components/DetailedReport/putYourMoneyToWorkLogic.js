@@ -69,8 +69,9 @@ export function getGoalTargetYear(goal, currentYear = new Date().getFullYear()) 
 }
 
 export function getSelectableMonths(planStartMonth = 0, currentMonth = new Date().getMonth()) {
-    const start = Math.max(0, Math.min(11, planStartMonth));
-    const end = Math.max(start, Math.min(11, currentMonth));
+    const anchorMonth = Math.max(0, Math.min(11, Math.max(planStartMonth, currentMonth)));
+    const start = anchorMonth;
+    const end = Math.min(11, anchorMonth + 2);
     const months = [];
     for (let m = start; m <= end; m += 1) {
         months.push({
@@ -97,13 +98,15 @@ export function summarizeJourneyConstraints(journeyAdjustments = [], journeyProj
     const items = journeyAdjustments.map((adj) => {
         const isLoan = adj.type === 'loan';
         const startYear = parseInt(adj.startYear, 10) || calendarYear;
+        const startMonth = parseInt(adj.startMonth, 10) || 1;
+        const monthLabel = MONTH_LABELS_LONG[Math.max(0, Math.min(11, startMonth - 1))];
         const monthlyImpact = isLoan
             ? parseAmount(adj.emi)
-            : parseAmount(adj.amount) / 12;
+            : parseAmount(adj.amount);
         const annualImpact = isLoan ? parseAmount(adj.amount) || monthlyImpact * 12 : parseAmount(adj.amount);
 
         const projectionRow = journeyProjections.find((p) => p.year === startYear);
-        const affectsSurplusFrom = startYear;
+        const affectsSurplusFrom = isLoan ? startYear : `${monthLabel} ${startYear}`;
 
         return {
             id: adj.id,
@@ -111,8 +114,9 @@ export function summarizeJourneyConstraints(journeyAdjustments = [], journeyProj
             name: adj.name || (isLoan ? 'Future loan' : 'Future expense'),
             isLoan,
             startYear,
-            startMonth: parseInt(adj.startMonth, 10) || 1,
-            duration: parseInt(adj.duration, 10) || 1,
+            startMonth,
+            monthLabel,
+            duration: isLoan ? (parseInt(adj.duration, 10) || 1) : 1,
             monthlyImpact: Math.round(monthlyImpact),
             annualImpact: Math.round(annualImpact),
             principal: isLoan ? parseAmount(adj.principal) : null,
@@ -121,8 +125,12 @@ export function summarizeJourneyConstraints(journeyAdjustments = [], journeyProj
             affectsSurplusFrom,
             hasStarted: startYear <= calendarYear,
             projectionNote: projectionRow
-                ? `Reduces investible surplus from ${startYear}`
-                : `Scheduled from ${startYear}`,
+                ? (isLoan
+                    ? `Reduces investible surplus from ${startYear}`
+                    : `One-time deduction in ${monthLabel} ${startYear}`)
+                : (isLoan
+                    ? `Scheduled from ${startYear}`
+                    : `Scheduled for ${monthLabel} ${startYear}`),
         };
     });
 

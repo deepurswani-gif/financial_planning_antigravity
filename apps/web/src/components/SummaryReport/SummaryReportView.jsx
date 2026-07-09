@@ -2,6 +2,8 @@ import React, { useEffect } from 'react';
 import { useNavigate, useParams, Navigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { patchSummaryUiDraft } from '../../lib/summaryFlowStorage';
 import MoneyStorySection from './MoneyStorySection';
 import SafetyNetSection from './SafetyNetSection';
 import FutureSelfSection from './FutureSelfSection';
@@ -22,13 +24,23 @@ const SECTION_BY_SLUG = {
 const SummaryReportView = () => {
     const navigate = useNavigate();
     const { section } = useParams();
+    const { user } = useAuth();
     const { summaryReportGeneratedAt, markReportGenerated } = useFinancialPlan();
+    const userId = user?.id ?? null;
 
     useEffect(() => {
         if (!summaryReportGeneratedAt) {
             markReportGenerated();
         }
     }, [summaryReportGeneratedAt, markReportGenerated]);
+
+    useEffect(() => {
+        if (!section) return;
+        patchSummaryUiDraft(userId, {
+            lastSummaryReportSection: section,
+            lastSummaryReportPath: `/summary-report/${section}`,
+        });
+    }, [section, userId]);
 
     if (!section || !summaryReportSlugs.has(section)) {
         return <Navigate to={DEFAULT_SUMMARY_REPORT_PATH} replace />;
@@ -59,17 +71,7 @@ const SummaryReportView = () => {
         >
             <h1 style={{ textAlign: 'center', marginBottom: '2rem' }}>Summary Report</h1>
 
-            <div
-                className="tabs-container"
-                style={{
-                    display: 'flex',
-                    gap: '1rem',
-                    borderBottom: '2px solid var(--border)',
-                    marginBottom: '2rem',
-                    flexWrap: 'wrap',
-                    justifyContent: 'center',
-                }}
-            >
+            <div className="tabs-container">
                 {summaryReportSteps.map((step) => (
                     <button
                         key={step.slug}
@@ -78,19 +80,6 @@ const SummaryReportView = () => {
                         onClick={() => {
                             navigate(step.path);
                             window.scrollTo({ top: 0, behavior: 'smooth' });
-                        }}
-                        style={{
-                            padding: '1rem 2rem',
-                            border: 'none',
-                            background: 'transparent',
-                            color: section === step.slug ? 'var(--primary)' : 'var(--text-muted)',
-                            fontWeight: section === step.slug ? 'bold' : 'normal',
-                            borderBottom:
-                                section === step.slug
-                                    ? '3px solid var(--primary)'
-                                    : '3px solid transparent',
-                            cursor: 'pointer',
-                            fontSize: '1rem',
                         }}
                     >
                         {step.label}

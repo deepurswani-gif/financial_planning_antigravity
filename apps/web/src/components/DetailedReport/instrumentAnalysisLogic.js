@@ -9,6 +9,13 @@ import { computeRDData } from '../Calculators/RDCalculator';
 import { MONTH_LABELS_SHORT } from './moneyFlowLedgerLogic';
 
 const parseAmount = (value) => parseFloat(value) || 0;
+const PPF_MAX_DURATION_YEARS = 15;
+
+function normalizePpfDuration(duration, fallback = PPF_MAX_DURATION_YEARS) {
+    const parsed = parseInt(duration, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+    return Math.min(PPF_MAX_DURATION_YEARS, parsed);
+}
 
 function getGoalFutureValue(goal) {
     if (goal.futureValue) return parseAmount(goal.futureValue);
@@ -57,7 +64,8 @@ export const INSTRUMENT_REGISTRY = {
         inputMode: 'monthly',
         step: 500,
         defaultRate: 7.1,
-        defaultDuration: 15,
+        defaultDuration: PPF_MAX_DURATION_YEARS,
+        maxDurationYears: PPF_MAX_DURATION_YEARS,
         maxMonthly: 12500,
     },
     NPS: {
@@ -182,6 +190,9 @@ function buildGoalImpacts(series, goals, goalMappings, currentYear, goalKey, val
 
 function makeScenarioAlloc(allocType, amount, startMonth, startYear, def) {
     const storedAmount = def.inputMode === 'monthly' ? amount * 12 : amount;
+    const duration = allocType === 'PPF'
+        ? normalizePpfDuration(def.defaultDuration, PPF_MAX_DURATION_YEARS)
+        : def.defaultDuration;
     return {
         id: `scenario-${allocType}`,
         type: allocType,
@@ -189,7 +200,7 @@ function makeScenarioAlloc(allocType, amount, startMonth, startYear, def) {
         amount: storedAmount,
         startMonth,
         startYear,
-        duration: def.defaultDuration,
+        duration,
         expectedReturn: def.defaultRate,
         frequency: 'Monthly',
     };
@@ -309,7 +320,10 @@ export function analyzeInstrument(
         series = data.map((r) => ({ year: r.year, corpus: r.valueAfterWithdrawal }));
         headlineValue = Math.round(series.find((r) => r.year === retirementYear)?.corpus || 0);
     } else if (instrumentType === 'PPF') {
-        const proposed = [...stored];
+        const proposed = stored.map((a) => ({
+            ...a,
+            duration: normalizePpfDuration(a.duration, def.defaultDuration),
+        }));
         if (scenario > 0) proposed.push(makeScenarioAlloc(allocType, scenario, startMonth, calendarYear, def));
         const data = computePPFData(proposed, rate, expenseCategories?.savings?.ppf || {}).results || [];
         series = data.map((r) => ({ year: r.year, corpus: r.endValue }));
@@ -479,7 +493,9 @@ export function applyAllocationPlan({
             amount: def.inputMode === 'monthly' ? amount * 12 : amount,
             startMonth,
             startYear: calendarYear,
-            duration: def.defaultDuration,
+            duration: instrumentType === 'PPF'
+                ? normalizePpfDuration(def.defaultDuration, PPF_MAX_DURATION_YEARS)
+                : def.defaultDuration,
             expectedReturn: def.defaultRate,
             frequency: 'Monthly',
             studioPlanKey: planKey,

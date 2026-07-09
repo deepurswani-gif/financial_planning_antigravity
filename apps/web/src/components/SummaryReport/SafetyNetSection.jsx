@@ -1,7 +1,15 @@
 import React, { useMemo, useEffect, useState, useRef } from 'react';
-import { Shield, ShieldAlert, ShieldCheck, AlertTriangle, AlertOctagon, Umbrella, Wallet, Clock, Heart, TrendingDown, CheckCircle2, ArrowRight, Info, Zap, Target } from 'lucide-react';
+import { Shield, ShieldAlert, ShieldCheck, AlertTriangle, AlertOctagon, Umbrella, Wallet, Clock, TrendingDown, CheckCircle2, ArrowRight, Info, Zap, Target, Send, Check } from 'lucide-react';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency } from '../CashFlowModule/CashFlowLogic';
+import {
+    submitSupportRequestViaWeb3forms,
+    buildSupportEmailContextFromUser,
+    getSupportWeb3StorageKey,
+    isSupportWeb3CooldownActive,
+    markSupportWeb3Sent,
+} from '../../services/supportRequestEmailService';
 import {
     calculateProtectionData,
     calculateContingencyData,
@@ -172,6 +180,113 @@ const CircularGauge = ({ percent, size = 220, strokeWidth = 18 }) => {
     );
 };
 
+const SUPPORT_CTA_ERROR_COOLDOWN_SEC = 60;
+
+/* ─────────────── Recovery Step CTA ─────────────── */
+const RecoverySupportCta = ({ familyMembers, user, moduleName, color }) => {
+    const [sendState, setSendState] = useState('idle');
+    const [retrySeconds, setRetrySeconds] = useState(null);
+
+    const supportEmailContext = useMemo(
+        () => buildSupportEmailContextFromUser(familyMembers, user, moduleName),
+        [familyMembers, user, moduleName]
+    );
+
+    const storageKey = useMemo(() => {
+        const email = supportEmailContext?.userEmail;
+        if (!email || !moduleName) return null;
+        return getSupportWeb3StorageKey(email, moduleName);
+    }, [supportEmailContext?.userEmail, moduleName]);
+
+    useEffect(() => {
+        if (!storageKey) return;
+        if (isSupportWeb3CooldownActive(storageKey)) {
+            setSendState('success');
+        } else {
+            setSendState('idle');
+        }
+        setRetrySeconds(null);
+    }, [storageKey]);
+
+    useEffect(() => {
+        if (retrySeconds === null || retrySeconds <= 0) return undefined;
+        const t = setTimeout(() => {
+            setRetrySeconds((prev) => {
+                if (prev === null || prev <= 1) {
+                    setSendState('idle');
+                    return null;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearTimeout(t);
+    }, [retrySeconds]);
+
+    const handleClick = async () => {
+        if (!storageKey || sendState === 'loading' || sendState === 'success') return;
+        if (isSupportWeb3CooldownActive(storageKey)) {
+            setSendState('success');
+            return;
+        }
+
+        setSendState('loading');
+        try {
+            const { ok } = await submitSupportRequestViaWeb3forms(supportEmailContext);
+            if (ok) {
+                markSupportWeb3Sent(storageKey);
+                setSendState('success');
+                setRetrySeconds(null);
+            } else {
+                setSendState('error');
+                setRetrySeconds(SUPPORT_CTA_ERROR_COOLDOWN_SEC);
+            }
+        } catch {
+            setSendState('error');
+            setRetrySeconds(SUPPORT_CTA_ERROR_COOLDOWN_SEC);
+        }
+    };
+
+    const disabled =
+        sendState === 'loading' ||
+        sendState === 'success' ||
+        (sendState === 'error' && retrySeconds !== null && retrySeconds > 0);
+
+    return (
+        <button
+            type="button"
+            className="sn-recovery-cta"
+            onClick={handleClick}
+            disabled={disabled}
+            style={{
+                '--cta-color': color,
+                background: sendState === 'success' ? '#16a34a' : sendState === 'error' ? '#dc2626' : color,
+            }}
+        >
+            {sendState === 'loading' && (
+                <>
+                    <Send size={16} />
+                    Sending…
+                </>
+            )}
+            {sendState === 'success' && (
+                <>
+                    <Check size={16} strokeWidth={2.5} />
+                    Request sent
+                </>
+            )}
+            {sendState === 'error' && (
+                <span>Try again in <strong>{retrySeconds ?? 0}s</strong></span>
+            )}
+            {sendState === 'idle' && (
+                <>
+                    <Send size={16} />
+                    Contact Finbrella for help
+                </>
+            )}
+        </button>
+    );
+};
+
 /* ─────────────── Timeline Stage Icon ─────────────── */
 const StageIcon = ({ icon, color }) => {
     const iconMap = {
@@ -191,6 +306,7 @@ const StageIcon = ({ icon, color }) => {
    MAIN COMPONENT
    ════════════════════════════════════════════════════════════ */
 const SafetyNetSection = () => {
+    const { user } = useAuth();
     const {
         familyMembers,
         expenseCategories,
@@ -320,7 +436,10 @@ const SafetyNetSection = () => {
                 <div className="sn-insight-content">
                     <p className="sn-insight-text">
                         Your current sum insured will cover{' '}
-                        <span className="sn-insight-highlight">{formatCompactSN(protectionData.annualNeed)}</span>{' '}
+                        <span className="sn-insight-highlight">
+                            {formatCompactSN(protectionData.annualNeed)}{' '}
+                            ({new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(protectionData.monthlyNeed)} X 12)
+                        </span>{' '}
                         annual need for{' '}
                         <span className="sn-insight-highlight">{protectionData.yearsCovered} years</span>{' '}
                         <span className="sn-insight-months">({protectionData.monthsCovered} Months)</span>
@@ -551,58 +670,17 @@ const SafetyNetSection = () => {
                                 <div className="sn-recovery-amount">
                                     {formatCurrency(step.amount)}
                                 </div>
+                                <RecoverySupportCta
+                                    familyMembers={familyMembers}
+                                    user={user}
+                                    moduleName={`Your Safety Net — ${step.title}`}
+                                    color={step.color}
+                                />
                             </div>
                         ))}
                     </RevealSection>
                 </>
             )}
-
-            {/* ══════════════════════════════════════════════
-                SECTION 5 — ACHIEVEMENT
-               ══════════════════════════════════════════════ */}
-            <div className="sn-section-divider" style={{ marginTop: '4rem' }}>
-                <div className="sn-divider-line" />
-                <span className="sn-divider-label">ACHIEVEMENT — Your Goals</span>
-                <div className="sn-divider-line" />
-            </div>
-
-            <RevealSection className="sn-achievement-section" delay={100}>
-                <div className="sn-achievement-card">
-                    <div className="sn-achievement-glow" />
-                    <h3 className="sn-achievement-title">
-                        <Heart size={22} style={{ color: '#6366F1' }} />
-                        Once These Steps Are Complete
-                    </h3>
-                    <div className="sn-achievement-items">
-                        <div className={`sn-achievement-item ${!protectionData.hasGap ? 'sn-achieved' : ''}`}>
-                            <div className={`sn-achievement-check ${!protectionData.hasGap ? 'sn-check-done' : ''}`}>
-                                <CheckCircle2 size={24} />
-                            </div>
-                            <div className="sn-achievement-info">
-                                <span className="sn-achievement-name">Protection Gap Fulfilled</span>
-                                <span className="sn-achievement-meta">
-                                    {!protectionData.hasGap
-                                        ? 'Your family is fully covered ✓'
-                                        : `Buy term cover of ${formatCompactSN(protectionData.protectionGap)}`}
-                                </span>
-                            </div>
-                        </div>
-                        <div className={`sn-achievement-item ${contingencyData.gap <= 0 ? 'sn-achieved' : ''}`}>
-                            <div className={`sn-achievement-check ${contingencyData.gap <= 0 ? 'sn-check-done' : ''}`}>
-                                <CheckCircle2 size={24} />
-                            </div>
-                            <div className="sn-achievement-info">
-                                <span className="sn-achievement-name">Emergency Fund Complete</span>
-                                <span className="sn-achievement-meta">
-                                    {contingencyData.gap <= 0
-                                        ? '6-month buffer maintained ✓'
-                                        : `Build emergency reserve of ${formatCompactSN(contingencyData.gap)}`}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </RevealSection>
 
             {/* ─── SCOPED STYLES ─── */}
             <style>{`
@@ -1203,95 +1281,30 @@ const SafetyNetSection = () => {
                     font-size: 1.5rem;
                     font-weight: 800;
                     color: var(--color-1);
+                    margin-bottom: 1.25rem;
                 }
-
-                /* ── Achievement ── */
-                .sn-achievement-section {
-                    max-width: 600px;
-                    margin: 0 auto 3rem;
-                    padding: 0 2rem;
-                }
-                .sn-achievement-card {
-                    position: relative;
-                    padding: 2.5rem 2rem;
-                    border-radius: 20px;
-                    background: #ffffff;
-                    border: 1px solid #f1f5f9;
-                    overflow: hidden;
-                }
-                .sn-achievement-glow {
-                    position: absolute;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    height: 4px;
-                    background: linear-gradient(90deg, var(--color-2), var(--color-5), var(--color-3), #10B981);
-                    background-size: 200% 100%;
-                    animation: sn-glow-slide 3s ease-in-out infinite;
-                }
-                @keyframes sn-glow-slide {
-                    0%, 100% { background-position: 0% 50%; }
-                    50% { background-position: 100% 50%; }
-                }
-                .sn-achievement-title {
-                    display: flex;
+                .sn-recovery-cta {
+                    display: inline-flex;
                     align-items: center;
                     justify-content: center;
                     gap: 0.5rem;
-                    font-size: 1.15rem;
-                    font-weight: 700;
-                    color: var(--text-main);
-                    margin: 0 0 2rem 0;
-                    text-align: center;
+                    width: 100%;
+                    padding: 0.75rem 1.25rem;
+                    border: none;
+                    border-radius: 10px;
+                    color: #fff;
+                    font-size: 0.88rem;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: opacity 0.2s, transform 0.2s;
                 }
-                .sn-achievement-items {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 1.25rem;
+                .sn-recovery-cta:hover:not(:disabled) {
+                    opacity: 0.9;
+                    transform: translateY(-1px);
                 }
-                .sn-achievement-item {
-                    display: flex;
-                    align-items: center;
-                    gap: 1rem;
-                    padding: 1.25rem 1.5rem;
-                    border-radius: 14px;
-                    background: #f8fafc;
-                    border: 1px solid #f1f5f9;
-                    transition: all 0.3s ease;
-                }
-                .sn-achievement-item.sn-achieved {
-                    background: rgba(16, 185, 129, 0.05);
-                    border-color: rgba(16, 185, 129, 0.2);
-                }
-                .sn-achievement-check {
-                    width: 40px;
-                    height: 40px;
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    color: #cbd5e1;
-                    background: #f1f5f9;
-                    flex-shrink: 0;
-                    transition: all 0.3s ease;
-                }
-                .sn-achievement-check.sn-check-done {
-                    color: #10B981;
-                    background: rgba(16, 185, 129, 0.1);
-                }
-                .sn-achievement-info {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 0.2rem;
-                }
-                .sn-achievement-name {
-                    font-size: 1rem;
-                    font-weight: 700;
-                    color: var(--text-main);
-                }
-                .sn-achievement-meta {
-                    font-size: 0.82rem;
-                    color: var(--text-muted);
+                .sn-recovery-cta:disabled {
+                    cursor: not-allowed;
+                    opacity: 0.85;
                 }
 
                 /* ── Responsive ── */

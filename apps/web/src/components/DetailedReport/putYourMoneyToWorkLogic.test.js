@@ -33,22 +33,26 @@ const moneyFlowReport = {
 };
 
 describe('putYourMoneyToWorkLogic', () => {
-    it('returns selectable months from plan start through current month', () => {
+    it('returns forward-looking selectable months for planning', () => {
         const months = getSelectableMonths(0, 6);
-        expect(months).toHaveLength(7);
-        expect(months[0].label).toBe('January');
-        expect(months[6].label).toBe('July');
+        expect(months).toHaveLength(3);
+        expect(months[0].label).toBe('July');
+        expect(months[1].label).toBe('August');
+        expect(months[2].label).toBe('September');
     });
 
     it('summarizes journey adjustments', () => {
         const summary = summarizeJourneyConstraints([
-            { id: 1, type: 'expense', name: 'School fees', startYear: 2028, amount: 120000, duration: 4 },
+            {
+                id: 1, type: 'expense', name: 'School fees', startYear: 2028, startMonth: 7, amount: 120000, duration: 4,
+            },
             { id: 2, type: 'loan', name: 'Home loan', startYear: 2029, emi: 45000, amount: 540000, principal: 5000000, rate: 8.5, tenure: 240 },
         ], [], 2026);
 
         expect(summary.hasItems).toBe(true);
         expect(summary.items).toHaveLength(2);
-        expect(summary.items[0].monthlyImpact).toBe(10000);
+        expect(summary.items[0].monthlyImpact).toBe(120000);
+        expect(summary.items[0].projectionNote).toContain('July 2028');
         expect(summary.items[1].isLoan).toBe(true);
     });
 

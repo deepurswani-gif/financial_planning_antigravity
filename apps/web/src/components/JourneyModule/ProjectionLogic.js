@@ -399,12 +399,11 @@ export const generateProjections = ({
                     activeAdjustments.push({ name: `EMI: ${adj.name}`, amount: yearEMI });
                 }
             } else {
-                // Type == Expense (Legacy/Standard)
+                // Standard expenses are one-time (month-year specific) lump-sum deductions.
                 const adjStartYear = parseInt(adj.startYear);
-                const adjDuration = parseInt(adj.duration) || 1;
                 const adjAmount = parseFloat(adj.amount) || 0;
-                
-                if (year >= adjStartYear && year < (adjStartYear + adjDuration)) {
+
+                if (year === adjStartYear) {
                     yearAdjustmentsTotal += adjAmount;
                     activeAdjustments.push({ name: adj.name, amount: adjAmount });
                 }
@@ -453,18 +452,10 @@ export const generateProjections = ({
                 } else {
                     const adjStartYear = parseInt(adj.startYear);
                     const adjStartMonth = parseInt(adj.startMonth) || 1;
-                    const adjDuration = parseInt(adj.duration) || 1;
                     const adjAmount = parseFloat(adj.amount) || 0;
-                    
-                    if (year >= adjStartYear && year < (adjStartYear + adjDuration)) {
-                        // Distribute the annual amount over active months
-                        if (year === adjStartYear) {
-                            if (m >= adjStartMonth) {
-                                monthlyJourneyDeduction += (adjAmount / (13 - adjStartMonth)); 
-                            }
-                        } else {
-                            monthlyJourneyDeduction += (adjAmount / 12);
-                        }
+
+                    if (year === adjStartYear && m === adjStartMonth) {
+                        monthlyJourneyDeduction += adjAmount;
                     }
                 }
             });

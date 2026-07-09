@@ -233,6 +233,12 @@ const LifeJourneySection = () => {
                 .lj-goal-node { position: absolute; top: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 0.35rem; }
                 .lj-goal-node-dot { width: 34px; height: 34px; border-radius: 50%; background: #fff; border: 2px solid var(--primary); color: var(--primary); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(37,99,235,0.15); }
                 .lj-goal-node-year { font-size: 0.68rem; font-weight: 700; color: var(--text-muted); }
+                @media (max-width: 640px) {
+                    .lj-section { padding: 0 0.5rem; }
+                    .lj-sticky-col, .lj-th-label { min-width: 140px; max-width: 140px; }
+                    .lj-visual-row { grid-template-columns: 1fr; }
+                    .lj-arc-marker { font-size: 0.65rem; }
+                }
             `}</style>
         </div>
     );

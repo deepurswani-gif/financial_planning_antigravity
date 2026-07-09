@@ -118,4 +118,45 @@ describe('CashFlowLogic', () => {
 
         expect(results.categorySums.household).toBe(35000);
     });
+
+    it('includes spouse summary income when hasSpouseIncome is true without spouse family member', () => {
+        const familyMembers = [{ relation: 'Self', occupation: 'Salaried' }];
+        const income = {
+            self: '100000',
+            summarySelfInHand: '100000',
+            summarySpouseInHand: '75000',
+            spouseDetail: { inHandSalary: '75000', otherIncome: [{ amount: '' }] },
+        };
+        const expenseCategories = {
+            household: {},
+            emi: {},
+            insurance: {},
+            savings: {},
+        };
+
+        const results = calculateCashFlow(income, expenseCategories, familyMembers, true);
+
+        expect(results.totalIncome).toBe(175000);
+    });
+
+    it('uses summary anchors when detail fields have stale partial digits', () => {
+        const familyMembers = [{ relation: 'Self', occupation: 'Salaried' }];
+        const income = {
+            self: '80000',
+            summarySelfInHand: '80000',
+            selfDetail: { inHandSalary: '8', otherIncome: [{ amount: '' }] },
+            summarySpouseInHand: '60000',
+            spouseDetail: { inHandSalary: '6', otherIncome: [{ amount: '' }] },
+        };
+        const expenseCategories = {
+            household: {},
+            emi: {},
+            insurance: {},
+            savings: {},
+        };
+
+        const results = calculateCashFlow(income, expenseCategories, familyMembers, true);
+
+        expect(results.totalIncome).toBe(140000);
+    });
 });

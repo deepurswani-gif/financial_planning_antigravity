@@ -160,8 +160,8 @@ const InsuranceOutput = ({ summary, policies }) => {
                 .coverage-list { display: flex; flex-direction: column; gap: 1rem; }
                 .cov-row { display: flex; align-items: center; justify-content: space-between; background: var(--bg-main); border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.5rem; flex-wrap: wrap; gap: 1rem;}
                 .cov-avatar { width: 40px; height: 40px; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; }
-                .cov-name { font-size: 1.05rem; font-weight: 600; width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-                .cov-amount { font-size: 1.2rem; font-weight: 800; width: 120px; }
+                .cov-name { font-size: 1.05rem; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                .cov-amount { font-size: 1.2rem; font-weight: 800; flex-shrink: 0; text-align: right; }
                 .cov-tag { padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; white-space: nowrap; }
                 .cov-tag.sufficient { background: #dcfce7; color: var(--success); }
                 .cov-tag.gap { background: #fee2e2; color: var(--destructive); }
@@ -183,6 +183,13 @@ const InsuranceOutput = ({ summary, policies }) => {
                 .outflow-val { font-size: 1.5rem; font-weight: 800; color: var(--destructive); margin-bottom: 1rem; }
                 .outflow-breakdown { font-size: 0.8rem; color: var(--text-muted); border-top: 1px dashed var(--border); padding-top: 0.75rem; display: flex; flex-direction: column; gap: 4px; text-align: left; }
                 .of-row { display: flex; justify-content: space-between; gap: 0.5rem;}
+                @media (max-width: 640px) {
+                    .report-section { padding: 1.25rem; }
+                    .cov-row { padding: 1rem; }
+                    .tl-card { flex-direction: column; align-items: flex-start; }
+                    .tl-amount { text-align: left; width: 100%; }
+                    .outflow-card { min-width: min(200px, 80vw); }
+                }
             `}</style>
         </div>
     );

@@ -1,41 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Sparkles, Calendar } from 'lucide-react';
 import ReportAnimatedCounter from './ReportAnimatedCounter';
 
-const ANALYSIS_STEPS = [
-    'Analyzing active goals…',
-    'Checking future financial adjustments…',
-    'Mapping investment avenues…',
-    'Ranking allocation bundles…',
-    'Validating surplus envelope…',
-    'Preparing your allocation brief…',
-];
-
 const AllocationStudioHero = ({
-    briefing,
     hero,
     meta,
     selectableMonths,
     selectedMonthIndex,
     onMonthChange,
 }) => {
-    const [analysisStep, setAnalysisStep] = useState(0);
-    const [analysisDone, setAnalysisDone] = useState(false);
-
-    useEffect(() => {
-        setAnalysisDone(false);
-        setAnalysisStep(0);
-        const timers = ANALYSIS_STEPS.map((_, idx) =>
-            setTimeout(() => {
-                setAnalysisStep(idx);
-                if (idx === ANALYSIS_STEPS.length - 1) {
-                    setTimeout(() => setAnalysisDone(true), 400);
-                }
-            }, idx * 300),
-        );
-        return () => timers.forEach(clearTimeout);
-    }, [selectedMonthIndex]);
-
     return (
         <div className="pymtw-zone-a card">
             <div className="pymtw-zone-a-top">
@@ -58,29 +31,6 @@ const AllocationStudioHero = ({
                     </select>
                 </div>
             </div>
-
-            <h2 className="pymtw-hero-title">{briefing.headline}</h2>
-            <p className="pymtw-hero-greeting">{briefing.greeting}</p>
-
-            {!analysisDone ? (
-                <div className="pymtw-analysis-sequence" aria-live="polite">
-                    {ANALYSIS_STEPS.map((step, idx) => (
-                        <div
-                            key={step}
-                            className={`pymtw-analysis-step ${idx <= analysisStep ? 'pymtw-analysis-active' : ''}`}
-                        >
-                            <span className="pymtw-analysis-dot" />
-                            {step}
-                        </div>
-                    ))}
-                </div>
-            ) : (
-                <div className="pymtw-briefing-lines">
-                    {briefing.lines.map((line) => (
-                        <p key={line} className="pymtw-briefing-line">{line}</p>
-                    ))}
-                </div>
-            )}
 
             <div className="pymtw-hero-kpis">
                 <div className="pymtw-kpi">

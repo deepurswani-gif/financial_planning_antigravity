@@ -109,7 +109,7 @@ function DetailedFlowLayout() {
     );
   }
 
-  // Tablet/desktop (lg+, same 768px threshold as the hook): full app. Mobile screens are now fully supported.
+  // Mobile: overlay drawers; tablet/desktop: persistent sidebars (useBreakpoints is layout-only, never blocks access).
 
   return (
     <RoleBasedRouting>
@@ -140,6 +140,10 @@ function DetailedFlowLayout() {
               borderBottom: '1px solid rgba(220, 38, 38, 0.35)',
               fontSize: '0.9rem',
               lineHeight: 1.45,
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              gap: '0.5rem',
             }}
           >
             <strong>Cannot sync your plan ΓÇö edits will not save.</strong>{' '}
@@ -148,12 +152,13 @@ function DetailedFlowLayout() {
               type="button"
               onClick={() => setPlanReloadToken((t) => t + 1)}
               style={{
-                marginLeft: '0.75rem',
+                marginLeft: 0,
                 padding: '0.25rem 0.6rem',
                 cursor: 'pointer',
                 borderRadius: '6px',
                 border: '1px solid rgba(220, 38, 38, 0.5)',
                 background: 'var(--bg-card, #fff)',
+                flexShrink: 0,
               }}
             >
               Retry

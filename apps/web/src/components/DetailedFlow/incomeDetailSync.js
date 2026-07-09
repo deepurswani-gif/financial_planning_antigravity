@@ -648,8 +648,12 @@ export function getMemberFlatMonthlyIncome(income = {}, memberKey = 'self') {
 
 /** Match Detailed Money in & out spouse inclusion rules. */
 export function shouldIncludeSpouseIncome(spouseMember, hasSpouseIncome = false, income = {}) {
-    if (!spouseMember) return false;
-    if (spouseMember.isSpouseWorking === true || hasSpouseIncome === true) return true;
+    if (hasSpouseIncome === true) return true;
+    if (!spouseMember) {
+        return getMemberFlatMonthlyIncome(income, 'spouse') > 0
+            || parseFloat(income.summarySpouseInHand) > 0;
+    }
+    if (spouseMember.isSpouseWorking === true) return true;
     if (getMemberFlatMonthlyIncome(income, 'spouse') > 0) return true;
     if (parseFloat(income.summarySpouseInHand) > 0) return true;
     return false;
@@ -665,13 +669,13 @@ export function getHouseholdMonthlyInflow(income, familyMembers, hasSpouseIncome
     if (!selfMember) return getFlatHouseholdMonthlyIncome(income);
 
     const selfType = resolveEmploymentType(selfMember);
-    const spouseType = spouseMember ? resolveEmploymentType(spouseMember) : '';
+    const spouseType = spouseMember ? resolveEmploymentType(spouseMember) : 'Private Sector';
     const includeSpouse = shouldIncludeSpouseIncome(spouseMember, hasSpouseIncome, income);
 
     const selfDetail = getMemberDetailForProjection(income, 'self', selfType);
     let total = getMemberDetailMonthlyTotal(selfDetail, selfType);
 
-    if (includeSpouse && spouseMember) {
+    if (includeSpouse) {
         const spouseDetail = getMemberDetailForProjection(income, 'spouse', spouseType);
         total += getMemberDetailMonthlyTotal(spouseDetail, spouseType);
     }
@@ -685,13 +689,14 @@ export function getMemberDetailForProjection(income = {}, memberKey = 'self', em
     const detailKey = memberKey === 'self' ? 'selfDetail' : 'spouseDetail';
     let detail = { ...createEmptyIncomeDetail(), ...(income[detailKey] || {}) };
 
-    if (hasIncomeDetailEntered(detail, employmentType)) {
-        return detail;
-    }
-
     const prefix = memberKey === 'self' ? 'self' : 'spouse';
     const summaryAmount = getSummaryIncomeTarget(income, memberKey) || income[prefix] || '';
-    detail = prefillDetailFromSummaryAmount(detail, summaryAmount, employmentType);
+
+    if (!hasIncomeDetailEntered(detail, employmentType)) {
+        detail = prefillDetailFromSummaryAmount(detail, summaryAmount, employmentType);
+    } else if (!hasIncomeBreakdown(detail, employmentType) && summaryAmount) {
+        detail = syncSummaryAmountToDetailPrimary(detail, summaryAmount, employmentType);
+    }
 
     const passive = income[`${prefix}Passive`];
     const other = income[`${prefix}Other`];

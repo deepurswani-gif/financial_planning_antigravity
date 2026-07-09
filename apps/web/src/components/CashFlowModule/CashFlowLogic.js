@@ -4,12 +4,15 @@ import {
     hasHouseholdDetailEntered,
     sumConfiguredEmis,
 } from '../DetailedFlow/expenseDetailSync';
+import { resolveEmploymentType } from '../DetailedFlow/employmentTypeSync';
+import { shouldIncludeSpouseIncome } from '../DetailedFlow/incomeDetailSync';
 import { getLifeMemberMonthlyTotal } from '../DetailedFlow/insuranceDetailSync';
 import {
     getEffectiveMonthlySavings,
     getSavingsMonthlyAmount,
     hasConfiguredSavings,
 } from '../DetailedFlow/savingsDetailSync';
+import { getLedgerNetIncomeMonthly, syncLedgerFromMonthlyTotals } from '../DetailedReport/moneyFlowLedgerLogic';
 export { syncLedgerFromMonthlyTotals } from '../DetailedReport/moneyFlowLedgerLogic';
 
 export const convertToMonthly = (value, frequency) => {
@@ -38,16 +41,18 @@ export const convertToAnnual = (value, frequency) => {
     }
 };
 
-export const calculateCashFlow = (income, expenseCategories, familyMembers = []) => {
-    const totalIncome = (parseFloat(income.self) || 0) + 
-                       (parseFloat(income.selfBonus) || 0) + 
-                       (parseFloat(income.selfPassive) || 0) + 
-                       (parseFloat(income.selfOther) || 0) +
-                       (parseFloat(income.spouse) || 0) + 
-                       (parseFloat(income.spouseBonus) || 0) + 
-                       (parseFloat(income.spousePassive) || 0) + 
-                       (parseFloat(income.spouseOther) || 0) +
-                       (parseFloat(income.family) || 0);
+export const calculateCashFlow = (income, expenseCategories, familyMembers = [], hasSpouseIncome) => {
+    const spouseMember = familyMembers?.find((m) => m.relation?.toLowerCase() === 'spouse');
+    const resolvedHasSpouseIncome = typeof hasSpouseIncome === 'boolean'
+        ? hasSpouseIncome
+        : shouldIncludeSpouseIncome(spouseMember, false, income);
+
+    const totalIncome = getLedgerNetIncomeMonthly(
+        income,
+        familyMembers,
+        resolvedHasSpouseIncome,
+        resolveEmploymentType,
+    ) + (parseFloat(income.family) || 0);
 
     const householdSum = getEffectiveMonthlyHousehold(expenseCategories, familyMembers);
     const emiSum = getEffectiveMonthlyEmi(expenseCategories);

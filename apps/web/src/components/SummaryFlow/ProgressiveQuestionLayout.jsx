@@ -3,6 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, ArrowRight, ArrowLeft, Sparkles } from 'lucide-react';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { loadSummaryUiDraft, patchSummaryUiDraft } from '../../lib/summaryFlowStorage';
 
 const steps = [
     { id: 'profile', label: 'Profile', path: '/summary-flow/profile' },
@@ -77,12 +79,40 @@ const ProgressiveQuestionLayout = ({
 }) => {
     const navigate = useNavigate();
     const location = useLocation();
+    const { user } = useAuth();
     const { savePlanData } = useFinancialPlan();
-    const [currentIndex, setCurrentIndex] = useState(0);
+    const userId = user?.id ?? null;
+    const [currentIndex, setCurrentIndex] = useState(() => {
+        const savedIndex = loadSummaryUiDraft(userId)?.questionIndexByStep?.[currentStepId];
+        if (typeof savedIndex === 'number' && savedIndex >= 0 && savedIndex < questions.length) {
+            return savedIndex;
+        }
+        return 0;
+    });
     const [direction, setDirection] = useState(1);
     const [showNarrative, setShowNarrative] = useState(false);
 
     const currentGlobalIndex = steps.findIndex(s => s.id === currentStepId);
+
+    useEffect(() => {
+        const savedIndex = loadSummaryUiDraft(userId)?.questionIndexByStep?.[currentStepId];
+        if (typeof savedIndex === 'number' && savedIndex >= 0 && savedIndex < questions.length) {
+            setCurrentIndex(savedIndex);
+        } else {
+            setCurrentIndex(0);
+        }
+    }, [currentStepId, questions.length, userId]);
+
+    useEffect(() => {
+        const existing = loadSummaryUiDraft(userId)?.questionIndexByStep || {};
+        patchSummaryUiDraft(userId, {
+            questionIndexByStep: {
+                ...existing,
+                [currentStepId]: currentIndex,
+            },
+            lastSummaryPath: location.pathname,
+        });
+    }, [currentIndex, currentStepId, location.pathname, userId]);
 
     // Handle intra-step navigation (chevron arrows)
     const handleNextQuestion = useCallback(() => {
@@ -204,7 +234,7 @@ const ProgressiveQuestionLayout = ({
             </button>
 
             {/* Question content area */}
-            <div style={{ width: '100%', maxWidth: '650px', position: 'relative', minHeight: '400px', display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '3rem auto' }}>
+            <div className="progressive-question-shell">
                 <AnimatePresence mode="wait" custom={direction}>
                     <motion.div
                         key={currentStepId + '-' + currentIndex}

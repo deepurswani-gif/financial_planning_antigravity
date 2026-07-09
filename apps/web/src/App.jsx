@@ -2,8 +2,6 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import RoleBasedRouting from './components/Auth/RoleBasedRouting';
 import ProtectedRoute from './components/ProtectedRoute';
-import MobileWebComingSoon from '@/components/common/MobileWebComingSoon';
-import { useBreakpoints } from '@/hooks';
 import { useFinancialPlan } from './contexts/FinancialPlanContext';
 import BlankLayout from './components/Layouts/BlankLayout';
 
@@ -28,7 +26,6 @@ import DetailedGrowthExpectations from './components/DetailedFlow/DetailedGrowth
 import DetailedFlowLayout from './DetailedFlowLayout';
 
 function App() {
-  const { lg } = useBreakpoints();
   const { loading } = useFinancialPlan();
 
   if (loading) {
@@ -38,8 +35,6 @@ function App() {
       </div>
     );
   }
-
-  // Tablet/desktop (lg+, same 768px threshold as the hook): full app. Mobile screens are now fully supported.
 
   return (
     <RoleBasedRouting>

@@ -107,12 +107,13 @@ const MoneyStorySection = () => {
         liabilityCategories,
         contingencyFund,
         summaryLifeCover,
+        hasSpouseIncome,
     } = useFinancialPlan();
 
     // ── Derived Calculations ──
     const cashFlowResults = useMemo(
-        () => calculateCashFlow(income, expenseCategories, familyMembers),
-        [income, expenseCategories, familyMembers],
+        () => calculateCashFlow(income, expenseCategories, familyMembers, hasSpouseIncome),
+        [income, expenseCategories, familyMembers, hasSpouseIncome],
     );
     const assetResults = useMemo(() => calculateNetWorth(assetCategories, liabilityCategories), [assetCategories, liabilityCategories]);
 

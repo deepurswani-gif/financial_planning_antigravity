@@ -329,8 +329,9 @@ export const buildExecutiveSummaryReport = ({
     goals,
     inflationRates,
     familyMembers = [],
+    hasSpouseIncome,
 }) => {
-    const cashFlow = calculateCashFlow(income, expenseCategories, familyMembers);
+    const cashFlow = calculateCashFlow(income, expenseCategories, familyMembers, hasSpouseIncome);
     const protectionData = calculateProtectionData(expenseCategories, summaryLifeCover, familyMembers);
     const emergencyCash = getEmergencyFundAmount(assetCategories, contingencyFund);
     const contingencyData = calculateContingencyData(expenseCategories, emergencyCash, familyMembers);

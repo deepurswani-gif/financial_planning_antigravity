@@ -7,6 +7,8 @@ import {
     Award, PenLine, Target, Check
 } from 'lucide-react';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { loadSummaryUiDraft, patchSummaryUiDraft } from '../../lib/summaryFlowStorage';
 import { calculateFutureCost } from '../GoalModule/GoalLogic';
 
 /* ─── Screen constants ─── */
@@ -92,19 +94,40 @@ const NarrativeOverlay = ({ text, onContinue }) => {
    ═══════════════════════════════════════════════════ */
 const SummaryGoals = () => {
     const { goals, setGoals, savePlanData, summaryReportGeneratedAt, markReportGenerated } = useFinancialPlan();
+    const { user } = useAuth();
     const navigate = useNavigate();
+    const userId = user?.id ?? null;
 
     // Only count goals that have actual user-entered values (years and present cost)
     const validGoals = goals.filter(g => g.presentValue && g.yearsToGoal);
+    const savedGoalsUi = loadSummaryUiDraft(userId)?.goalsWizard;
 
     // Start at SUMMARY if they already have valid goals (from legacy flow or previous edits), otherwise start at INTRO
-    const [screen, setScreen] = useState(validGoals.length > 0 ? SUMMARY : INTRO);
+    const [screen, setScreen] = useState(() => {
+        if (typeof savedGoalsUi?.screen === 'number') return savedGoalsUi.screen;
+        return validGoals.length > 0 ? SUMMARY : INTRO;
+    });
     const [direction, setDirection] = useState(1);
-    const [editingGoalIndex, setEditingGoalIndex] = useState(null);
-    const [selectedTemplateId, setSelectedTemplateId] = useState(null);
-    const [customGoalName, setCustomGoalName] = useState('');
-    const [showCustomInput, setShowCustomInput] = useState(false);
+    const [editingGoalIndex, setEditingGoalIndex] = useState(
+        typeof savedGoalsUi?.editingGoalIndex === 'number' ? savedGoalsUi.editingGoalIndex : null,
+    );
+    const [selectedTemplateId, setSelectedTemplateId] = useState(savedGoalsUi?.selectedTemplateId ?? null);
+    const [customGoalName, setCustomGoalName] = useState(savedGoalsUi?.customGoalName ?? '');
+    const [showCustomInput, setShowCustomInput] = useState(Boolean(savedGoalsUi?.showCustomInput));
     const [showNarrative, setShowNarrative] = useState(false);
+
+    useEffect(() => {
+        patchSummaryUiDraft(userId, {
+            goalsWizard: {
+                screen,
+                editingGoalIndex,
+                selectedTemplateId,
+                customGoalName,
+                showCustomInput,
+            },
+            lastSummaryPath: '/summary-flow/goals',
+        });
+    }, [userId, screen, editingGoalIndex, selectedTemplateId, customGoalName, showCustomInput]);
 
     /* ── Navigation helpers ── */
     const goTo = useCallback((target, dir = 1) => {

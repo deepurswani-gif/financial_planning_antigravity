@@ -251,7 +251,7 @@ const DetailedProgressiveLayout = ({
                 <ChevronRight size={24} />
             </button>
 
-            <div style={{ width: '100%', maxWidth: '650px', position: 'relative', minHeight: '400px', display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '3rem auto' }}>
+            <div className="progressive-question-shell">
                 <AnimatePresence mode="wait" custom={direction}>
                     <motion.div
                         key={`${currentStepId}-${currentQuestion?.id ?? resolvedIndex}`}

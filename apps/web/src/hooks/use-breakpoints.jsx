@@ -47,9 +47,8 @@ function useWindowDimensions() {
  * @property {number} scale
  */
 
-// No constrained mobile web column in this app — width is the real viewport width (no useMobileLayout / maxWidth cap).
-
 /**
+ * Responsive layout breakpoints only — never used to block or gate mobile access.
  * @returns {UseBreakpointsResult}
  */
 function useBreakpoints() {

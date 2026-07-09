@@ -1,6 +1,14 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import { createFinancialPlan, getActivePlan, updateFinancialPlan, markSummaryReportGenerated } from '../services/financialPlanService';
+import {
+  buildSummaryDraftPayload,
+  clearSummaryDraft,
+  getDraftSavedAtMs,
+  hasMeaningfulSummaryDraft,
+  loadSummaryDraft,
+  saveSummaryDraft,
+} from '../lib/summaryFlowStorage';
 import { generateProjections } from '../components/JourneyModule/ProjectionLogic';
 import { normalizeIncomeState } from '../components/DetailedFlow/incomeDetailSync';
 import { getLedgerNetIncomeMonthly, getLedgerHouseholdMonthly, computeTaxAdjustmentArray, getMonthlyInsuranceTotal, syncLedgerFromMonthlyTotals } from '../components/DetailedReport/moneyFlowLedgerLogic';
@@ -23,6 +31,11 @@ export const useFinancialPlan = () => {
 
 export const FinancialPlanProvider = ({ children }) => {
   const { user } = useAuth();
+  const isHydratingRef = useRef(false);
+  const prevUserIdRef = useRef(undefined);
+  const userCreatedAtRef = useRef(user?.created_at);
+  userCreatedAtRef.current = user?.created_at;
+  const userId = user?.id ?? null;
   
   // Supabase plan ID & sync state
   const [planId, setPlanId] = useState(null);
@@ -115,8 +128,9 @@ export const FinancialPlanProvider = ({ children }) => {
   useEffect(() => {
     const spouseMember = familyMembers.find(m => m.relation?.toLowerCase() === 'spouse');
     const isSpouseHousewife = spouseMember?.occupation?.toLowerCase() === 'housewife';
-    
-    if (!spouseMember || isSpouseHousewife) {
+    const shouldClearSpouseIncome = isSpouseHousewife || (!spouseMember && !hasSpouseIncome);
+
+    if (shouldClearSpouseIncome) {
       setIncome(prev => {
         if (prev.spouse || prev.spouseBonus || prev.spousePassive || prev.spouseOther) {
           return { ...prev, spouse: '', spouseBonus: '', spousePassive: '', spouseOther: '' };
@@ -124,7 +138,7 @@ export const FinancialPlanProvider = ({ children }) => {
         return prev;
       });
     }
-  }, [familyMembers]);
+  }, [familyMembers, hasSpouseIncome]);
 
   // Keep ledger in sync with detailed net inflow, household (incl. education), and tax adjustment.
   useEffect(() => {
@@ -207,196 +221,337 @@ export const FinancialPlanProvider = ({ children }) => {
     setPlanSyncError(null);
   };
 
+  const applySummaryDraft = useCallback((draft) => {
+    if (!draft) return;
+
+    if (draft.familyMembers?.length) {
+      setFamilyMembers(draft.familyMembers.map((member) => ({ ...member, mobile: member.mobile || '' })));
+    }
+    if (draft.income) {
+      setIncome(normalizeIncomeState(draft.income));
+      setHasSpouseIncome(
+        draft.hasSpouseIncome ?? !!(draft.income.spouse && Number(draft.income.spouse) > 0),
+      );
+    }
+    if (draft.expenseCategories) {
+      setExpenseCategories(draft.expenseCategories);
+      setHasEMI(
+        draft.hasEMI ?? hasAnyEmiCommitment(draft.expenseCategories),
+      );
+    }
+    if (draft.assetCategories) setAssetCategories(draft.assetCategories);
+    if (draft.liabilityCategories) setLiabilityCategories(draft.liabilityCategories);
+    if (Array.isArray(draft.goals)) setGoals(draft.goals);
+    if (draft.contingencyFund !== undefined) setContingencyFund(draft.contingencyFund);
+    if (draft.hasLifeInsurance !== undefined) setHasLifeInsurance(draft.hasLifeInsurance);
+    if (draft.hasHealthInsurance !== undefined) setHasHealthInsurance(draft.hasHealthInsurance);
+    if (draft.summaryLifeCover !== undefined) setSummaryLifeCover(draft.summaryLifeCover);
+    if (draft.summaryHealthCover !== undefined) setSummaryHealthCover(draft.summaryHealthCover);
+    if (draft.summaryReportGeneratedAt !== undefined) {
+      setSummaryReportGeneratedAt(draft.summaryReportGeneratedAt);
+    }
+    if (draft.inflationRates) setInflationRates(draft.inflationRates);
+  }, []);
+
+  const applySupabasePlan = useCallback((data) => {
+    if (!data) return data;
+
+    setPlanId(data.id);
+
+    const initializeMaxStep = async () => {
+      try {
+        const stored = await Promise.resolve(localStorage.getItem(`max_step_${data.id}`));
+        let newMax = data.current_step || 1;
+        if (stored) newMax = Math.max(parseInt(stored, 10), newMax);
+        setMaxStep(newMax);
+        await Promise.resolve(localStorage.setItem(`max_step_${data.id}`, newMax.toString()));
+      } catch (e) {
+        setMaxStep(data.current_step || 1);
+      }
+    };
+    initializeMaxStep();
+
+    setCurrentStep(data.current_step || 1);
+    setInsuranceMode(data.insurance_mode || null);
+    let rawPlanStartMonth = data.plan_start_month;
+    let derivedPlanStartMonth = (rawPlanStartMonth !== undefined && rawPlanStartMonth !== null) ? parseInt(rawPlanStartMonth, 10) : null;
+    let finalMonth = (derivedPlanStartMonth !== null && !isNaN(derivedPlanStartMonth)) ? derivedPlanStartMonth : new Date().getMonth();
+
+    if (finalMonth === 0) {
+      let trueMonth = null;
+      if (data.current_year_ledger?.income) {
+        const firstActive = data.current_year_ledger.income.findIndex((val) => Number(val) > 0);
+        if (firstActive > 0) trueMonth = firstActive;
+      }
+      if (trueMonth === null) {
+        const extractMonth = (dateVal) => {
+          if (!dateVal) return null;
+          let normalized = dateVal;
+          if (typeof dateVal === 'string' && !/^\d+$/.test(dateVal)) normalized = dateVal.replace(' ', 'T');
+          else if (typeof dateVal === 'string' && /^\d+$/.test(dateVal)) normalized = parseInt(dateVal, 10);
+          const mt = new Date(normalized).getMonth();
+          return isNaN(mt) ? null : mt;
+        };
+        trueMonth = extractMonth(userCreatedAtRef.current) ?? extractMonth(data.created_at) ?? extractMonth(data.updated_at);
+      }
+      if (trueMonth !== null && trueMonth !== 0) finalMonth = trueMonth;
+      else if (new Date().getMonth() !== 0) finalMonth = new Date().getMonth();
+    }
+    if (isNaN(finalMonth)) finalMonth = new Date().getMonth();
+    setPlanStartMonth(finalMonth);
+
+    setFamilyMembers(data.family_members?.length > 0 ? data.family_members.map((m) => ({ ...m, mobile: m.mobile || '' })) : [{ name: '', dob: '', occupation: 'Salaried', retirementAge: 60, relation: 'Self', mobile: '' }]);
+
+    const loadedIncome = data.income || {};
+    setIncome(normalizeIncomeState(loadedIncome));
+    setHasSpouseIncome(!!(loadedIncome.spouse && Number(loadedIncome.spouse) > 0));
+
+    const loadedExpenseCategories = data.expense_categories || {};
+    const emiObj = loadedExpenseCategories.emi || {};
+    setHasEMI(hasAnyEmiCommitment({
+      ...loadedExpenseCategories,
+      emi: emiObj,
+    }));
+    const loadedInsurance = loadedExpenseCategories.insurance || {};
+    let migratedLife = {};
+    const selfMember = (data.family_members || []).find((m) => m.relation === 'Self') || { name: '', relation: 'Self' };
+    const selfKey = selfMember.name || selfMember.relation;
+
+    if (loadedInsurance.life && typeof loadedInsurance.life === 'object' && 'value' in loadedInsurance.life) {
+      const hasMembers = Object.keys(loadedInsurance.life).some((k) => k !== 'value' && k !== 'frequency');
+      if (hasMembers) {
+        migratedLife = { ...loadedInsurance.life };
+        delete migratedLife.value;
+        delete migratedLife.frequency;
+      } else {
+        migratedLife = { [selfKey]: { value: loadedInsurance.life.value, frequency: loadedInsurance.life.frequency || 'Annual' } };
+      }
+    } else if (loadedInsurance.life) {
+      migratedLife = { ...loadedInsurance.life };
+      if (selfMember.name && migratedLife.Self) {
+        if (!migratedLife[selfMember.name]) migratedLife[selfMember.name] = migratedLife.Self;
+        delete migratedLife.Self;
+      }
+    }
+
+    setExpenseCategories(initializeSavingsSnapshots(initializeExpenseSnapshots({
+      household: { grocery: '', rent: '', education: '', lifestyle: '', medical: '', travel: '', ...(loadedExpenseCategories.household || {}) },
+      emi: {
+        personalLoan: loadedExpenseCategories.emi?.personalLoan ?? '',
+        homeLoan: loadedExpenseCategories.emi?.homeLoan ?? '',
+        educationLoan: loadedExpenseCategories.emi?.educationLoan ?? '',
+        carLoan: loadedExpenseCategories.emi?.carLoan ?? '',
+        twoWheelerLoan: loadedExpenseCategories.emi?.twoWheelerLoan ?? '',
+        otherEmi: loadedExpenseCategories.emi?.otherEmi ?? '',
+        otherEmiName: loadedExpenseCategories.emi?.otherEmiName ?? '',
+      },
+      insurance: migrateInsuranceBlock({
+        health: loadedInsurance.health || { value: loadedExpenseCategories.emi?.healthInsurance || '', frequency: 'Annual' },
+        car: loadedInsurance.car || { value: loadedExpenseCategories.emi?.carInsurance || '', frequency: 'Annual' },
+        bike: loadedInsurance.bike || { value: loadedExpenseCategories.emi?.bikeInsurance || '', frequency: 'Annual' },
+        life: migratedLife,
+        others: loadedInsurance.others || { value: loadedExpenseCategories.emi?.otherInsurance || '', frequency: 'Annual' },
+        policyDocs: loadedInsurance.policyDocs || {},
+      }),
+      savings: (() => {
+        const loadedSavings = loadedExpenseCategories.savings || {};
+        const { sip: _legacySip, mfSip: _legacyMfSip, ...restSavings } = loadedSavings;
+        return {
+          ppf: '',
+          nps: '',
+          rd: '',
+          otherSaving: '',
+          ...restSavings,
+          sip: loadedSavings.sip || loadedSavings.mfSip || '',
+        };
+      })(),
+      summaryHouseholdTotal: loadedExpenseCategories.summaryHouseholdTotal ?? '',
+      summaryEmiTotal: loadedExpenseCategories.summaryEmiTotal ?? '',
+      summaryMonthlyInvestments: loadedExpenseCategories.summaryMonthlyInvestments ?? '',
+      summaryOtherSavings: loadedExpenseCategories.summaryOtherSavings ?? '',
+    })));
+
+    const defaultAssetCategories = {
+      summaryPortfolioValue: '', summaryLiquidCash: '', summaryRealEstateAssets: '',
+      realEstate: { residential: '', secondProperty: '', landPlot: '' }, vehicles: { idv: '' },
+      valuables: { gold: '', art: '' }, cash: { savings: '', cashInHand: '' },
+      investments: { equity: '', mutualFunds: '', fixedDeposit: '', recurringDeposit: '' },
+      insurance: { savingPlans: '', ulip: '' }, retirement: { epf: '', ppf: '', nps: '' },
+      others: { other: '' }, custom: [],
+    };
+    const loadedAssetCategories = data.asset_categories || {};
+    setAssetCategories({
+      ...defaultAssetCategories,
+      summaryPortfolioValue: loadedAssetCategories.summaryPortfolioValue ?? '',
+      summaryLiquidCash: loadedAssetCategories.summaryLiquidCash ?? '',
+      summaryRealEstateAssets: loadedAssetCategories.summaryRealEstateAssets ?? '',
+      realEstate: {
+        ...defaultAssetCategories.realEstate,
+        ...(loadedAssetCategories.realEstate || {}),
+        residential: loadedAssetCategories.realEstate?.residential || loadedAssetCategories.realEstate?.residence || '',
+        secondProperty: loadedAssetCategories.realEstate?.secondProperty || loadedAssetCategories.realEstate?.investmentProp || '',
+      },
+      vehicles: { ...defaultAssetCategories.vehicles, ...(loadedAssetCategories.vehicles || {}) },
+      valuables: {
+        ...defaultAssetCategories.valuables,
+        ...(loadedAssetCategories.valuables || {}),
+        gold: loadedAssetCategories.valuables?.gold || loadedAssetCategories.others?.gold || '',
+      },
+      cash: { ...defaultAssetCategories.cash, ...(loadedAssetCategories.cash || {}) },
+      investments: {
+        ...defaultAssetCategories.investments,
+        ...(loadedAssetCategories.investments || {}),
+        equity: loadedAssetCategories.investments?.equity || loadedAssetCategories.equity?.stocks || '',
+        mutualFunds: loadedAssetCategories.investments?.mutualFunds || loadedAssetCategories.equity?.mfEquity || '',
+        fixedDeposit: loadedAssetCategories.investments?.fixedDeposit || loadedAssetCategories.debt?.fd || '',
+      },
+      insurance: { ...defaultAssetCategories.insurance, ...(loadedAssetCategories.insurance || {}) },
+      retirement: {
+        ...defaultAssetCategories.retirement,
+        ...(loadedAssetCategories.retirement || {}),
+        ppf: loadedAssetCategories.retirement?.ppf || loadedAssetCategories.debt?.ppf || '',
+      },
+      others: {
+        ...defaultAssetCategories.others,
+        ...(loadedAssetCategories.others || {}),
+        other: loadedAssetCategories.others?.other || loadedAssetCategories.others?.others || '',
+      },
+      custom: Array.isArray(loadedAssetCategories.custom) ? loadedAssetCategories.custom : [],
+    });
+
+    const loadedLiabilityCategories = data.liability_categories || {};
+    setLiabilityCategories({
+      summaryOutstandingLoans: loadedLiabilityCategories.summaryOutstandingLoans ?? '',
+      summaryCreditCardDues: loadedLiabilityCategories.summaryCreditCardDues ?? '',
+      summaryOtherPayables: loadedLiabilityCategories.summaryOtherPayables ?? '',
+      loans: {
+        home: loadedLiabilityCategories.loans?.home || '',
+        personal: loadedLiabilityCategories.loans?.personal || '',
+        car: loadedLiabilityCategories.loans?.car || '',
+        education: loadedLiabilityCategories.loans?.education || '',
+        otherEmis: loadedLiabilityCategories.loans?.otherEmis || loadedLiabilityCategories.loans?.other || '',
+        creditCard: loadedLiabilityCategories.loans?.creditCard || '',
+      },
+      custom: Array.isArray(loadedLiabilityCategories.custom) ? loadedLiabilityCategories.custom : [],
+    });
+
+    setGoals(data.goals || []);
+    setPolicies(data.policies || []);
+    setContingencyFund(data.contingency_fund || '');
+    setHasLifeInsurance(data.has_life_insurance ?? null);
+    setHasHealthInsurance(data.has_health_insurance ?? null);
+    setSummaryLifeCover(data.summary_life_cover || '');
+    setSummaryHealthCover(data.summary_health_cover || '');
+    setSummaryReportGeneratedAt(data.summary_report_generated_at || null);
+    setInflationRates(data.inflation_rates || { incomeIncrement: 10, householdInflation: 6, educationInflation: 8 });
+    setJourneyAdjustments(data.journey_adjustments || []);
+    setInvestmentAllocations(data.investment_allocations || []);
+    setLoanProposals(data.loan_proposals || []);
+    setAllocationPlans(data.allocation_plans || {});
+
+    let loadedMappings = data.goal_mappings || {};
+    Object.keys(loadedMappings).forEach((goalId) => {
+      if (Array.isArray(loadedMappings[goalId])) {
+        const legacyArray = loadedMappings[goalId];
+        const newDict = {};
+        legacyArray.forEach((sourceName) => { newDict[sourceName] = 0; });
+        loadedMappings[goalId] = newDict;
+      }
+    });
+    setGoalMappings(loadedMappings);
+
+    if (data.calculator_inputs) setCalculatorInputs(data.calculator_inputs);
+    setCurrentYearLedger({
+      income: data.current_year_ledger?.income || Array(12).fill(0),
+      household: data.current_year_ledger?.household || Array(12).fill(0),
+      emi: data.current_year_ledger?.emi || Array(12).fill(0),
+      insurance: data.current_year_ledger?.insurance || Array(12).fill(0),
+      savings: data.current_year_ledger?.savings || Array(12).fill(0),
+      taxAdjustment: data.current_year_ledger?.taxAdjustment || Array(12).fill(0),
+    });
+
+    return data;
+  }, []);
+
+  const mergeLocalDraftIfNewer = useCallback((data, localDraft) => {
+    if (!localDraft || !hasMeaningfulSummaryDraft(localDraft)) return;
+
+    const supabaseUpdatedMs = data?.updated_at ? new Date(data.updated_at).getTime() : 0;
+    const localUpdatedMs = getDraftSavedAtMs(localDraft);
+
+    if (!data || localUpdatedMs > supabaseUpdatedMs) {
+      applySummaryDraft(localDraft);
+    }
+  }, [applySummaryDraft]);
+
   useEffect(() => {
     const loadPlan = async () => {
-      resetState();
-      if (!user) { setLoading(false); return; }
-      setLoading(true);
+      const userIdChanged = prevUserIdRef.current !== userId;
+      prevUserIdRef.current = userId;
+
+      isHydratingRef.current = true;
+
+      if (userIdChanged) {
+        resetState();
+      }
+
+      const localDraft = loadSummaryDraft(userId);
+
+      if (!userId) {
+        if (localDraft && hasMeaningfulSummaryDraft(localDraft)) {
+          applySummaryDraft(localDraft);
+        }
+        isHydratingRef.current = false;
+        setLoading(false);
+        return;
+      }
+
+      // Full-page loader only on first load or account switch — not token refresh / plan reload.
+      if (userIdChanged) {
+        setLoading(true);
+      }
+
       const { data, error } = await getActivePlan();
 
       if (error) {
         console.error('Error loading plan from Supabase:', error);
         const retry = await createFinancialPlan();
         if (retry.data) {
-          setPlanSyncError(null); setPlanId(retry.data.id); setCurrentStep(retry.data.current_step || 1); setMaxStep(retry.data.current_step || 1);
-          setFamilyMembers(retry.data.family_members?.length > 0 ? retry.data.family_members.map(m => ({ ...m, mobile: m.mobile || '' })) : [{ name: '', dob: '', occupation: 'Salaried', retirementAge: 60, relation: 'Self', mobile: '' }]);
-          setLoading(false); return;
+          setPlanSyncError(null);
+          applySupabasePlan(retry.data);
+          mergeLocalDraftIfNewer(retry.data, localDraft);
+          isHydratingRef.current = false;
+          setLoading(false);
+          return;
         }
-        const msg = typeof error?.message === 'string' ? error.message : error?.code ? `${error.code}: ${error.message || error.details || ''}` : String(error);
+        const msg = typeof error?.message === 'string'
+          ? error.message
+          : error?.code
+            ? `${error.code}: ${error.message || error.details || ''}`
+            : String(error);
         setPlanSyncError(`${msg}. Retry failed.`);
-        setLoading(false); return;
+        if (localDraft && hasMeaningfulSummaryDraft(localDraft)) {
+          applySummaryDraft(localDraft);
+        }
+        isHydratingRef.current = false;
+        setLoading(false);
+        return;
       }
 
       setPlanSyncError(null);
       if (data) {
-        setPlanId(data.id);
-        
-        const initializeMaxStep = async () => {
-          try {
-             const stored = await Promise.resolve(localStorage.getItem(`max_step_${data.id}`));
-             let newMax = data.current_step || 1;
-             if (stored) newMax = Math.max(parseInt(stored, 10), newMax);
-             setMaxStep(newMax);
-             await Promise.resolve(localStorage.setItem(`max_step_${data.id}`, newMax.toString()));
-          } catch(e) { setMaxStep(data.current_step || 1); }
-        };
-        initializeMaxStep();
-
-        setCurrentStep(data.current_step || 1);
-        setInsuranceMode(data.insurance_mode || null);
-        let rawPlanStartMonth = data.plan_start_month;
-        let derivedPlanStartMonth = (rawPlanStartMonth !== undefined && rawPlanStartMonth !== null) ? parseInt(rawPlanStartMonth, 10) : null;
-        let finalMonth = (derivedPlanStartMonth !== null && !isNaN(derivedPlanStartMonth)) ? derivedPlanStartMonth : new Date().getMonth();
-
-        if (finalMonth === 0) {
-            let trueMonth = null;
-            if (data.current_year_ledger?.income) {
-                const firstActive = data.current_year_ledger.income.findIndex(val => Number(val) > 0);
-                if (firstActive > 0) trueMonth = firstActive;
-            }
-            if (trueMonth === null) {
-                const extractMonth = (dateVal) => {
-                     if (!dateVal) return null;
-                     let normalized = dateVal;
-                     if (typeof dateVal === 'string' && !/^\d+$/.test(dateVal)) normalized = dateVal.replace(' ', 'T');
-                     else if (typeof dateVal === 'string' && /^\d+$/.test(dateVal)) normalized = parseInt(dateVal, 10);
-                     const mt = new Date(normalized).getMonth(); return isNaN(mt) ? null : mt;
-                };
-                trueMonth = extractMonth(user?.created_at) ?? extractMonth(data.created_at) ?? extractMonth(data.updated_at);
-            }
-            if (trueMonth !== null && trueMonth !== 0) finalMonth = trueMonth;
-            else if (new Date().getMonth() !== 0) finalMonth = new Date().getMonth();
-        }
-        if (isNaN(finalMonth)) finalMonth = new Date().getMonth();
-        setPlanStartMonth(finalMonth);
-
-        setFamilyMembers(data.family_members?.length > 0 ? data.family_members.map(m => ({ ...m, mobile: m.mobile || '' })) : [{ name: '', dob: '', occupation: 'Salaried', retirementAge: 60, relation: 'Self', mobile: '' }]);
-        
-        const loadedIncome = data.income || {};
-        setIncome(normalizeIncomeState(loadedIncome));
-        setHasSpouseIncome(!!(loadedIncome.spouse && Number(loadedIncome.spouse) > 0));
-
-        const loadedExpenseCategories = data.expense_categories || {};
-        const emiObj = loadedExpenseCategories.emi || {};
-        setHasEMI(hasAnyEmiCommitment({
-            ...loadedExpenseCategories,
-            emi: emiObj,
-        }));
-        const loadedInsurance = loadedExpenseCategories.insurance || {};
-        let migratedLife = {};
-        const selfMember = (data.family_members || []).find(m => m.relation === 'Self') || { name: '', relation: 'Self' };
-        const selfKey = selfMember.name || selfMember.relation;
-
-        if (loadedInsurance.life && typeof loadedInsurance.life === 'object' && 'value' in loadedInsurance.life) {
-            const hasMembers = Object.keys(loadedInsurance.life).some(k => k !== 'value' && k !== 'frequency');
-            if (hasMembers) { migratedLife = { ...loadedInsurance.life }; delete migratedLife.value; delete migratedLife.frequency; } 
-            else migratedLife = { [selfKey]: { value: loadedInsurance.life.value, frequency: loadedInsurance.life.frequency || 'Annual' } };
-        } else if (loadedInsurance.life) {
-            migratedLife = { ...loadedInsurance.life };
-            if (selfMember.name && migratedLife['Self']) {
-                if (!migratedLife[selfMember.name]) migratedLife[selfMember.name] = migratedLife['Self'];
-                delete migratedLife['Self'];
-            }
-        }
-
-        setExpenseCategories(initializeSavingsSnapshots(initializeExpenseSnapshots({
-          household: { grocery: '', rent: '', education: '', lifestyle: '', medical: '', travel: '', ...(loadedExpenseCategories.household || {}) },
-          emi: { 
-            personalLoan: loadedExpenseCategories.emi?.personalLoan ?? '', homeLoan: loadedExpenseCategories.emi?.homeLoan ?? '', educationLoan: loadedExpenseCategories.emi?.educationLoan ?? '', carLoan: loadedExpenseCategories.emi?.carLoan ?? '', twoWheelerLoan: loadedExpenseCategories.emi?.twoWheelerLoan ?? '', otherEmi: loadedExpenseCategories.emi?.otherEmi ?? '', otherEmiName: loadedExpenseCategories.emi?.otherEmiName ?? '',
-          },
-          insurance: migrateInsuranceBlock({
-            health: loadedInsurance.health || { value: loadedExpenseCategories.emi?.healthInsurance || '', frequency: 'Annual' },
-            car: loadedInsurance.car || { value: loadedExpenseCategories.emi?.carInsurance || '', frequency: 'Annual' },
-            bike: loadedInsurance.bike || { value: loadedExpenseCategories.emi?.bikeInsurance || '', frequency: 'Annual' },
-            life: migratedLife,
-            others: loadedInsurance.others || { value: loadedExpenseCategories.emi?.otherInsurance || '', frequency: 'Annual' },
-            policyDocs: loadedInsurance.policyDocs || {},
-          }),
-          savings: (() => {
-            const loadedSavings = loadedExpenseCategories.savings || {};
-            const { sip: _legacySip, mfSip: _legacyMfSip, ...restSavings } = loadedSavings;
-            return {
-              ppf: '',
-              nps: '',
-              rd: '',
-              otherSaving: '',
-              ...restSavings,
-              sip: loadedSavings.sip || loadedSavings.mfSip || '',
-            };
-          })(),
-          summaryHouseholdTotal: loadedExpenseCategories.summaryHouseholdTotal ?? '',
-          summaryEmiTotal: loadedExpenseCategories.summaryEmiTotal ?? '',
-          summaryMonthlyInvestments: loadedExpenseCategories.summaryMonthlyInvestments ?? '',
-          summaryOtherSavings: loadedExpenseCategories.summaryOtherSavings ?? '',
-        })));
-
-        const defaultAssetCategories = { summaryPortfolioValue: '', summaryLiquidCash: '', summaryRealEstateAssets: '', realEstate: { residential: '', secondProperty: '', landPlot: '' }, vehicles: { idv: '' }, valuables: { gold: '', art: '' }, cash: { savings: '', cashInHand: '' }, investments: { equity: '', mutualFunds: '', fixedDeposit: '', recurringDeposit: '' }, insurance: { savingPlans: '', ulip: '' }, retirement: { epf: '', ppf: '', nps: '' }, others: { other: '' }, custom: [] };
-        const loadedAssetCategories = data.asset_categories || {};
-        setAssetCategories({
-          ...defaultAssetCategories,
-          summaryPortfolioValue: loadedAssetCategories.summaryPortfolioValue ?? '',
-          summaryLiquidCash: loadedAssetCategories.summaryLiquidCash ?? '',
-          summaryRealEstateAssets: loadedAssetCategories.summaryRealEstateAssets ?? '',
-          realEstate: { ...defaultAssetCategories.realEstate, ...(loadedAssetCategories.realEstate || {}), residential: loadedAssetCategories.realEstate?.residential || loadedAssetCategories.realEstate?.residence || '', secondProperty: loadedAssetCategories.realEstate?.secondProperty || loadedAssetCategories.realEstate?.investmentProp || '' },
-          vehicles: { ...defaultAssetCategories.vehicles, ...(loadedAssetCategories.vehicles || {}) },
-          valuables: { ...defaultAssetCategories.valuables, ...(loadedAssetCategories.valuables || {}), gold: loadedAssetCategories.valuables?.gold || loadedAssetCategories.others?.gold || '' },
-          cash: { ...defaultAssetCategories.cash, ...(loadedAssetCategories.cash || {}) },
-          investments: { ...defaultAssetCategories.investments, ...(loadedAssetCategories.investments || {}), equity: loadedAssetCategories.investments?.equity || loadedAssetCategories.equity?.stocks || '', mutualFunds: loadedAssetCategories.investments?.mutualFunds || loadedAssetCategories.equity?.mfEquity || '', fixedDeposit: loadedAssetCategories.investments?.fixedDeposit || loadedAssetCategories.debt?.fd || '' },
-          insurance: { ...defaultAssetCategories.insurance, ...(loadedAssetCategories.insurance || {}) },
-          retirement: { ...defaultAssetCategories.retirement, ...(loadedAssetCategories.retirement || {}), ppf: loadedAssetCategories.retirement?.ppf || loadedAssetCategories.debt?.ppf || '' },
-          others: { ...defaultAssetCategories.others, ...(loadedAssetCategories.others || {}), other: loadedAssetCategories.others?.other || loadedAssetCategories.others?.others || '' },
-          custom: Array.isArray(loadedAssetCategories.custom) ? loadedAssetCategories.custom : []
-        });
-
-        const loadedLiabilityCategories = data.liability_categories || {};
-        setLiabilityCategories({
-          summaryOutstandingLoans: loadedLiabilityCategories.summaryOutstandingLoans ?? '',
-          summaryCreditCardDues: loadedLiabilityCategories.summaryCreditCardDues ?? '',
-          summaryOtherPayables: loadedLiabilityCategories.summaryOtherPayables ?? '',
-          loans: { home: loadedLiabilityCategories.loans?.home || '', personal: loadedLiabilityCategories.loans?.personal || '', car: loadedLiabilityCategories.loans?.car || '', education: loadedLiabilityCategories.loans?.education || '', otherEmis: loadedLiabilityCategories.loans?.otherEmis || loadedLiabilityCategories.loans?.other || '', creditCard: loadedLiabilityCategories.loans?.creditCard || '' },
-          custom: Array.isArray(loadedLiabilityCategories.custom) ? loadedLiabilityCategories.custom : []
-        });
-
-        setGoals(data.goals || []);
-        setPolicies(data.policies || []);
-        setContingencyFund(data.contingency_fund || '');
-        setHasLifeInsurance(data.has_life_insurance ?? null);
-        setHasHealthInsurance(data.has_health_insurance ?? null);
-        setSummaryLifeCover(data.summary_life_cover || '');
-        setSummaryHealthCover(data.summary_health_cover || '');
-        setSummaryReportGeneratedAt(data.summary_report_generated_at || null);
-        setInflationRates(data.inflation_rates || { incomeIncrement: 10, householdInflation: 6, educationInflation: 8 });
-        setJourneyAdjustments(data.journey_adjustments || []);
-        setInvestmentAllocations(data.investment_allocations || []);
-        setLoanProposals(data.loan_proposals || []);
-        setAllocationPlans(data.allocation_plans || {});
-        
-        let loadedMappings = data.goal_mappings || {};
-        Object.keys(loadedMappings).forEach(goalId => {
-            if (Array.isArray(loadedMappings[goalId])) {
-                const legacyArray = loadedMappings[goalId];
-                const newDict = {};
-                legacyArray.forEach(sourceName => { newDict[sourceName] = 0; });
-                loadedMappings[goalId] = newDict;
-            }
-        });
-        setGoalMappings(loadedMappings);
-
-        if (data.calculator_inputs) setCalculatorInputs(data.calculator_inputs);
-        setCurrentYearLedger({
-          income: data.current_year_ledger?.income || Array(12).fill(0),
-          household: data.current_year_ledger?.household || Array(12).fill(0),
-          emi: data.current_year_ledger?.emi || Array(12).fill(0),
-          insurance: data.current_year_ledger?.insurance || Array(12).fill(0),
-          savings: data.current_year_ledger?.savings || Array(12).fill(0),
-          taxAdjustment: data.current_year_ledger?.taxAdjustment || Array(12).fill(0),
-        });
+        applySupabasePlan(data);
+        mergeLocalDraftIfNewer(data, localDraft);
+      } else if (localDraft && hasMeaningfulSummaryDraft(localDraft)) {
+        applySummaryDraft(localDraft);
       }
+
+      isHydratingRef.current = false;
       setLoading(false);
     };
 
     loadPlan();
-  }, [user, planReloadToken]);
+  }, [userId, planReloadToken, applySummaryDraft, applySupabasePlan, mergeLocalDraftIfNewer]);
 
   const savePlanData = async () => {
     if (!planId) return;
@@ -447,6 +602,49 @@ export const FinancialPlanProvider = ({ children }) => {
       console.error('Save crashed:', err);
     }
   };
+
+  useEffect(() => {
+    if (loading || isHydratingRef.current) return;
+
+    saveSummaryDraft(userId, buildSummaryDraftPayload({
+      planId,
+      userId,
+      familyMembers,
+      income,
+      expenseCategories,
+      assetCategories,
+      liabilityCategories,
+      goals,
+      hasEMI,
+      hasSpouseIncome,
+      hasLifeInsurance,
+      hasHealthInsurance,
+      summaryLifeCover,
+      summaryHealthCover,
+      summaryReportGeneratedAt,
+      contingencyFund,
+      inflationRates,
+    }));
+  }, [
+    loading,
+    userId,
+    planId,
+    familyMembers,
+    income,
+    expenseCategories,
+    assetCategories,
+    liabilityCategories,
+    goals,
+    hasEMI,
+    hasSpouseIncome,
+    hasLifeInsurance,
+    hasHealthInsurance,
+    summaryLifeCover,
+    summaryHealthCover,
+    summaryReportGeneratedAt,
+    contingencyFund,
+    inflationRates,
+  ]);
 
   useEffect(() => {
     if (!planId || loading) return;
@@ -509,7 +707,8 @@ export const FinancialPlanProvider = ({ children }) => {
   };
 
   const handleLogoutCleanup = () => {
-      resetState();
+    clearSummaryDraft(userId);
+    resetState();
   };
 
   return (

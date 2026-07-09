@@ -15,12 +15,12 @@ import GrowthModule from '../GrowthModule/GrowthModule';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 
 const ReportView = ({ onBack }) => {
-    const { familyMembers, income, expenseCategories, assetCategories, liabilityCategories, goals, policies, investmentAllocations: allocations, goalMappings, contingencyFund, journeyAdjustments, journeyProjections: projections, calculatorInputs } = useFinancialPlan();
+    const { familyMembers, income, expenseCategories, assetCategories, liabilityCategories, goals, policies, investmentAllocations: allocations, goalMappings, contingencyFund, journeyAdjustments, journeyProjections: projections, calculatorInputs, hasSpouseIncome } = useFinancialPlan();
     const [isDashboardMode, setIsDashboardMode] = useState(true);
     const [activeGoalTab, setActiveGoalTab] = useState('short'); // For goal tabs
 
     const profileResults = calculateFamilyProfile(familyMembers);
-    const cashFlowResults = calculateCashFlow(income, expenseCategories);
+    const cashFlowResults = calculateCashFlow(income, expenseCategories, familyMembers, hasSpouseIncome);
     const assetResults = calculateNetWorth(assetCategories, liabilityCategories);
 
     const validGoals = goals.filter(g => parseFloat(g.futureValue || g.presentValue || 0) > 0);

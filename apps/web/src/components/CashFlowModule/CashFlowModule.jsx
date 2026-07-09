@@ -12,7 +12,7 @@ const CashFlowModule = ({ onNext, onBack, setCurrentStep }) => {
     const [showWarning, setShowWarning] = useState(false);
 
     const handleCalculate = () => {
-        const calculated = calculateCashFlow(income, expenseCategories, familyMembers);
+        const calculated = calculateCashFlow(income, expenseCategories, familyMembers, hasSpouseIncome);
         if (calculated.totalExpenses + calculated.totalSavings > calculated.totalIncome) {
             setShowWarning(true);
             return;
