@@ -8,6 +8,7 @@ import {
     buildInstrumentCards,
     buildRecommendedBundles,
     compareSipGoalImpacts,
+    computeJourneyAdjustmentImpactForMonth,
     getAllocationPlanKey,
     getGoalFutureValue,
     getSelectableMonths,
@@ -104,6 +105,36 @@ describe('putYourMoneyToWorkLogic', () => {
         expect(ctx.hero.deployableSurplus).toBe(25000);
         expect(ctx.briefing.lines.length).toBeGreaterThan(0);
         expect(ctx.sipAnalysis.totalMonthly).toBeGreaterThanOrEqual(0);
+    });
+
+    it('deducts one-time standard expenses from deployable surplus in the selected month', () => {
+        const deduction = computeJourneyAdjustmentImpactForMonth([
+            { id: 1, type: 'expense', name: 'Mobile', startYear: 2026, startMonth: 7, amount: 30000 },
+        ], 2026, 6);
+        expect(deduction).toBe(30000);
+
+        const ctx = buildAllocationStudioContext({
+            moneyFlowReport: {
+                ...moneyFlowReport,
+                ledger: {
+                    unallocatedSurplus: [0, 0, 0, 0, 0, 0, 40000, 0, 0, 0, 0, 0],
+                },
+            },
+            familyMembers: [{ relation: 'Self', name: 'Priya', dob: '1990-01-01', retirementAge: 60 }],
+            expenseCategories: {},
+            assetCategories: {},
+            journeyAdjustments: [
+                { id: 1, type: 'expense', name: 'Mobile', startYear: 2026, startMonth: 7, amount: 30000 },
+            ],
+            journeyProjections: [],
+            investmentAllocations: [],
+            goals: [],
+            selectedMonthIndex: 6,
+        });
+
+        expect(ctx.hero.monthlyFreeCash).toBe(40000);
+        expect(ctx.hero.journeyMonthDeduction).toBe(30000);
+        expect(ctx.hero.deployableSurplus).toBe(10000);
     });
 
     it('computes goal future value with inflation', () => {

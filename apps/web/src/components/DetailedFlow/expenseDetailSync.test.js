@@ -5,6 +5,7 @@ import {
     getEffectiveMonthlyEmi,
     getEffectiveMonthlyHousehold,
     reconcileHousehold,
+    reconcileHouseholdWithInsurance,
     reconcileEmi,
     hasAnyEmiCommitment,
     isLikelySummaryEmiInHomeLoan,
@@ -145,5 +146,32 @@ describe('expenseDetailSync household snapshot', () => {
             },
         });
         expect(result.status).toBe('match');
+    });
+
+    it('reconcileHouseholdWithInsurance includes insurance in combined detail total', () => {
+        const result = reconcileHouseholdWithInsurance({
+            summaryHouseholdTotal: '50000',
+            household: { grocery: '30000', rent: '', lifestyle: '', medical: '', travel: '', education: '' },
+            insurance: {
+                health: { value: '12000', frequency: 'Annual' },
+                life: {},
+            },
+        });
+        expect(result.householdDetailTotal).toBe(30000);
+        expect(result.insuranceDetailTotal).toBe(1000);
+        expect(result.reconciliation.status).toBe('under');
+        expect(result.reconciliation.delta).toBe(19000);
+    });
+
+    it('reconcileHouseholdWithInsurance matches when household and insurance fill summary', () => {
+        const result = reconcileHouseholdWithInsurance({
+            summaryHouseholdTotal: '40000',
+            household: { grocery: '39500', rent: '', lifestyle: '', medical: '', travel: '', education: '' },
+            insurance: {
+                health: { value: '6000', frequency: 'Annual' },
+                life: {},
+            },
+        });
+        expect(result.reconciliation.status).toBe('match');
     });
 });

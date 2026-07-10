@@ -6,6 +6,8 @@
 
 import { getEffectiveMonthlyEmi, getEffectiveMonthlyHousehold } from '../DetailedFlow/expenseDetailSync';
 
+export const MIN_HEALTH_COVER = 1_000_000;
+
 function getEffectiveMonthlyNeed(expenseCategories = {}, familyMembers = []) {
     return getEffectiveMonthlyHousehold(expenseCategories, familyMembers) + getEffectiveMonthlyEmi(expenseCategories);
 }
@@ -82,6 +84,43 @@ export const calculateContingencyData = (expenseCategories, contingencyFund, fam
         daysCovered,
         isHealthy: emergencyFundHave >= emergencyFundNeeded,
         hasData: monthlyNeed > 0
+    };
+};
+
+/**
+ * Calculate health insurance gap data.
+ *
+ * Uses a fixed minimum of ₹10 Lakh for family health protection.
+ *
+ * @param {string|number} summaryHealthCover - Total health cover from summary flow
+ * @param {boolean|null} hasHealthInsurance - Whether user reported having health cover
+ * @param {Array} familyMembers - Family members (for copy context)
+ * @returns {object} Health insurance data
+ */
+export const calculateHealthInsuranceData = (summaryHealthCover, hasHealthInsurance, familyMembers = []) => {
+    const minimumRequired = MIN_HEALTH_COVER;
+    const coverageHave = hasHealthInsurance === false ? 0 : (parseFloat(summaryHealthCover) || 0);
+    const healthGap = Math.max(0, minimumRequired - coverageHave);
+
+    const coveredPercent = minimumRequired > 0
+        ? Math.min(100, Math.round((coverageHave / minimumRequired) * 100))
+        : 0;
+
+    let status = 'adequate';
+    if (hasHealthInsurance === false || coverageHave === 0) {
+        status = 'none';
+    } else if (healthGap > 0) {
+        status = 'partial';
+    }
+
+    return {
+        minimumRequired,
+        coverageHave,
+        healthGap,
+        coveredPercent,
+        hasGap: hasHealthInsurance === false || healthGap > 0,
+        status,
+        familySize: familyMembers.length
     };
 };
 
@@ -165,10 +204,11 @@ export const buildCrisisTimeline = (contingencyData, protectionData) => {
  * Build recovery action steps.
  *
  * @param {object} protectionData - From calculateProtectionData
+ * @param {object} healthData - From calculateHealthInsuranceData
  * @param {object} contingencyData - From calculateContingencyData
  * @returns {Array} Recovery steps
  */
-export const buildRecoverySteps = (protectionData, contingencyData) => {
+export const buildRecoverySteps = (protectionData, healthData, contingencyData) => {
     const steps = [];
 
     if (protectionData.hasGap) {
@@ -181,6 +221,25 @@ export const buildRecoverySteps = (protectionData, contingencyData) => {
             amount: protectionData.protectionGap,
             icon: 'shield',
             color: '#6366F1'
+        });
+    }
+
+    if (healthData.hasGap) {
+        const healthAmount = healthData.coverageHave === 0 ? healthData.minimumRequired : healthData.healthGap;
+        const healthTitle = healthData.coverageHave === 0 ? 'Get Family Health Cover' : 'Strengthen Health Cover';
+        const healthDesc = healthData.coverageHave === 0
+            ? `Get family health insurance with at least ${formatCompactSN(healthData.minimumRequired)} sum insured.`
+            : `Increase health cover by ${formatCompactSN(healthData.healthGap)} to reach the ${formatCompactSN(healthData.minimumRequired)} minimum.`;
+
+        steps.push({
+            id: 'step-health',
+            step: steps.length + 1,
+            urgency: 'High',
+            title: healthTitle,
+            description: healthDesc,
+            amount: healthAmount,
+            icon: 'heart',
+            color: '#00A9F2'
         });
     }
 

@@ -25,6 +25,8 @@ const SummaryProfile = () => {
     const retireAge = selfMember.retirementAge || 60;
     const sliderPercent = ((retireAge - 40) / (60 - 40)) * 100;
 
+    const narrative = "Good start. With your profile in place, let's now understand how money flows in and out of your household each month.";
+
     const questions = [
         // Q1: Name & Mobile
         {
@@ -152,6 +154,7 @@ const SummaryProfile = () => {
         <ProgressiveQuestionLayout
             currentStepId="profile"
             questions={questions}
+            narrative={narrative}
         />
     );
 };

@@ -492,6 +492,7 @@ const PutYourMoneyToWorkSection = () => {
                 setJourneyAdjustments={handleJourneyAdjustmentsChange}
                 defaultStartMonthIndex={effectiveMonth}
                 defaultCalendarYear={studio.meta.calendarYear}
+                selectableMonths={studio.selectableMonths}
                 onSaveAdjustments={handleSaveAdjustments}
                 adjustmentsSaved={adjustmentsSaved}
                 saveMessage={adjustmentSaveMessage}

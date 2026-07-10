@@ -90,6 +90,36 @@ export function getSelectableMonths(planStartMonth = 0, currentMonth = new Date(
     return months;
 }
 
+export function computeJourneyAdjustmentImpactForMonth(
+    journeyAdjustments = [],
+    calendarYear,
+    monthIndex,
+) {
+    const month = monthIndex + 1;
+    let deduction = 0;
+
+    journeyAdjustments.forEach((adj) => {
+        const startYear = parseInt(adj.startYear, 10) || calendarYear;
+        const startMonth = parseInt(adj.startMonth, 10) || 1;
+
+        if (adj.type === 'loan') {
+            const tenureMonths = parseInt(adj.tenure, 10) || 12;
+            const emi = parseAmount(adj.emi);
+            const loanStartAbsolute = (startYear * 12) + startMonth;
+            const loanEndAbsolute = loanStartAbsolute + tenureMonths - 1;
+            const currentAbsolute = (calendarYear * 12) + month;
+
+            if (currentAbsolute >= loanStartAbsolute && currentAbsolute <= loanEndAbsolute) {
+                deduction += emi;
+            }
+        } else if (startYear === calendarYear && startMonth === month) {
+            deduction += parseAmount(adj.amount);
+        }
+    });
+
+    return Math.round(deduction);
+}
+
 export function summarizeJourneyConstraints(journeyAdjustments = [], journeyProjections = [], calendarYear) {
     if (!journeyAdjustments.length) {
         return { items: [], hasItems: false, totalAnnualImpact: 0 };
@@ -610,7 +640,15 @@ export function buildAllocationStudioContext({
         : 0;
 
     const allocationsSummary = summarizeInvestmentAllocations(investmentAllocations);
-    const deployableSurplus = Math.max(0, monthlyFreeCash - allocationsSummary.monthlyCommitted);
+    const journeyMonthDeduction = computeJourneyAdjustmentImpactForMonth(
+        journeyAdjustments,
+        calendarYear,
+        monthIndex,
+    );
+    const deployableSurplus = Math.max(
+        0,
+        monthlyFreeCash - allocationsSummary.monthlyCommitted - journeyMonthDeduction,
+    );
 
     const protectionData = calculateProtectionData(expenseCategories, summaryLifeCover, familyMembers);
     const contingencyData = calculateContingencyData(
@@ -687,6 +725,7 @@ export function buildAllocationStudioContext({
             monthlyFreeCash,
             deployableSurplus,
             monthlyCommitted: allocationsSummary.monthlyCommitted,
+            journeyMonthDeduction,
             journeyYearSurplus,
             ytdUnallocated: moneyFlowReport.totals?.ytdUnallocated || 0,
         },

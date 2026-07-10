@@ -9,6 +9,7 @@ import {
     deriveLifeMemberTotals,
     applyLifeEntryUpdate,
     getLifeMemberMonthlyTotal,
+    getInsuranceMonthlyTotal,
 } from './insuranceDetailSync';
 
 describe('insuranceDetailSync cover reconciliation', () => {
@@ -120,5 +121,19 @@ describe('deriveLifeMemberTotals frequency preservation', () => {
         expect(updated.value).toBe('18000');
         expect(updated.frequency).toBe('Half Yearly');
         expect(updated.premiums[0]).toEqual({ amount: '18000', frequency: 'Half Yearly' });
+    });
+});
+
+describe('getInsuranceMonthlyTotal', () => {
+    it('sums health, vehicle, and life premiums as monthly amounts', () => {
+        const total = getInsuranceMonthlyTotal({
+            health: { value: '12000', frequency: 'Annual' },
+            car: { value: '3000', frequency: 'Quarterly' },
+            life: {
+                Self: { value: '24000', frequency: 'Annual' },
+            },
+            policyDocs: { health: 'policy.pdf' },
+        });
+        expect(total).toBe(4000);
     });
 });

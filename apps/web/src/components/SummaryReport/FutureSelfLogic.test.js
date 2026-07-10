@@ -7,7 +7,8 @@ import {
     enrichGoal,
     projectFutureSurplusFV,
     buildFutureSelfReport,
-    getValidGoals
+    getValidGoals,
+    getMonthlyInvestmentForProjection
 } from './FutureSelfLogic';
 
 describe('FutureSelfLogic', () => {
@@ -89,5 +90,63 @@ describe('FutureSelfLogic', () => {
             householdInflationPct: 6
         });
         expect(fv).toBeGreaterThan(0);
+    });
+
+    it('uses summaryMonthlyInvestments when savings.sip is empty', () => {
+        const result = getMonthlyInvestmentForProjection({
+            savings: { sip: '' },
+            summaryMonthlyInvestments: '15000',
+            summaryOtherSavings: '5000',
+        });
+        expect(result).toEqual({ amount: 15000, source: 'summary_consolidated' });
+    });
+
+    it('prefers detailed SIP over summaryMonthlyInvestments', () => {
+        const result = getMonthlyInvestmentForProjection({
+            savings: { sip: { amount: '12000' } },
+            summaryMonthlyInvestments: '15000',
+        });
+        expect(result).toEqual({ amount: 12000, source: 'detailed_sip' });
+    });
+
+    it('projects current investments for summary-flow near-term goals', () => {
+        const report = buildFutureSelfReport({
+            goals: [{ name: 'Car', presentValue: 800000, yearsToGoal: 3, inflationRate: 6 }],
+            cashFlowResults: {
+                totalIncome: 100000,
+                categorySums: { household: 40000, emi: 10000, insurance: 5000 },
+                totalSavings: 15000,
+            },
+            expenseCategories: {
+                savings: { sip: '' },
+                summaryMonthlyInvestments: '15000',
+            },
+            inflationRates: { incomeIncrement: 10, householdInflation: 6 },
+        });
+
+        expect(report.nearTermGoals).toHaveLength(1);
+        expect(report.nearTermGoals[0].projectedCurrentSips).toBeGreaterThan(0);
+        expect(report.nearTermGoals[0].investmentProjectionSource).toBe('summary_consolidated');
+        expect(report.cashSnapshot.currentMonthlyInvestment).toBe(15000);
+    });
+
+    it('sorts near-term readiness goals by target year ascending', () => {
+        const report = buildFutureSelfReport({
+            goals: [
+                { name: 'Vacation', presentValue: 500000, yearsToGoal: 5, inflationRate: 6 },
+                { name: 'Car', presentValue: 800000, yearsToGoal: 2, inflationRate: 6 },
+                { name: 'Bike', presentValue: 200000, yearsToGoal: 1, inflationRate: 6 },
+            ],
+            cashFlowResults: {
+                totalIncome: 100000,
+                categorySums: { household: 40000, emi: 10000, insurance: 5000 },
+                totalSavings: 15000,
+            },
+            expenseCategories: { savings: { sip: '15000' } },
+            inflationRates: { incomeIncrement: 10, householdInflation: 6 },
+        }, 2026);
+
+        expect(report.nearTermGoals.map((g) => g.name)).toEqual(['Bike', 'Car', 'Vacation']);
+        expect(report.nearTermGoals.map((g) => g.targetYear)).toEqual([2027, 2028, 2031]);
     });
 });

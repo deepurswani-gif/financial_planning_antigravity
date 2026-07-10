@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect, useState, useRef } from 'react';
-import { Shield, ShieldAlert, ShieldCheck, AlertTriangle, AlertOctagon, Umbrella, Wallet, Clock, TrendingDown, CheckCircle2, ArrowRight, Info, Zap, Target, Send, Check } from 'lucide-react';
+import { Shield, ShieldAlert, ShieldCheck, AlertTriangle, AlertOctagon, Umbrella, Wallet, Clock, TrendingDown, CheckCircle2, ArrowRight, Info, Zap, Target, Send, Check, Heart } from 'lucide-react';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency } from '../CashFlowModule/CashFlowLogic';
@@ -13,6 +13,7 @@ import {
 import {
     calculateProtectionData,
     calculateContingencyData,
+    calculateHealthInsuranceData,
     buildCrisisTimeline,
     buildRecoverySteps,
     formatCompactSN
@@ -311,6 +312,8 @@ const SafetyNetSection = () => {
         familyMembers,
         expenseCategories,
         summaryLifeCover,
+        summaryHealthCover,
+        hasHealthInsurance,
         contingencyFund,
         assetCategories
     } = useFinancialPlan();
@@ -326,20 +329,25 @@ const SafetyNetSection = () => {
         return calculateContingencyData(expenseCategories, emergencyCash, familyMembers);
     }, [expenseCategories, contingencyFund, assetCategories, familyMembers]);
 
+    const healthData = useMemo(
+        () => calculateHealthInsuranceData(summaryHealthCover, hasHealthInsurance, familyMembers),
+        [summaryHealthCover, hasHealthInsurance, familyMembers]
+    );
+
     const crisisTimeline = useMemo(
         () => buildCrisisTimeline(contingencyData, protectionData),
         [contingencyData, protectionData]
     );
 
     const recoverySteps = useMemo(
-        () => buildRecoverySteps(protectionData, contingencyData),
-        [protectionData, contingencyData]
+        () => buildRecoverySteps(protectionData, healthData, contingencyData),
+        [protectionData, healthData, contingencyData]
     );
 
     const selfMember = familyMembers.find(m => m.relation?.toLowerCase() === 'self');
     const userName = selfMember?.name?.split(' ')[0] || 'there';
 
-    const hasAnyGap = protectionData.hasGap || contingencyData.gap > 0;
+    const hasAnyGap = protectionData.hasGap || contingencyData.gap > 0 || healthData.hasGap;
 
     // ── No data guard ──
     if (!protectionData.hasData) {
@@ -642,7 +650,124 @@ const SafetyNetSection = () => {
             </RevealSection>
 
             {/* ══════════════════════════════════════════════
-                SECTION 4 — RECOVERY PLAN
+                SECTION 4 — HEALTH PROTECTION
+               ══════════════════════════════════════════════ */}
+            <div className="sn-section-divider" style={{ marginTop: '4rem' }}>
+                <div className="sn-divider-line" />
+                <span className="sn-divider-label">HEALTH PROTECTION — Medical Security</span>
+                <div className="sn-divider-line" />
+            </div>
+
+            <RevealSection className="sn-hero-block">
+                <p className="sn-contingency-question">
+                    If a major hospitalization happened tomorrow, would your family's health cover handle it without touching savings?
+                </p>
+                <CircularGauge percent={healthData.coveredPercent} />
+                <div className="sn-hero-gradient-bar" />
+            </RevealSection>
+
+            <RevealSection className="sn-stat-strip-3" delay={200}>
+                <div className="sn-stat-card-glass">
+                    <div className="sn-stat-glass-icon" style={{ background: 'rgba(0, 169, 242, 0.1)', color: '#00A9F2' }}>
+                        <Target size={22} />
+                    </div>
+                    <span className="sn-stat-glass-label">Recommended Cover</span>
+                    <span className="sn-stat-glass-value">{formatCurrency(healthData.minimumRequired)}</span>
+                    <span className="sn-stat-glass-note">Minimum for family health protection</span>
+                </div>
+                <div className="sn-stat-card-glass">
+                    <div className="sn-stat-glass-icon" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10B981' }}>
+                        <Heart size={22} />
+                    </div>
+                    <span className="sn-stat-glass-label">Cover You Have</span>
+                    <span className="sn-stat-glass-value">
+                        {healthData.coverageHave > 0 ? formatCurrency(healthData.coverageHave) : 'None'}
+                    </span>
+                    <span className="sn-stat-glass-note">Personal, floater & employer cover</span>
+                </div>
+                <div className="sn-stat-card-glass" style={{ borderColor: healthData.hasGap ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)' }}>
+                    <div className="sn-stat-glass-icon" style={{ background: healthData.hasGap ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)', color: healthData.hasGap ? '#EF4444' : '#10B981' }}>
+                        {healthData.hasGap ? <TrendingDown size={22} /> : <CheckCircle2 size={22} />}
+                    </div>
+                    <span className="sn-stat-glass-label">Health Cover Gap</span>
+                    <span className="sn-stat-glass-value" style={{ color: healthData.hasGap ? '#EF4444' : '#10B981' }}>
+                        {healthData.hasGap ? formatCurrency(healthData.healthGap) : 'Nil ✓'}
+                    </span>
+                    <span className="sn-stat-glass-note">{healthData.hasGap ? 'Needs attention' : 'Meets minimum'}</span>
+                </div>
+            </RevealSection>
+
+            <RevealSection className="sn-insight-card" delay={300}>
+                <div className="sn-insight-icon-wrapper">
+                    <Heart size={24} />
+                </div>
+                <div className="sn-insight-content">
+                    <p className="sn-insight-text">
+                        {healthData.status === 'none' && (
+                            <>
+                                A single major hospitalization can cost ₹3–8 Lakh or more. Without health insurance, your emergency fund and long-term goals become the first line of defence — and they get depleted fast. We recommend a minimum sum insured of{' '}
+                                <span className="sn-insight-highlight">{formatCurrency(healthData.minimumRequired)}</span> for family health protection.
+                            </>
+                        )}
+                        {healthData.status === 'partial' && (
+                            <>
+                                Your current cover of{' '}
+                                <span className="sn-insight-highlight">{formatCurrency(healthData.coverageHave)}</span>{' '}
+                                is about{' '}
+                                <span className="sn-insight-highlight">{healthData.coveredPercent}%</span>{' '}
+                                of the recommended minimum. A serious illness could still force you to dip into savings or take loans. Consider increasing cover by{' '}
+                                <span className="sn-insight-highlight">{formatCurrency(healthData.healthGap)}</span>.
+                            </>
+                        )}
+                        {healthData.status === 'adequate' && (
+                            <>
+                                Your family's health cover of{' '}
+                                <span className="sn-insight-highlight">{formatCurrency(healthData.coverageHave)}</span>{' '}
+                                meets the minimum of{' '}
+                                <span className="sn-insight-highlight">{formatCurrency(healthData.minimumRequired)}</span>{' '}
+                                we recommend. Keep policies renewed and review cover every few years as medical costs rise.
+                            </>
+                        )}
+                    </p>
+                </div>
+            </RevealSection>
+
+            <RevealSection className="sn-year-bar-section" delay={400}>
+                <h4 className="sn-year-bar-title">Health Cover vs Recommended Minimum</h4>
+                <div className="sn-year-bar-container">
+                    <div className="sn-year-bar-track">
+                        <div
+                            className="sn-year-bar-fill"
+                            style={{
+                                width: `${Math.max(healthData.coveredPercent, healthData.coverageHave > 0 ? 8 : 0)}%`,
+                                background: healthData.coveredPercent >= 100
+                                    ? 'linear-gradient(90deg, #10B981, #059669)'
+                                    : healthData.coveredPercent >= 40
+                                    ? 'linear-gradient(90deg, #F59E0B, #D97706)'
+                                    : 'linear-gradient(90deg, #EF4444, #DC2626)'
+                            }}
+                        >
+                            {healthData.coverageHave > 0 && (
+                                <span className="sn-year-bar-label">{formatCompactSN(healthData.coverageHave)}</span>
+                            )}
+                        </div>
+                    </div>
+                    <div className="sn-year-bar-markers">
+                        <span className="sn-year-marker">₹0</span>
+                        <span className="sn-year-marker">{formatCompactSN(healthData.minimumRequired)}</span>
+                    </div>
+                </div>
+            </RevealSection>
+
+            <RevealSection className="sn-narrative-block" delay={500}>
+                <p className="sn-narrative-note">
+                    <Info size={14} />
+                    <span>Include personal policies, family floater plans, and employer-provided cover when assessing your total health cover.</span>
+                </p>
+            </RevealSection>
+
+            {/* ══════════════════════════════════════════════
+                SECTION 5 — RECOVERY PLAN
                ══════════════════════════════════════════════ */}
             {recoverySteps.length > 0 && (
                 <>
@@ -659,7 +784,7 @@ const SafetyNetSection = () => {
                                     Step {step.step}
                                 </div>
                                 <div className="sn-recovery-icon" style={{ background: `${step.color}15`, color: step.color }}>
-                                    {step.icon === 'shield' ? <Shield size={28} /> : <Wallet size={28} />}
+                                    {step.icon === 'shield' ? <Shield size={28} /> : step.icon === 'heart' ? <Heart size={28} /> : <Wallet size={28} />}
                                 </div>
                                 <div className="sn-recovery-urgency">
                                     <Zap size={14} />

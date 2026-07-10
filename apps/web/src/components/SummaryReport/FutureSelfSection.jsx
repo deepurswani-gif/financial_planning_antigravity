@@ -341,7 +341,7 @@ const FutureSelfSection = () => {
                                     <span className="fs-metric-value">{formatCurrency(goal.futureCost)}</span>
                                 </div>
                                 <div className="fs-readiness-metric">
-                                    <span className="fs-metric-label">Projected Value of Current SIPs by {goal.targetYear}</span>
+                                    <span className="fs-metric-label">Projected value of current monthly investments by {goal.targetYear}</span>
                                     <span className="fs-metric-value">{formatCurrency(goal.projectedCurrentSips)}</span>
                                 </div>
                                 <div className="fs-readiness-metric">
@@ -355,8 +355,11 @@ const FutureSelfSection = () => {
                                 <span>
                                     As your income grows over time, the amount available for future savings and investments is also expected to increase.
                                     Thoughtful allocation of this growing surplus can significantly improve your ability to achieve important life goals.
-                                    Projections assume income growth at {goal.incomeGrowthPct}% p.a., household inflation at {goal.householdInflationPct}%,
-                                    and investment returns at {DEFAULT_INVESTMENT_CAGR}% on monthly SIP and surplus allocations.
+                                    {goal.investmentProjectionSource === 'summary_consolidated' && (
+                                        <> Your monthly investment total from the summary flow (SIPs, mutual funds, stocks, retirement contributions, etc.) is assumed to be invested monthly at {DEFAULT_INVESTMENT_CAGR}% CAGR until your goal year. Safer savings such as FDs and RDs are excluded from this projection.</>
+                                    )}
+                                    {' '}Projections assume income growth at {goal.incomeGrowthPct}% p.a., household inflation at {goal.householdInflationPct}%,
+                                    and investment returns at {DEFAULT_INVESTMENT_CAGR}% on monthly investments and surplus allocations.
                                 </span>
                             </p>
 

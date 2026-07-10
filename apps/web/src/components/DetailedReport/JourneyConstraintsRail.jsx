@@ -11,6 +11,7 @@ const JourneyConstraintsRail = ({
     setJourneyAdjustments,
     defaultStartMonthIndex = new Date().getMonth(),
     defaultCalendarYear = new Date().getFullYear(),
+    selectableMonths = [],
     onSaveAdjustments,
     adjustmentsSaved = false,
     saveMessage = '',
@@ -18,6 +19,9 @@ const JourneyConstraintsRail = ({
     const defaultStartMonth = Math.min(12, Math.max(1, defaultStartMonthIndex + 1));
     const monthLabel = (month) => new Date(2000, Math.max(0, (month || 1) - 1), 1)
         .toLocaleString('default', { month: 'short' });
+    const standardExpenseMonths = selectableMonths.length > 0
+        ? selectableMonths
+        : [{ monthIndex: defaultStartMonthIndex, label: monthLabel(defaultStartMonth) }];
     const standardExpenses = journeyAdjustments.filter((adj) => (adj.type || 'expense') !== 'loan');
     const futureLoans = journeyAdjustments.filter((adj) => (adj.type || 'expense') === 'loan');
 
@@ -36,6 +40,15 @@ const JourneyConstraintsRail = ({
         if (!setJourneyAdjustments) return;
         setJourneyAdjustments((prev) => prev.map((adj) => (
             adj.id === id ? { ...adj, [field]: value } : adj
+        )));
+    };
+
+    const updateStandardExpense = (id, field, value) => {
+        if (!setJourneyAdjustments) return;
+        setJourneyAdjustments((prev) => prev.map((adj) => (
+            adj.id === id
+                ? { ...adj, [field]: value, startYear: defaultCalendarYear }
+                : adj
         )));
     };
 
@@ -113,7 +126,7 @@ const JourneyConstraintsRail = ({
                                     <input
                                         type="text"
                                         value={adj.name || ''}
-                                        onChange={(e) => updateAdjustment(adj.id, 'name', e.target.value)}
+                                        onChange={(e) => updateStandardExpense(adj.id, 'name', e.target.value)}
                                         placeholder="e.g. Vacation or laptop purchase"
                                     />
                                 </div>
@@ -121,11 +134,11 @@ const JourneyConstraintsRail = ({
                                     <label>Occurs in month</label>
                                     <select
                                         value={adj.startMonth || defaultStartMonth}
-                                        onChange={(e) => updateAdjustment(adj.id, 'startMonth', parseInt(e.target.value, 10))}
+                                        onChange={(e) => updateStandardExpense(adj.id, 'startMonth', parseInt(e.target.value, 10))}
                                     >
-                                        {[...Array(12)].map((_, i) => (
-                                            <option key={i + 1} value={i + 1}>
-                                                {monthLabel(i + 1)}
+                                        {standardExpenseMonths.map((m) => (
+                                            <option key={m.monthIndex} value={m.monthIndex + 1}>
+                                                {m.label}
                                             </option>
                                         ))}
                                     </select>
@@ -134,9 +147,10 @@ const JourneyConstraintsRail = ({
                                     <label>Occurs in year</label>
                                     <input
                                         type="number"
-                                        value={adj.startYear || defaultCalendarYear}
-                                        min={defaultCalendarYear}
-                                        onChange={(e) => updateAdjustment(adj.id, 'startYear', parseInt(e.target.value, 10) || defaultCalendarYear)}
+                                        value={defaultCalendarYear}
+                                        readOnly
+                                        disabled
+                                        aria-label="Occurs in year"
                                     />
                                 </div>
                                 <div className="input-group">
@@ -145,8 +159,17 @@ const JourneyConstraintsRail = ({
                                         type="number"
                                         value={adj.amount || ''}
                                         onChange={(e) => {
-                                            updateAdjustment(adj.id, 'amount', e.target.value);
-                                            updateAdjustment(adj.id, 'duration', 1);
+                                            if (!setJourneyAdjustments) return;
+                                            setJourneyAdjustments((prev) => prev.map((item) => (
+                                                item.id === adj.id
+                                                    ? {
+                                                        ...item,
+                                                        amount: e.target.value,
+                                                        duration: 1,
+                                                        startYear: defaultCalendarYear,
+                                                    }
+                                                    : item
+                                            )));
                                         }}
                                     />
                                 </div>

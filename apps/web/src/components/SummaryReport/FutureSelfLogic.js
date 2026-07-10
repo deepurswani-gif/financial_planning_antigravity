@@ -4,6 +4,7 @@
  */
 
 import { calculateFutureCost } from '../GoalModule/GoalLogic';
+import { getSavingsMonthlyAmount } from '../DetailedFlow/savingsDetailSync';
 import { computeSIPProjection } from './MoneyStoryLogic';
 
 export const HORIZON_YEARS = 5;
@@ -30,6 +31,25 @@ export const getValidGoals = (goals) =>
     (goals || []).filter((g) => (parseFloat(g.presentValue) || 0) > 0 && (parseFloat(g.yearsToGoal) || 0) > 0);
 
 /**
+ * Monthly investment amount used for goal-readiness projections.
+ * Prefers detailed-flow SIP; falls back to summary-flow consolidated investments.
+ * Excludes safer "other savings" (FDs, RDs, etc.).
+ */
+export const getMonthlyInvestmentForProjection = (expenseCategories = {}) => {
+    const sipAmount = getSavingsMonthlyAmount(expenseCategories.savings?.sip);
+    if (sipAmount > 0) {
+        return { amount: sipAmount, source: 'detailed_sip' };
+    }
+
+    const summaryInvest = parseFloat(expenseCategories.summaryMonthlyInvestments) || 0;
+    if (summaryInvest > 0) {
+        return { amount: summaryInvest, source: 'summary_consolidated' };
+    }
+
+    return { amount: 0, source: 'none' };
+};
+
+/**
  * Cash-flow snapshot for income journey & surplus projections.
  */
 export const buildCashFlowSnapshot = (cashFlowResults, expenseCategories) => {
@@ -41,7 +61,8 @@ export const buildCashFlowSnapshot = (cashFlowResults, expenseCategories) => {
     const fixedOutflow = emiMonthly + insuranceMonthly + savingsMonthly;
     const monthlyCommitted = householdMonthly + fixedOutflow;
     const monthlySurplus = Math.max(0, monthlyIncome - monthlyCommitted);
-    const currentMonthlySip = parseFloat(expenseCategories?.savings?.sip) || 0;
+    const { amount: currentMonthlyInvestment, source: investmentProjectionSource } =
+        getMonthlyInvestmentForProjection(expenseCategories);
 
     return {
         monthlyIncome,
@@ -52,7 +73,8 @@ export const buildCashFlowSnapshot = (cashFlowResults, expenseCategories) => {
         fixedOutflow,
         monthlyCommitted,
         monthlySurplus,
-        currentMonthlySip
+        currentMonthlyInvestment,
+        investmentProjectionSource
     };
 };
 
@@ -130,7 +152,7 @@ export const buildGoalReadiness = (enrichedGoal, cashSnapshot, inflationRates) =
     const householdInflationPct = parseFloat(inflationRates?.householdInflation) || 6;
 
     const projectedCurrentSips = computeSIPProjection(
-        cashSnapshot.currentMonthlySip,
+        cashSnapshot.currentMonthlyInvestment,
         DEFAULT_INVESTMENT_CAGR,
         enrichedGoal.yearsToGoal
     ).futureValue;
@@ -160,6 +182,7 @@ export const buildGoalReadiness = (enrichedGoal, cashSnapshot, inflationRates) =
         coveragePercent,
         incomeGrowthPct,
         householdInflationPct,
+        investmentProjectionSource: cashSnapshot.investmentProjectionSource,
         comfortableMessage:
             'Your current financial path indicates that this goal is comfortably achievable if your savings and income trends continue as expected.',
         gapMessage:
@@ -221,7 +244,8 @@ export const buildFutureSelfReport = ({
     const enrichedGoals = validGoals.map((g) => enrichGoal(g, currentYear));
     const nearTermGoals = enrichedGoals
         .filter((g) => g.isNearTerm)
-        .map((g) => buildGoalReadiness(g, cashSnapshot, inflationRates));
+        .map((g) => buildGoalReadiness(g, cashSnapshot, inflationRates))
+        .sort((a, b) => a.targetYear - b.targetYear || a.yearsToGoal - b.yearsToGoal);
     const longTermGoals = enrichedGoals
         .filter((g) => !g.isNearTerm)
         .sort((a, b) => a.targetYear - b.targetYear);

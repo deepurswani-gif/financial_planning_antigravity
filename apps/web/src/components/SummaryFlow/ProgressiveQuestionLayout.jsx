@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, ArrowRight, ArrowLeft, Sparkles } from 'luci
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { loadSummaryUiDraft, patchSummaryUiDraft } from '../../lib/summaryFlowStorage';
+import QuestionProgressBar from './QuestionProgressBar';
 
 const steps = [
     { id: 'profile', label: 'Profile', path: '/summary-flow/profile' },
@@ -235,6 +236,10 @@ const ProgressiveQuestionLayout = ({
 
             {/* Question content area */}
             <div className="progressive-question-shell">
+                <QuestionProgressBar
+                    totalQuestions={questions.length}
+                    currentIndex={currentIndex}
+                />
                 <AnimatePresence mode="wait" custom={direction}>
                     <motion.div
                         key={currentStepId + '-' + currentIndex}
@@ -252,18 +257,6 @@ const ProgressiveQuestionLayout = ({
                         {questions[currentIndex]?.content}
                     </motion.div>
                 </AnimatePresence>
-
-                {/* Question dots */}
-                {questions.length > 1 && (
-                    <div className="question-dots">
-                        {questions.map((_, idx) => (
-                            <div 
-                                key={idx}
-                                className={`question-dot ${idx === currentIndex ? 'active' : ''} ${idx < currentIndex ? 'completed' : ''}`}
-                            />
-                        ))}
-                    </div>
-                )}
 
                 {/* Inter-step navigation buttons */}
                 <div className="step-nav-bar">

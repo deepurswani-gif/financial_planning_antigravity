@@ -18,6 +18,7 @@ import {
 } from './insuranceDetailSync';
 import ReconciliationStatus from './ReconciliationStatus';
 import ReconciliationStickyPanel from './ReconciliationStickyPanel';
+import HouseholdInsuranceReconciliationPanel from './HouseholdInsuranceReconciliationPanel';
 
 const formatInr = (val) => {
     if (!val || isNaN(val)) return '₹0';
@@ -369,6 +370,10 @@ export function useInsurancePremiumQuestions() {
                     <div className="question-container">
                         <p className="question-narrative">Let&apos;s start with health cover.</p>
                         <h2 className="question-title">Health Insurance</h2>
+                    <HouseholdInsuranceReconciliationPanel
+                        expenseCategories={expenseCategories}
+                        familyMembers={familyMembers}
+                    />
                         <div className="question-fields" style={{ maxWidth: '420px', margin: '0 auto', gap: '1rem' }}>
                             {renderInsuranceLine(
                                 'health',
@@ -391,6 +396,10 @@ export function useInsurancePremiumQuestions() {
                             : 'Now tell us about life insurance premiums for your family.'}
                     </p>
                     <h2 className="question-title">Life Insurance Premium</h2>
+                    <HouseholdInsuranceReconciliationPanel
+                        expenseCategories={expenseCategories}
+                        familyMembers={familyMembers}
+                    />
                     <ReconciliationStickyPanel visible={showLifePremiumPanel}>
                         <div className="reconciliation-sticky-panel__title">Summary vs detailed premium</div>
                         {lifePremiumReconciliations.length > 0 ? (
@@ -480,6 +489,10 @@ export function useInsurancePremiumQuestions() {
                 <div className="question-container">
                     <p className="question-narrative">Almost done with insurance — vehicle and other covers.</p>
                     <h2 className="question-title">Car, two-wheeler &amp; other insurance</h2>
+                    <HouseholdInsuranceReconciliationPanel
+                        expenseCategories={expenseCategories}
+                        familyMembers={familyMembers}
+                    />
                     <div className="question-fields" style={{ maxWidth: '420px', margin: '0 auto', gap: '1rem', textAlign: 'left' }}>
                         {renderInsuranceLine(
                             'car',
@@ -506,7 +519,7 @@ export function useInsurancePremiumQuestions() {
     }, [
         insurance, policyDocs, adultLifeMembers, childLifeMembers, lifeMap,
         lifePremiumReconciliations, showLifePremiumPanel, summaryLifePremiums,
-        skipHealthInsuranceQuestion, hasLifeInsurance, policies,
+        skipHealthInsuranceQuestion, hasLifeInsurance, policies, expenseCategories, familyMembers,
         handleInsurancePremiumChange, handlePolicyDocChange, updateLifeMember,
     ]);
 

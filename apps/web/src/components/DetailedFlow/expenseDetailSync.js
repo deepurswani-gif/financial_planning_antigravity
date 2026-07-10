@@ -1,8 +1,8 @@
-/** Sum user-entered monthly education per child. */
+import { sumChildrenMonthlyEducation } from './educationExpenseSync';
+
+/** Sum monthly education per child (manual or derived from profile fields). */
 export function sumUserEducationFromChildren(familyMembers = []) {
-    return familyMembers
-        .filter((m) => m.relation === 'Child')
-        .reduce((sum, m) => sum + (parseFloat(m.monthlyEducationExpense) || 0), 0);
+    return sumChildrenMonthlyEducation(familyMembers);
 }
 
 export function sumHouseholdExceptEducation(household = {}) {
@@ -129,6 +129,7 @@ export function getEffectiveMonthlyHousehold(expenseCategories = {}, familyMembe
     return parseFloat(expenseCategories.summaryHouseholdTotal) || 0;
 }
 
+import { getInsuranceMonthlyTotal } from './insuranceDetailSync';
 import { reconcileAmounts, RECONCILE_TOLERANCE } from './detailReconcile';
 
 export { reconcileAmounts, RECONCILE_TOLERANCE };
@@ -136,6 +137,20 @@ export function reconcileHousehold(expenseCategories = {}, familyMembers = []) {
     const summaryTotal = parseFloat(expenseCategories.summaryHouseholdTotal) || 0;
     const detailTotal = getHouseholdBreakdownTotal(expenseCategories, familyMembers);
     return reconcileAmounts(summaryTotal, detailTotal);
+}
+
+/** Summary household anchor vs detailed household + insurance (premiums may sit inside summary total). */
+export function reconcileHouseholdWithInsurance(expenseCategories = {}, familyMembers = []) {
+    const summaryTotal = parseFloat(expenseCategories.summaryHouseholdTotal) || 0;
+    const householdDetailTotal = getHouseholdBreakdownTotal(expenseCategories, familyMembers);
+    const insuranceDetailTotal = getInsuranceMonthlyTotal(expenseCategories.insurance || {});
+    const combinedDetailTotal = householdDetailTotal + insuranceDetailTotal;
+    return {
+        householdDetailTotal,
+        insuranceDetailTotal,
+        combinedDetailTotal,
+        reconciliation: reconcileAmounts(summaryTotal, combinedDetailTotal),
+    };
 }
 
 export function reconcileEmi(expenseCategories = {}) {

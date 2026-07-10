@@ -30,6 +30,21 @@ export function emptyLifeEntry() {
     return { policyCount: 0, premiums: [], value: '', frequency: 'Annual' };
 }
 
+/** Sum all detailed insurance premiums (life per member + health/car/bike/others) as monthly INR. */
+export function getInsuranceMonthlyTotal(insurance = {}) {
+    return Object.entries(insurance).reduce((sum, [key, item]) => {
+        if (key === 'life') {
+            return sum + Object.values(item || {}).reduce(
+                (lifeSum, lifeItem) => lifeSum + getLifeMemberMonthlyTotal(migrateLifeEntry(lifeItem)),
+                0,
+            );
+        }
+        if (key === 'policyDocs') return sum;
+        if (!item || typeof item !== 'object' || item.value === undefined) return sum;
+        return sum + convertToMonthly(item.value, item.frequency);
+    }, 0);
+}
+
 export function getLifeMemberMonthlyTotal(entry) {
     if (!entry) return 0;
     if (Array.isArray(entry.premiums) && entry.premiums.length > 0) {

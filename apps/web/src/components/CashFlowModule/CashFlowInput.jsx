@@ -6,6 +6,7 @@ import InvestmentDetailsModal from './InvestmentDetailsModal';
 import DocumentUploadButton from '../common/DocumentUploadButton';
 import CurrencyInput from '../common/CurrencyInput';
 import { MONTH_LABELS_LONG } from '../DetailedReport/moneyFlowLedgerLogic';
+import { formatEducationMonthlyTotal } from '../DetailedFlow/educationExpenseSync';
 
 const CashFlowInput = ({ familyMembers, income, setIncome, expenseCategories, setExpenseCategories, currentYearLedger, setCurrentYearLedger, subStep, planStartMonth = 0, hasSpouseIncome = false }) => {
     const [activeModal, setActiveModal] = useState(null);
@@ -76,21 +77,9 @@ const CashFlowInput = ({ familyMembers, income, setIncome, expenseCategories, se
 
     // Auto-fill Children Education Expense
     React.useEffect(() => {
-        let totalEducationMonthly = 0;
-        familyMembers.forEach(member => {
-            if (member.relation === 'Child') {
-                if (member.occupation === 'School' && member.annualSchoolFee) {
-                    totalEducationMonthly += (parseFloat(member.annualSchoolFee) || 0) / 12;
-                } else if (member.occupation === 'College' && member.costOfCompleteCourse && member.courseDuration) {
-                    const totalCost = parseFloat(member.costOfCompleteCourse) || 0;
-                    const durationYears = parseFloat(member.courseDuration) || 1;
-                    totalEducationMonthly += totalCost / (durationYears * 12);
-                }
-            }
-        });
-
-        if (totalEducationMonthly > 0) {
-            handleExpenseChange('household', 'education', Math.round(totalEducationMonthly).toString());
+        const education = formatEducationMonthlyTotal(familyMembers);
+        if (education) {
+            handleExpenseChange('household', 'education', education);
         }
     }, [familyMembers]);
 

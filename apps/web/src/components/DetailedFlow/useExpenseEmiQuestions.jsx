@@ -2,15 +2,18 @@ import { useMemo, useState, useCallback, useEffect } from 'react';
 import { Pencil, Check } from 'lucide-react';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 import {
+    formatEducationMonthlyTotal,
+    prefillChildMonthlyEducationExpense,
+} from './educationExpenseSync';
+import {
     initializeExpenseSnapshots,
-    sumHouseholdExceptEducation,
     sumHouseholdIncludingEducation,
     sumConfiguredEmis,
     sumUserEducationFromChildren,
-    reconcileHousehold,
     reconcileEmi,
     EMI_LOAN_KEYS,
 } from './expenseDetailSync';
+import HouseholdInsuranceReconciliationPanel from './HouseholdInsuranceReconciliationPanel';
 import ReconciliationStatus from './ReconciliationStatus';
 import ReconciliationStickyPanel from './ReconciliationStickyPanel';
 
@@ -68,21 +71,21 @@ export function useExpenseEmiQuestions() {
         setFamilyMembers(prev => {
             let changed = false;
             const next = prev.map((m) => {
-                if (m.relation !== 'Child' || m.monthlyEducationExpense) return m;
-                if (m.occupation === 'School' && m.annualSchoolFee) {
+                if (m.relation !== 'Child') return m;
+                const prefilled = prefillChildMonthlyEducationExpense(m);
+                if (prefilled.monthlyEducationExpense !== m.monthlyEducationExpense) {
                     changed = true;
-                    return {
-                        ...m,
-                        monthlyEducationExpense: String(Math.round(parseFloat(m.annualSchoolFee) / 12)),
-                    };
+                    return prefilled;
                 }
                 return m;
             });
             if (!changed) return prev;
-            const total = sumUserEducationFromChildren(next);
             setExpenseCategories((ec) => ({
                 ...ec,
-                household: { ...ec.household, education: total ? String(total) : '' },
+                household: {
+                    ...ec.household,
+                    education: formatEducationMonthlyTotal(next),
+                },
             }));
             return next;
         });
@@ -96,12 +99,11 @@ export function useExpenseEmiQuestions() {
     const summaryEmiTotal = expenseCategories.summaryEmiTotal || '';
 
     const syncEducationTotal = useCallback((members) => {
-        const total = sumUserEducationFromChildren(members);
         setExpenseCategories(prev => ({
             ...prev,
             household: {
                 ...prev.household,
-                education: total ? String(total) : '',
+                education: formatEducationMonthlyTotal(members),
             },
         }));
     }, [setExpenseCategories]);
@@ -150,7 +152,6 @@ export function useExpenseEmiQuestions() {
     const educationMonthlyTotal = sumUserEducationFromChildren(childMembers);
     const householdGrandTotal = sumHouseholdIncludingEducation(household, educationMonthlyTotal);
     const emiTotal = sumConfiguredEmis(emi);
-    const householdReconciliation = reconcileHousehold(expenseCategories, childMembers);
     const emiReconciliation = reconcileEmi(expenseCategories);
 
     const renderChildFeeFields = () => {
@@ -217,14 +218,10 @@ export function useExpenseEmiQuestions() {
                         )}
                     </div>
                     {summaryHouseholdTotal > 0 && (
-                        <ReconciliationStickyPanel>
-                            <div className="reconciliation-sticky-panel__title">Summary vs detailed household</div>
-                            <div>Summary household: <strong>{formatInr(summaryHouseholdTotal)}</strong> / month</div>
-                            <div>Your detailed total: <strong style={{ color: 'var(--primary)' }}>{formatInr(householdGrandTotal)}</strong> / month</div>
-                            <div style={{ marginTop: '0.35rem' }}>
-                                <ReconciliationStatus reconciliation={householdReconciliation} />
-                            </div>
-                        </ReconciliationStickyPanel>
+                        <HouseholdInsuranceReconciliationPanel
+                            expenseCategories={expenseCategories}
+                            familyMembers={familyMembers}
+                        />
                     )}
                     <div className="question-fields" style={{ maxWidth: '420px', margin: '0 auto', gap: '1rem' }}>
                         <CurrencyField label="Household (Grocery, LPG, Fuel etc.)" value={household.grocery} onChange={(v) => handleHouseholdChange('grocery', v)} />
@@ -354,7 +351,7 @@ export function useExpenseEmiQuestions() {
     }, [
         editingHouseholdSummary, household, childMembers, hasEMI, emi, emiTotal,
         summaryHouseholdTotal, summaryEmiTotal, householdGrandTotal,
-        educationMonthlyTotal, householdReconciliation, emiReconciliation,
+        educationMonthlyTotal, emiReconciliation, expenseCategories, familyMembers,
         editHouseholdSummary,
         handleHouseholdChange, updateChild, setHasEMI, setExpenseCategories,
     ]);

@@ -12,6 +12,7 @@ import {
     applyChildOccupationFields,
 } from './employmentTypeSync';
 import { EDUCATION_STANDARDS } from '../JourneyModule/ProjectionLogic';
+import { applyHouseholdEducationFromChildren } from './educationExpenseSync';
 
 const formatDate = (value) => {
     if (!value) return '—';
@@ -23,7 +24,7 @@ const formatDate = (value) => {
 };
 
 const DetailedFamilyInfo = () => {
-    const { familyMembers, setFamilyMembers, setHasSpouseIncome } = useFinancialPlan();
+    const { familyMembers, setFamilyMembers, setHasSpouseIncome, setExpenseCategories } = useFinancialPlan();
     const [editingRecap, setEditingRecap] = useState(false);
 
     useEffect(() => {
@@ -141,9 +142,11 @@ const DetailedFamilyInfo = () => {
             const updatedChildren = children.map((c, i) => (
                 i === index ? applyChildOccupationFields(c, occupation) : c
             ));
-            return [...others, ...updatedChildren];
+            const next = [...others, ...updatedChildren];
+            setExpenseCategories((ec) => applyHouseholdEducationFromChildren(ec, next));
+            return next;
         });
-    }, [setMembers]);
+    }, [setMembers, setExpenseCategories]);
 
     const applySemYearHelper = useCallback((index, kind) => {
         const child = childMembers[index];

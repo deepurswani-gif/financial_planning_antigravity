@@ -1,6 +1,10 @@
 import { resolveEmploymentType } from '../DetailedFlow/employmentTypeSync';
 import { getEffectiveMonthlyHousehold } from '../DetailedFlow/expenseDetailSync';
 import {
+    getChildMonthlyEducationExpense,
+    isEducationInHouseholdBaseline,
+} from '../DetailedFlow/educationExpenseSync';
+import {
     getMemberDetailForProjection,
     getMemberFlatMonthlyIncome,
     getFlatHouseholdMonthlyIncome,
@@ -313,14 +317,16 @@ export const generateProjections = ({
         const annualOutflow = householdOutflow + fixedOutflow;
         
         let totalEducationExpenses = 0;
-        const householdEducationMonthly = parseFloat(expenseCategories.household?.education) || 0;
-        const schoolFeesCapturedInHousehold = householdEducationMonthly > 0;
-        
+        const householdEducationBaseline = isEducationInHouseholdBaseline(
+            familyMembers,
+            expenseCategories.household,
+        );
+
         // 1. School Education
         familyMembers.forEach(member => {
             if (member.relation === 'Child') {
                 if (member.occupation === 'School' || !member.occupation) {
-                    if (schoolFeesCapturedInHousehold) return;
+                    if (getChildMonthlyEducationExpense(member) > 0 || householdEducationBaseline) return;
                     const currentStandard = member.standard || '';
                     const baseFee = parseFloat(member.annualSchoolFee)
                         || (parseFloat(member.monthlyEducationExpense) || 0) * 12;
@@ -336,6 +342,8 @@ export const generateProjections = ({
                         }
                     }
                 } else if (member.occupation === 'College') {
+                    if (getChildMonthlyEducationExpense(member) > 0 || householdEducationBaseline) return;
+
                     const duration = parseFloat(member.courseDuration) || 1;
                     const remainingTime = parseFloat(member.remainingTime) || 0;
                     const totalCost = parseFloat(member.costOfCompleteCourse) || 0;

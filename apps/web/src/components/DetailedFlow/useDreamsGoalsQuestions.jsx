@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback, useEffect } from 'react';
 import {
-    Plus, Trash2, PenLine, Check,
+    Plus, Trash2, PenLine, Check, Target,
 } from 'lucide-react';
 import { getGoalIcon } from './goalIcons';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';

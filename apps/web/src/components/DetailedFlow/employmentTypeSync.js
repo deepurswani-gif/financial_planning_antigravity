@@ -91,5 +91,6 @@ export function applyChildOccupationFields(child, occupation) {
     } else {
         [...CHILD_SCHOOL_FIELDS, ...CHILD_COLLEGE_FIELDS].forEach((f) => { next[f] = ''; });
     }
+    CHILD_FEE_FIELDS.forEach((f) => { next[f] = ''; });
     return next;
 }
