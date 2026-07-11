@@ -12,6 +12,8 @@ import {
     getAllocationPlanKey,
     getGoalFutureValue,
     getSelectableMonths,
+    getLoanStartMonths,
+    clampLoanStartMonth,
     summarizeJourneyConstraints,
 } from './putYourMoneyToWorkLogic';
 
@@ -40,6 +42,28 @@ describe('putYourMoneyToWorkLogic', () => {
         expect(months[0].label).toBe('July');
         expect(months[1].label).toBe('August');
         expect(months[2].label).toBe('September');
+    });
+
+    it('restricts future loan start months to current month onward in the current year', () => {
+        const months = getLoanStartMonths(2026, 2026, 6);
+        expect(months).toHaveLength(6);
+        expect(months[0].label).toBe('July');
+        expect(months[months.length - 1].label).toBe('December');
+    });
+
+    it('allows all months for future loan start years', () => {
+        const months = getLoanStartMonths(2027, 2026, 6);
+        expect(months).toHaveLength(12);
+        expect(months[0].label).toBe('January');
+    });
+
+    it('clamps past loan start months when the year is current', () => {
+        expect(clampLoanStartMonth(3, 2026, 2026, 6)).toBe(7);
+        expect(clampLoanStartMonth(9, 2026, 2026, 6)).toBe(9);
+    });
+
+    it('does not clamp loan start months for future years', () => {
+        expect(clampLoanStartMonth(3, 2027, 2026, 6)).toBe(3);
     });
 
     it('summarizes journey adjustments', () => {

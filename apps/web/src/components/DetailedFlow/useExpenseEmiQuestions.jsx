@@ -12,6 +12,9 @@ import {
     sumUserEducationFromChildren,
     reconcileEmi,
     EMI_LOAN_KEYS,
+    inferSelectedEmiLoanTypes,
+    toggleEmiLoanTypeSelection,
+    clearEmiLoansNotInSelection,
 } from './expenseDetailSync';
 import HouseholdInsuranceReconciliationPanel from './HouseholdInsuranceReconciliationPanel';
 import ReconciliationStatus from './ReconciliationStatus';
@@ -95,6 +98,8 @@ export function useExpenseEmiQuestions() {
     const childMembers = familyMembers.filter((m) => m.relation === 'Child');
     const household = expenseCategories.household || {};
     const emi = expenseCategories.emi || {};
+    const selectedEmiLoanTypes = inferSelectedEmiLoanTypes(expenseCategories);
+    const selectedEmiLoans = EMI_LOAN_KEYS.filter(({ key }) => selectedEmiLoanTypes.includes(key));
     const summaryHouseholdTotal = expenseCategories.summaryHouseholdTotal || '';
     const summaryEmiTotal = expenseCategories.summaryEmiTotal || '';
 
@@ -126,11 +131,31 @@ export function useExpenseEmiQuestions() {
         });
     }, [setFamilyMembers, syncEducationTotal]);
 
+    const handleEmiLoanTypeToggle = useCallback((loanKey) => {
+        setExpenseCategories((prev) => {
+            const nextSelected = toggleEmiLoanTypeSelection(
+                inferSelectedEmiLoanTypes(prev),
+                loanKey,
+            );
+            return {
+                ...prev,
+                selectedEmiLoanTypes: nextSelected,
+                emi: clearEmiLoansNotInSelection(prev.emi, nextSelected),
+            };
+        });
+    }, [setExpenseCategories]);
+
     const handleEmiSave = useCallback((loanKey, configuredData) => {
-        setExpenseCategories(prev => ({
-            ...prev,
-            emi: { ...prev.emi, [loanKey]: configuredData },
-        }));
+        setExpenseCategories((prev) => {
+            const nextSelected = prev.selectedEmiLoanTypes?.includes(loanKey)
+                ? prev.selectedEmiLoanTypes
+                : toggleEmiLoanTypeSelection(inferSelectedEmiLoanTypes(prev), loanKey);
+            return {
+                ...prev,
+                selectedEmiLoanTypes: nextSelected,
+                emi: { ...prev.emi, [loanKey]: configuredData },
+            };
+        });
         setHasEMI(true);
     }, [setExpenseCategories, setHasEMI]);
 
@@ -250,6 +275,7 @@ export function useExpenseEmiQuestions() {
                                 setExpenseCategories(prev => ({
                                     ...prev,
                                     summaryEmiTotal: '',
+                                    selectedEmiLoanTypes: [],
                                     emi: {
                                         personalLoan: '', homeLoan: '', educationLoan: '',
                                         carLoan: '', twoWheelerLoan: '', otherEmi: '', otherEmiName: '',
@@ -280,6 +306,51 @@ export function useExpenseEmiQuestions() {
 
         if (hasEMI === true) {
             list.push({
+                id: 'emi-loan-types',
+                content: (
+                    <div className="question-container">
+                        <p className="question-narrative">Select every loan type you are currently repaying.</p>
+                        <h2 className="question-title">Which EMIs do you have?</h2>
+                        <p className="question-helper" style={{ maxWidth: '420px', margin: '0 auto 1.25rem', textAlign: 'center' }}>
+                            You can select more than one loan type.
+                        </p>
+                        <div style={{ maxWidth: '420px', margin: '0 auto', display: 'grid', gap: '0.65rem', textAlign: 'left' }}>
+                            {EMI_LOAN_KEYS.map(({ key, label }) => {
+                                const isSelected = selectedEmiLoanTypes.includes(key);
+                                return (
+                                    <label
+                                        key={key}
+                                        htmlFor={`emi-loan-${key}`}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.75rem',
+                                            padding: '0.85rem 1rem',
+                                            border: `1px solid ${isSelected ? 'var(--primary)' : 'var(--border)'}`,
+                                            borderRadius: '10px',
+                                            background: isSelected ? 'rgba(37, 99, 235, 0.06)' : 'var(--bg-card)',
+                                            cursor: 'pointer',
+                                        }}
+                                    >
+                                        <input
+                                            id={`emi-loan-${key}`}
+                                            type="checkbox"
+                                            checked={isSelected}
+                                            onChange={() => handleEmiLoanTypeToggle(key)}
+                                            style={{ width: '1rem', height: '1rem', accentColor: 'var(--primary)' }}
+                                        />
+                                        <span style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-main)' }}>
+                                            {label}
+                                        </span>
+                                    </label>
+                                );
+                            })}
+                        </div>
+                    </div>
+                ),
+            });
+
+            list.push({
                 id: 'emi-loans',
                 content: (
                     <div className="question-container">
@@ -296,7 +367,11 @@ export function useExpenseEmiQuestions() {
                             </ReconciliationStickyPanel>
                         )}
                         <div className="question-fields" style={{ maxWidth: '480px', margin: '0 auto', gap: '1rem' }}>
-                            {EMI_LOAN_KEYS.map(({ key, label, hasName }) => {
+                            {selectedEmiLoans.length === 0 ? (
+                                <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+                                    Go back and select at least one loan type to configure.
+                                </p>
+                            ) : selectedEmiLoans.map(({ key, label, hasName }) => {
                                 const rawValue = emi[key];
                                 const isConfigured = rawValue !== null && typeof rawValue === 'object' && rawValue.principal > 0;
                                 const displayValue = isConfigured ? rawValue.emi : '';
@@ -350,10 +425,12 @@ export function useExpenseEmiQuestions() {
         return list;
     }, [
         editingHouseholdSummary, household, childMembers, hasEMI, emi, emiTotal,
+        selectedEmiLoanTypes, selectedEmiLoans,
         summaryHouseholdTotal, summaryEmiTotal, householdGrandTotal,
         educationMonthlyTotal, emiReconciliation, expenseCategories, familyMembers,
         editHouseholdSummary,
         handleHouseholdChange, updateChild, setHasEMI, setExpenseCategories,
+        handleEmiLoanTypeToggle,
     ]);
 
     return {

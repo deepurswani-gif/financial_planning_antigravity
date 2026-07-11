@@ -90,6 +90,38 @@ export function getSelectableMonths(planStartMonth = 0, currentMonth = new Date(
     return months;
 }
 
+export function getLoanStartMonths(
+    selectedYear,
+    calendarYear,
+    currentMonthIndex = new Date().getMonth(),
+) {
+    const year = parseInt(selectedYear, 10) || calendarYear;
+    const minMonthIndex = year <= calendarYear
+        ? Math.max(0, Math.min(11, currentMonthIndex))
+        : 0;
+    const months = [];
+    for (let m = minMonthIndex; m < 12; m += 1) {
+        months.push({
+            monthIndex: m,
+            value: m + 1,
+            label: MONTH_LABELS_LONG[m],
+        });
+    }
+    return months;
+}
+
+export function clampLoanStartMonth(
+    startMonth,
+    startYear,
+    calendarYear,
+    currentMonthIndex = new Date().getMonth(),
+) {
+    const year = parseInt(startYear, 10) || calendarYear;
+    const month = parseInt(startMonth, 10) || (currentMonthIndex + 1);
+    const minMonth = year <= calendarYear ? currentMonthIndex + 1 : 1;
+    return Math.max(month, minMonth);
+}
+
 export function computeJourneyAdjustmentImpactForMonth(
     journeyAdjustments = [],
     calendarYear,

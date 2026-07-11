@@ -185,10 +185,24 @@ export function initializeExpenseSnapshots(expenseCategories = {}) {
 
     const breakdownStarted = hasHouseholdBreakdown(h, summaryHousehold);
 
+    const selectedEmiLoanTypes = inferSelectedEmiLoanTypes({
+        ...expenseCategories,
+        emi: loansConfigured ? emi : {
+            personalLoan: '',
+            homeLoan: '',
+            educationLoan: '',
+            carLoan: '',
+            twoWheelerLoan: '',
+            otherEmi: '',
+            otherEmiName: emi.otherEmiName || '',
+        },
+    });
+
     return {
         ...expenseCategories,
         summaryHouseholdTotal: summaryHousehold,
         summaryEmiTotal: summaryEmi,
+        selectedEmiLoanTypes,
         household: breakdownStarted ? h : {
             ...h,
             grocery: '',
@@ -210,11 +224,56 @@ export function initializeExpenseSnapshots(expenseCategories = {}) {
     };
 }
 
+export const EMI_LOAN_KEY_IDS = [
+    'personalLoan',
+    'homeLoan',
+    'educationLoan',
+    'carLoan',
+    'twoWheelerLoan',
+    'otherEmi',
+];
+
 export const EMI_LOAN_KEYS = [
     { key: 'personalLoan', label: 'Personal Loan' },
     { key: 'homeLoan', label: 'Home Loan' },
     { key: 'educationLoan', label: 'Education Loan' },
     { key: 'carLoan', label: 'Car Loan' },
-    { key: 'twoWheelerLoan', label: 'Two Wheeler Loan' },
+    { key: 'twoWheelerLoan', label: 'Two-Wheeler Loan' },
     { key: 'otherEmi', label: 'Any other EMIs', hasName: true },
 ];
+
+export function getConfiguredEmiLoanKeys(emi = {}) {
+    return EMI_LOAN_KEY_IDS.filter((key) => {
+        const val = emi[key];
+        return val !== null && typeof val === 'object' && parseFloat(val.principal) > 0;
+    });
+}
+
+/** Resolve selected loan types from stored selection or configured loan objects. */
+export function inferSelectedEmiLoanTypes(expenseCategories = {}) {
+    const stored = expenseCategories.selectedEmiLoanTypes;
+    if (Array.isArray(stored) && stored.length > 0) {
+        return stored.filter((key) => EMI_LOAN_KEY_IDS.includes(key));
+    }
+    return getConfiguredEmiLoanKeys(expenseCategories.emi);
+}
+
+export function toggleEmiLoanTypeSelection(selected = [], key) {
+    if (!EMI_LOAN_KEY_IDS.includes(key)) return selected;
+    if (selected.includes(key)) return selected.filter((item) => item !== key);
+    return [...selected, key];
+}
+
+/** Drop configured EMI data for loan types the user unchecked. */
+export function clearEmiLoansNotInSelection(emi = {}, selectedKeys = []) {
+    const next = { ...emi };
+    EMI_LOAN_KEY_IDS.forEach((key) => {
+        if (!selectedKeys.includes(key)) {
+            next[key] = '';
+        }
+    });
+    if (!selectedKeys.includes('otherEmi')) {
+        next.otherEmiName = '';
+    }
+    return next;
+}

@@ -3,6 +3,7 @@ import {
     Banknote, Home, AlertCircle, Info, Plus, Trash2, CheckCircle2,
 } from 'lucide-react';
 import { formatCurrency } from '../CashFlowModule/CashFlowLogic';
+import { clampLoanStartMonth, getLoanStartMonths } from './putYourMoneyToWorkLogic';
 import ReportReveal from './ReportReveal';
 
 const JourneyConstraintsRail = ({
@@ -41,6 +42,21 @@ const JourneyConstraintsRail = ({
         setJourneyAdjustments((prev) => prev.map((adj) => (
             adj.id === id ? { ...adj, [field]: value } : adj
         )));
+    };
+
+    const updateLoanStartYear = (id, startYear) => {
+        if (!setJourneyAdjustments) return;
+        setJourneyAdjustments((prev) => prev.map((adj) => {
+            if (adj.id !== id) return adj;
+            const nextYear = parseInt(startYear, 10) || defaultCalendarYear;
+            const startMonth = clampLoanStartMonth(
+                adj.startMonth || defaultStartMonth,
+                nextYear,
+                defaultCalendarYear,
+                defaultStartMonthIndex,
+            );
+            return { ...adj, startYear: nextYear, startMonth };
+        }));
     };
 
     const updateStandardExpense = (id, field, value) => {
@@ -276,12 +292,21 @@ const JourneyConstraintsRail = ({
                                 <div className="input-group">
                                     <label>Start month</label>
                                     <select
-                                        value={adj.startMonth || defaultStartMonth}
+                                        value={clampLoanStartMonth(
+                                            adj.startMonth || defaultStartMonth,
+                                            adj.startYear || defaultCalendarYear,
+                                            defaultCalendarYear,
+                                            defaultStartMonthIndex,
+                                        )}
                                         onChange={(e) => updateAdjustment(adj.id, 'startMonth', parseInt(e.target.value, 10))}
                                     >
-                                        {[...Array(12)].map((_, i) => (
-                                            <option key={i + 1} value={i + 1}>
-                                                {monthLabel(i + 1)}
+                                        {getLoanStartMonths(
+                                            adj.startYear || defaultCalendarYear,
+                                            defaultCalendarYear,
+                                            defaultStartMonthIndex,
+                                        ).map((m) => (
+                                            <option key={m.value} value={m.value}>
+                                                {m.label}
                                             </option>
                                         ))}
                                     </select>
@@ -292,7 +317,7 @@ const JourneyConstraintsRail = ({
                                         type="number"
                                         value={adj.startYear || defaultCalendarYear}
                                         min={defaultCalendarYear}
-                                        onChange={(e) => updateAdjustment(adj.id, 'startYear', parseInt(e.target.value, 10) || defaultCalendarYear)}
+                                        onChange={(e) => updateLoanStartYear(adj.id, e.target.value)}
                                     />
                                 </div>
                                 <div className="pymtw-adjust-emi">
@@ -368,10 +393,6 @@ const JourneyConstraintsRail = ({
                                     </div>
                                 </div>
                             ))}
-                        </div>
-                        <div className="pymtw-constraint-total">
-                            Combined annual impact when active:{' '}
-                            <strong>{formatCurrency(journeyConstraints.totalAnnualImpact)}</strong>
                         </div>
                     </>
                 ) : (

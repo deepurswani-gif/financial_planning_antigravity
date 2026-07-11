@@ -9,6 +9,9 @@ import {
     reconcileEmi,
     hasAnyEmiCommitment,
     isLikelySummaryEmiInHomeLoan,
+    inferSelectedEmiLoanTypes,
+    toggleEmiLoanTypeSelection,
+    clearEmiLoansNotInSelection,
 } from './expenseDetailSync';
 
 describe('expenseDetailSync EMI snapshot', () => {
@@ -100,6 +103,59 @@ describe('expenseDetailSync EMI snapshot', () => {
             homeLoan: '50000',
             personalLoan: '10000',
         })).toBe(false);
+    });
+});
+
+describe('expenseDetailSync EMI loan type selection', () => {
+    it('infers selected loan types from configured loans when no explicit selection exists', () => {
+        expect(inferSelectedEmiLoanTypes({
+            emi: {
+                homeLoan: { principal: 1000000, emi: '25000' },
+                carLoan: { principal: 500000, emi: '12000' },
+            },
+        })).toEqual(['homeLoan', 'carLoan']);
+    });
+
+    it('prefers stored selectedEmiLoanTypes over configured inference', () => {
+        expect(inferSelectedEmiLoanTypes({
+            selectedEmiLoanTypes: ['personalLoan'],
+            emi: {
+                homeLoan: { principal: 1000000, emi: '25000' },
+            },
+        })).toEqual(['personalLoan']);
+    });
+
+    it('toggleEmiLoanTypeSelection supports multi-select and deselect', () => {
+        expect(toggleEmiLoanTypeSelection(['homeLoan'], 'carLoan')).toEqual(['homeLoan', 'carLoan']);
+        expect(toggleEmiLoanTypeSelection(['homeLoan', 'carLoan'], 'homeLoan')).toEqual(['carLoan']);
+    });
+
+    it('clearEmiLoansNotInSelection removes unchecked loan data', () => {
+        expect(clearEmiLoansNotInSelection({
+            homeLoan: { principal: 1000000, emi: '25000' },
+            carLoan: { principal: 500000, emi: '12000' },
+            otherEmiName: 'Gold Loan',
+        }, ['homeLoan'])).toEqual({
+            homeLoan: { principal: 1000000, emi: '25000' },
+            personalLoan: '',
+            educationLoan: '',
+            carLoan: '',
+            twoWheelerLoan: '',
+            otherEmi: '',
+            otherEmiName: '',
+        });
+    });
+
+    it('initializeExpenseSnapshots preserves selectedEmiLoanTypes from configured loans', () => {
+        const result = initializeExpenseSnapshots({
+            emi: {
+                homeLoan: { principal: 1000000, emi: '25000' },
+                personalLoan: '',
+            },
+            summaryEmiTotal: '25000',
+        });
+
+        expect(result.selectedEmiLoanTypes).toEqual(['homeLoan']);
     });
 });
 
