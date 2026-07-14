@@ -54,6 +54,23 @@ describe('reportVisualLogic', () => {
         expect(nodes[0].positionPct).toBeGreaterThan(0);
     });
 
+    it('staggers same-year goals so overlapping nodes stay distinct', () => {
+        const nodes = flattenGoalsForTimeline(
+            {
+                2028: [
+                    { id: 'car', name: 'Buying Car', futureCost: 898880 },
+                    { id: 'tour', name: 'Domestic Tour', futureCost: 168540 },
+                ],
+            },
+            2026,
+            2057,
+        );
+        expect(nodes).toHaveLength(2);
+        expect(nodes[0].positionPct).not.toBe(nodes[1].positionPct);
+        expect(nodes[0].stackCount).toBe(2);
+        expect(nodes[1].stackIndex).toBe(1);
+    });
+
     it('builds income vs outflow series from projections', () => {
         const series = buildIncomeVsOutflowSeries([
             { year: 2027, netInflowAfterTax: 1200000, totalOutflow: 900000 },

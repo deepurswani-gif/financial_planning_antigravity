@@ -14,11 +14,8 @@ import {
     getLifeMemberMonthlyTotal,
     initializeInsuranceSnapshots,
     syncPolicySlots,
-    reconcileMemberLifePremiumSummary,
 } from './insuranceDetailSync';
-import ReconciliationStatus from './ReconciliationStatus';
-import ReconciliationStickyPanel from './ReconciliationStickyPanel';
-import HouseholdInsuranceReconciliationPanel from './HouseholdInsuranceReconciliationPanel';
+import InsuranceReconciliationPanel from './InsuranceReconciliationPanel';
 
 const formatInr = (val) => {
     if (!val || isNaN(val)) return '₹0';
@@ -220,25 +217,6 @@ export function useInsurancePremiumQuestions() {
         });
     }, [familyMembers, lifeMap, policies]);
 
-    const summaryLifePremiums = expenseCategories.summaryLifePremiums || {};
-
-    const lifePremiumReconciliations = useMemo(() => {
-        const members = [...adultLifeMembers, ...childLifeMembers];
-        return members.map((member) => {
-            const memberKey = getMemberInsuranceKey(member);
-            const displayName = member.name || member.relation;
-            const entry = migrateLifeEntry(lifeMap[memberKey]);
-            const summaryMonthly = parseFloat(summaryLifePremiums[memberKey]) || 0;
-            const detailMonthly = getLifeMemberMonthlyTotal(entry);
-            if (summaryMonthly <= 0 && detailMonthly <= 0) return null;
-            const reconciliation = reconcileMemberLifePremiumSummary(summaryLifePremiums[memberKey], entry);
-            return { memberKey, displayName, reconciliation, summaryMonthly, detailMonthly };
-        }).filter(Boolean);
-    }, [adultLifeMembers, childLifeMembers, lifeMap, summaryLifePremiums]);
-
-    const showLifePremiumPanel = hasLifeInsurance !== false
-        && (lifePremiumReconciliations.length > 0 || adultLifeMembers.length + childLifeMembers.length > 0);
-
     const renderInsuranceLine = (key, label, note, showUpload = true) => (
         <div key={key} style={{ marginBottom: '1.5rem' }}>
             <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--primary)', marginBottom: '0.75rem' }}>
@@ -370,9 +348,8 @@ export function useInsurancePremiumQuestions() {
                     <div className="question-container">
                         <p className="question-narrative">Let&apos;s start with health cover.</p>
                         <h2 className="question-title">Health Insurance</h2>
-                    <HouseholdInsuranceReconciliationPanel
+                    <InsuranceReconciliationPanel
                         expenseCategories={expenseCategories}
-                        familyMembers={familyMembers}
                     />
                         <div className="question-fields" style={{ maxWidth: '420px', margin: '0 auto', gap: '1rem' }}>
                             {renderInsuranceLine(
@@ -396,34 +373,9 @@ export function useInsurancePremiumQuestions() {
                             : 'Now tell us about life insurance premiums for your family.'}
                     </p>
                     <h2 className="question-title">Life Insurance Premium</h2>
-                    <HouseholdInsuranceReconciliationPanel
+                    <InsuranceReconciliationPanel
                         expenseCategories={expenseCategories}
-                        familyMembers={familyMembers}
                     />
-                    <ReconciliationStickyPanel visible={showLifePremiumPanel}>
-                        <div className="reconciliation-sticky-panel__title">Summary vs detailed premium</div>
-                        {lifePremiumReconciliations.length > 0 ? (
-                            lifePremiumReconciliations.map(({ memberKey, displayName, reconciliation, summaryMonthly, detailMonthly }) => (
-                                <div key={memberKey} className="reconciliation-sticky-panel__row">
-                                    <div style={{ fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.25rem' }}>{displayName}</div>
-                                    {summaryMonthly > 0 && (
-                                        <div>Summary premium: <strong>{formatInr(summaryMonthly)}</strong> / month</div>
-                                    )}
-                                    <div>Your detailed total: <strong style={{ color: 'var(--primary)' }}>{formatInr(detailMonthly)}</strong> / month</div>
-                                    {summaryMonthly > 0 && (
-                                        <div style={{ marginTop: '0.35rem' }}>
-                                            <ReconciliationStatus
-                                                reconciliation={reconciliation}
-                                                matchLabel="Matches summary"
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-                            ))
-                        ) : (
-                            <div>Enter each member&apos;s premium below — allocation status will update here.</div>
-                        )}
-                    </ReconciliationStickyPanel>
                     <div className="question-fields" style={{ maxWidth: '480px', margin: '0 auto', gap: '1rem', textAlign: 'left' }}>
                         {adultLifeMembers.map(renderLifeMemberBlock)}
                         {childLifeMembers.length > 0 && (
@@ -489,9 +441,8 @@ export function useInsurancePremiumQuestions() {
                 <div className="question-container">
                     <p className="question-narrative">Almost done with insurance — vehicle and other covers.</p>
                     <h2 className="question-title">Car, two-wheeler &amp; other insurance</h2>
-                    <HouseholdInsuranceReconciliationPanel
+                    <InsuranceReconciliationPanel
                         expenseCategories={expenseCategories}
-                        familyMembers={familyMembers}
                     />
                     <div className="question-fields" style={{ maxWidth: '420px', margin: '0 auto', gap: '1rem', textAlign: 'left' }}>
                         {renderInsuranceLine(
@@ -518,7 +469,6 @@ export function useInsurancePremiumQuestions() {
         return list;
     }, [
         insurance, policyDocs, adultLifeMembers, childLifeMembers, lifeMap,
-        lifePremiumReconciliations, showLifePremiumPanel, summaryLifePremiums,
         skipHealthInsuranceQuestion, hasLifeInsurance, policies, expenseCategories, familyMembers,
         handleInsurancePremiumChange, handlePolicyDocChange, updateLifeMember,
     ]);

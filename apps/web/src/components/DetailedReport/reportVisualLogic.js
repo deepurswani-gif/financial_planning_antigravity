@@ -84,13 +84,24 @@ export function buildSavingsRateData(baseline, ledger, meta) {
 export function flattenGoalsForTimeline(goalsByYear, startYear, endYear) {
     if (!endYear || endYear <= startYear) return [];
     const span = endYear - startYear;
-    return Object.entries(goalsByYear)
-        .flatMap(([year, yearGoals]) => yearGoals.map((goal) => ({
-            ...goal,
-            targetYear: parseInt(year, 10),
-            positionPct: Math.min(98, Math.max(2, ((parseInt(year, 10) - startYear) / span) * 100)),
-        })))
-        .sort((a, b) => a.targetYear - b.targetYear);
+    const flat = Object.entries(goalsByYear)
+        .flatMap(([year, yearGoals]) => {
+            const targetYear = parseInt(year, 10);
+            const basePct = Math.min(98, Math.max(2, ((targetYear - startYear) / span) * 100));
+            return yearGoals.map((goal, stackIndex) => ({
+                ...goal,
+                targetYear,
+                stackIndex,
+                stackCount: yearGoals.length,
+                // Nudge same-year goals apart so stacked nodes stay visible.
+                positionPct: yearGoals.length <= 1
+                    ? basePct
+                    : Math.min(98, Math.max(2, basePct + (stackIndex - (yearGoals.length - 1) / 2) * 3.5)),
+            }));
+        })
+        .sort((a, b) => a.targetYear - b.targetYear || a.stackIndex - b.stackIndex);
+
+    return flat;
 }
 
 export function buildJourneyArcMeta(hero, meta) {

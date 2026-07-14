@@ -3,10 +3,14 @@ import {
     analyzeInstrument,
     applyAllocationPlan,
     buildGrowthPreview,
+    clearStudioMonthPlan,
     compareInstrumentGoalImpacts,
     createEmptyDraftAllocations,
     getTotalDraftAllocated,
     INSTRUMENT_REGISTRY,
+    monthHasStudioPlan,
+    pruneAllocationPlansForAllocations,
+    removeInvestmentAllocationById,
 } from './instrumentAnalysisLogic';
 
 const baseParams = {
@@ -22,7 +26,7 @@ const baseParams = {
 
 describe('instrumentAnalysisLogic', () => {
     it('exposes all studio instrument types', () => {
-        expect(Object.keys(INSTRUMENT_REGISTRY)).toHaveLength(10);
+        expect(Object.keys(INSTRUMENT_REGISTRY)).toHaveLength(14);
     });
 
     it('sums draft allocations for surplus check', () => {
@@ -98,5 +102,46 @@ describe('instrumentAnalysisLogic', () => {
 
         expect(analysis.growthSeries.length).toBeLessThanOrEqual(16);
         expect(appliedPpf?.duration).toBe(15);
+    });
+
+    it('clears all studio allocations for a month', () => {
+        const applied = applyAllocationPlan({
+            investmentAllocations: [{ id: 99, type: 'SIP', amount: 60000, studioPlanKey: '2026-5' }],
+            draftAllocations: { ...createEmptyDraftAllocations(), SIP: 10000, PPF: 5000 },
+            calendarYear: 2026,
+            monthIndex: 6,
+        });
+        expect(applied.filter((a) => a.studioPlanKey === '2026-6')).toHaveLength(2);
+
+        const cleared = clearStudioMonthPlan({
+            investmentAllocations: applied,
+            calendarYear: 2026,
+            monthIndex: 6,
+        });
+        expect(cleared).toHaveLength(1);
+        expect(cleared[0].studioPlanKey).toBe('2026-5');
+        expect(monthHasStudioPlan(cleared, 2026, 6)).toBe(false);
+        expect(monthHasStudioPlan(applied, 2026, 6)).toBe(true);
+    });
+
+    it('removes a single allocation by id', () => {
+        const list = [
+            { id: 1, type: 'SIP', amount: 60000, studioPlanKey: '2026-6' },
+            { id: 2, type: 'PPF', amount: 60000, studioPlanKey: '2026-6' },
+        ];
+        expect(removeInvestmentAllocationById(list, 1)).toEqual([list[1]]);
+    });
+
+    it('prunes applied allocation plans without matching allocations', () => {
+        const plans = {
+            '2026-6': { status: 'applied', items: [] },
+            '2026-7': { status: 'draft', items: [] },
+            '2026-8': { status: 'applied', items: [] },
+        };
+        const allocations = [{ id: 1, type: 'SIP', studioPlanKey: '2026-8' }];
+        const pruned = pruneAllocationPlansForAllocations(plans, allocations);
+        expect(pruned['2026-6']).toBeUndefined();
+        expect(pruned['2026-7']?.status).toBe('draft');
+        expect(pruned['2026-8']?.status).toBe('applied');
     });
 });

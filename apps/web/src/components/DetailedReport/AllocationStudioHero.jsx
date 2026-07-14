@@ -9,6 +9,8 @@ const AllocationStudioHero = ({
     selectedMonthIndex,
     onMonthChange,
 }) => {
+    const carriedForward = Math.round(hero.carriedForward || 0);
+
     return (
         <div className="pymtw-zone-a card">
             <div className="pymtw-zone-a-top">
@@ -38,6 +40,11 @@ const AllocationStudioHero = ({
                     <strong className="pymtw-kpi-accent">
                         <ReportAnimatedCounter value={hero.deployableSurplus} />
                     </strong>
+                    {carriedForward > 0 && (
+                        <em className="pymtw-kpi-carry">
+                            includes ₹{carriedForward.toLocaleString('en-IN')} carried from prior months
+                        </em>
+                    )}
                 </div>
                 <div className="pymtw-kpi">
                     <span>Free cash (month)</span>

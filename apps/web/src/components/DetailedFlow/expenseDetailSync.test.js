@@ -5,7 +5,7 @@ import {
     getEffectiveMonthlyEmi,
     getEffectiveMonthlyHousehold,
     reconcileHousehold,
-    reconcileHouseholdWithInsurance,
+    reconcileInsurance,
     reconcileEmi,
     hasAnyEmiCommitment,
     isLikelySummaryEmiInHomeLoan,
@@ -157,6 +157,16 @@ describe('expenseDetailSync EMI loan type selection', () => {
 
         expect(result.selectedEmiLoanTypes).toEqual(['homeLoan']);
     });
+
+    it('initializeExpenseSnapshots preserves summaryInsuranceTotal', () => {
+        const result = initializeExpenseSnapshots({
+            summaryInsuranceTotal: '5000',
+            household: { grocery: '', rent: '', lifestyle: '', medical: '', travel: '', education: '' },
+            emi: {},
+        });
+
+        expect(result.summaryInsuranceTotal).toBe('5000');
+    });
 });
 
 describe('expenseDetailSync household snapshot', () => {
@@ -204,30 +214,43 @@ describe('expenseDetailSync household snapshot', () => {
         expect(result.status).toBe('match');
     });
 
-    it('reconcileHouseholdWithInsurance includes insurance in combined detail total', () => {
-        const result = reconcileHouseholdWithInsurance({
-            summaryHouseholdTotal: '50000',
-            household: { grocery: '30000', rent: '', lifestyle: '', medical: '', travel: '', education: '' },
+    it('reconcileInsurance includes all premium types in detail total', () => {
+        const result = reconcileInsurance({
+            summaryInsuranceTotal: '5000',
             insurance: {
                 health: { value: '12000', frequency: 'Annual' },
                 life: {},
             },
         });
-        expect(result.householdDetailTotal).toBe(30000);
-        expect(result.insuranceDetailTotal).toBe(1000);
-        expect(result.reconciliation.status).toBe('under');
-        expect(result.reconciliation.delta).toBe(19000);
+        expect(result.detailTotal).toBe(1000);
+        expect(result.status).toBe('under');
+        expect(result.delta).toBe(4000);
     });
 
-    it('reconcileHouseholdWithInsurance matches when household and insurance fill summary', () => {
-        const result = reconcileHouseholdWithInsurance({
-            summaryHouseholdTotal: '40000',
-            household: { grocery: '39500', rent: '', lifestyle: '', medical: '', travel: '', education: '' },
+    it('reconcileInsurance matches when detailed premiums equal summary', () => {
+        const result = reconcileInsurance({
+            summaryInsuranceTotal: '5000',
             insurance: {
-                health: { value: '6000', frequency: 'Annual' },
+                health: { value: '60000', frequency: 'Annual' },
                 life: {},
             },
         });
-        expect(result.reconciliation.status).toBe('match');
+        expect(result.status).toBe('match');
+    });
+
+    it('reconcileHousehold and reconcileInsurance reconcile independently', () => {
+        const householdResult = reconcileHousehold({
+            summaryHouseholdTotal: '35000',
+            household: { grocery: '30000', rent: '5000', lifestyle: '', medical: '', travel: '', education: '' },
+        });
+        const insuranceResult = reconcileInsurance({
+            summaryInsuranceTotal: '5000',
+            insurance: {
+                health: { value: '60000', frequency: 'Annual' },
+                life: {},
+            },
+        });
+        expect(householdResult.status).toBe('match');
+        expect(insuranceResult.status).toBe('match');
     });
 });

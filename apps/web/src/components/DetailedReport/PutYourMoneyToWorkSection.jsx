@@ -14,7 +14,11 @@ import {
     analyzeInstrument,
     applyAllocationPlan,
     buildGrowthPreview,
+    clearStudioMonthPlan,
     compareInstrumentGoalImpacts,
+    monthHasStudioPlan,
+    pruneAllocationPlansForAllocations,
+    removeInvestmentAllocationById,
 } from './instrumentAnalysisLogic';
 import AllocationStudioHero from './AllocationStudioHero';
 import JourneyConstraintsRail from './JourneyConstraintsRail';
@@ -26,6 +30,8 @@ import OutcomeTheater from './OutcomeTheater';
 import ApplyPlanBar from './ApplyPlanBar';
 import StudioInsightsRail from './StudioInsightsRail';
 import ScenarioComparePanel from './ScenarioComparePanel';
+import PlannedInvestmentAllocationsPanel from './PlannedInvestmentAllocationsPanel';
+import { summarizeInvestmentAllocations } from './investSurplusLogic';
 import {
     validateDraftPlan,
     buildScenarioComparison,
@@ -99,6 +105,9 @@ const PutYourMoneyToWorkSection = () => {
         goals,
         allocationPlans,
         setAllocationPlans,
+        summaryHealthCover,
+        hasHealthInsurance,
+        inflationRates,
     } = useFinancialPlan();
 
     const moneyFlowReport = useMemo(
@@ -243,9 +252,33 @@ const PutYourMoneyToWorkSection = () => {
             contingencyData: studio.safety?.contingencyData,
             protectionData: studio.safety?.protectionData,
             goals,
+            familyMembers,
+            expenseCategories,
+            assetCategories,
+            contingencyFund,
+            summaryLifeCover,
+            summaryHealthCover,
+            hasHealthInsurance,
+            inflationRates,
+            ppfMaxMonthly: ppfMaxByCap,
         }),
-        [studio.hero, studio.safety, goals],
+        [
+            studio.hero,
+            studio.safety,
+            goals,
+            familyMembers,
+            expenseCategories,
+            assetCategories,
+            contingencyFund,
+            summaryLifeCover,
+            summaryHealthCover,
+            hasHealthInsurance,
+            inflationRates,
+            ppfMaxByCap,
+        ],
     );
+
+    const engineResult = recommendedBundles[0]?.engineResult || null;
 
     const validation = useMemo(() => {
         if (!studio.meta?.hasData) return { issues: [], hasBlockingErrors: false, canApply: false };
@@ -438,6 +471,76 @@ const PutYourMoneyToWorkSection = () => {
         if (bundle) handleSelectBundle(bundle);
     }, [recommendedBundles, handleSelectBundle]);
 
+    const allocationsSummary = useMemo(
+        () => summarizeInvestmentAllocations(investmentAllocations),
+        [investmentAllocations],
+    );
+
+    const hasMonthPlan = Boolean(
+        studio.meta?.hasData
+        && monthHasStudioPlan(investmentAllocations, studio.meta.calendarYear, effectiveMonth),
+    );
+
+    const resetLocalDraftState = useCallback(() => {
+        setDraftAllocations(createEmptyDraftAllocations());
+        setActiveBundleId(null);
+        setAppliedPlanKey(null);
+    }, []);
+
+    const handleClearMonthPlan = useCallback((planKeyOverride) => {
+        const targetKey = planKeyOverride || planKey;
+        if (!targetKey || !studio.meta?.hasData) return;
+
+        const [yearStr, monthStr] = String(targetKey).split('-');
+        const calendarYear = parseInt(yearStr, 10);
+        const monthIndex = parseInt(monthStr, 10);
+        if (!Number.isFinite(calendarYear) || !Number.isFinite(monthIndex)) return;
+
+        const nextAllocations = clearStudioMonthPlan({
+            investmentAllocations,
+            calendarYear,
+            monthIndex,
+        });
+        setInvestmentAllocations(nextAllocations);
+
+        const nextPlans = { ...allocationPlans };
+        delete nextPlans[targetKey];
+        setAllocationPlans(pruneAllocationPlansForAllocations(nextPlans, nextAllocations));
+
+        if (targetKey === planKey) {
+            resetLocalDraftState();
+        }
+    }, [
+        planKey,
+        studio.meta,
+        investmentAllocations,
+        setInvestmentAllocations,
+        allocationPlans,
+        setAllocationPlans,
+        resetLocalDraftState,
+    ]);
+
+    const handleRemoveAllocation = useCallback((id) => {
+        const removed = investmentAllocations.find((a) => a.id === id);
+        const nextAllocations = removeInvestmentAllocationById(investmentAllocations, id);
+        setInvestmentAllocations(nextAllocations);
+        setAllocationPlans(pruneAllocationPlansForAllocations(allocationPlans, nextAllocations));
+
+        if (removed?.studioPlanKey && removed.studioPlanKey === planKey) {
+            const stillHasMonth = nextAllocations.some((a) => a.studioPlanKey === planKey);
+            if (!stillHasMonth) {
+                resetLocalDraftState();
+            }
+        }
+    }, [
+        investmentAllocations,
+        setInvestmentAllocations,
+        allocationPlans,
+        setAllocationPlans,
+        planKey,
+        resetLocalDraftState,
+    ]);
+
     const handleJourneyAdjustmentsChange = useCallback((updater) => {
         setJourneyAdjustments(updater);
         setAdjustmentsSaved(false);
@@ -493,6 +596,7 @@ const PutYourMoneyToWorkSection = () => {
                 defaultStartMonthIndex={effectiveMonth}
                 defaultCalendarYear={studio.meta.calendarYear}
                 selectableMonths={studio.selectableMonths}
+                unallocatedSurplusByMonth={moneyFlowReport?.ledger?.unallocatedSurplus || []}
                 onSaveAdjustments={handleSaveAdjustments}
                 adjustmentsSaved={adjustmentsSaved}
                 saveMessage={adjustmentSaveMessage}
@@ -527,6 +631,7 @@ const PutYourMoneyToWorkSection = () => {
                         activeBundleId={activeBundleId}
                         onSelectBundle={handleSelectBundle}
                         deployableSurplus={studio.hero.deployableSurplus}
+                        engineResult={engineResult}
                     />
 
                     <InstrumentCardGrid
@@ -545,6 +650,12 @@ const PutYourMoneyToWorkSection = () => {
                     />
 
                     <GrowthPreviewStrip growthPreview={growthPreview} />
+
+                    <PlannedInvestmentAllocationsPanel
+                        allocationsSummary={allocationsSummary}
+                        onRemove={handleRemoveAllocation}
+                        onClearMonthPlan={handleClearMonthPlan}
+                    />
 
                     <OutcomeTheater
                         growthPreview={growthPreview}
@@ -574,6 +685,8 @@ const PutYourMoneyToWorkSection = () => {
                         validation={validation}
                         onSaveDraft={handleSaveDraft}
                         onApply={handleApply}
+                        onClearMonthPlan={() => handleClearMonthPlan(planKey)}
+                        hasMonthPlan={hasMonthPlan}
                         isApplied={appliedPlanKey === planKey}
                     />
                 </>
@@ -632,6 +745,16 @@ const PutYourMoneyToWorkSection = () => {
                     color: #059669;
                     font-size: 0.88rem;
                     font-weight: 600;
+                }
+                .pymtw-adjust-save-error {
+                    display: inline-flex;
+                    align-items: flex-start;
+                    gap: 0.45rem;
+                    color: #B91C1C;
+                    font-size: 0.88rem;
+                    font-weight: 600;
+                    max-width: 36rem;
+                    line-height: 1.4;
                 }
                 .pymtw-recalculated-surplus-card {
                     padding: 1rem 1.25rem;
@@ -738,6 +861,15 @@ const PutYourMoneyToWorkSection = () => {
                 }
                 .pymtw-kpi strong { font-size: 1.1rem; }
                 .pymtw-kpi-accent { color: #7C3AED; }
+                .pymtw-kpi-carry {
+                    display: block;
+                    margin-top: 0.25rem;
+                    font-size: 0.72rem;
+                    font-style: normal;
+                    font-weight: 500;
+                    color: var(--text-muted);
+                    line-height: 1.35;
+                }
 
                 .pymtw-bundles { padding: 1.25rem; }
 
@@ -847,6 +979,71 @@ const PutYourMoneyToWorkSection = () => {
                 }
 
                 .pymtw-bundles-sub { margin: -0.25rem 0 1rem !important; }
+                .pymtw-bundles-headline {
+                    margin: 0 0 1rem;
+                    font-size: 0.9rem;
+                    line-height: 1.5;
+                    color: var(--text);
+                }
+                .pymtw-fpi-stack {
+                    margin: 0 0 1.25rem;
+                    padding: 1rem;
+                    border-radius: 10px;
+                    background: rgba(16, 185, 129, 0.06);
+                    border: 1px solid rgba(16, 185, 129, 0.18);
+                }
+                .pymtw-fpi-title {
+                    margin: 0 0 0.65rem;
+                    font-size: 0.85rem;
+                    font-weight: 700;
+                }
+                .pymtw-fpi-list {
+                    margin: 0;
+                    padding: 0;
+                    list-style: none;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.65rem;
+                }
+                .pymtw-fpi-item p {
+                    margin: 0.25rem 0 0;
+                    font-size: 0.8rem;
+                    color: var(--text-muted);
+                    line-height: 1.45;
+                }
+                .pymtw-fpi-item-head {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    flex-wrap: wrap;
+                }
+                .pymtw-fpi-rank {
+                    font-size: 0.72rem;
+                    font-weight: 700;
+                    color: #059669;
+                }
+                .pymtw-fpi-score {
+                    margin-left: auto;
+                    font-size: 0.72rem;
+                    color: var(--text-muted);
+                }
+                .pymtw-engine-explanations {
+                    margin-top: 1.25rem;
+                    padding-top: 1rem;
+                    border-top: 1px solid var(--border);
+                }
+                .pymtw-explain-list {
+                    margin: 0;
+                    padding-left: 1.1rem;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.55rem;
+                    font-size: 0.82rem;
+                    line-height: 1.45;
+                    color: var(--text-muted);
+                }
+                .pymtw-explain-list strong { color: var(--text); }
+                .pymtw-explain-inaction { display: block; margin-top: 0.2rem; font-size: 0.78rem; }
                 .pymtw-bundle-grid {
                     display: grid;
                     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -978,6 +1175,15 @@ const PutYourMoneyToWorkSection = () => {
                     border-radius: 10px;
                     border: 1px solid var(--border);
                     background: var(--bg-main);
+                    align-items: flex-start;
+                }
+                .pymtw-constraint-remove-btn {
+                    margin-left: auto;
+                    flex-shrink: 0;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.35rem;
+                    white-space: nowrap;
                 }
                 .pymtw-constraint-loan { border-left: 3px solid #6366F1; }
                 .pymtw-constraint-expense { border-left: 3px solid #F59E0B; }
@@ -1238,7 +1444,7 @@ const PutYourMoneyToWorkSection = () => {
                 .pymtw-apply-sip { color: #10B981; }
                 .pymtw-apply-over { color: #ef4444; }
                 .pymtw-apply-actions { display: flex; gap: 0.65rem; flex-wrap: wrap; }
-                .pymtw-save-btn, .pymtw-apply-btn {
+                .pymtw-save-btn, .pymtw-apply-btn, .pymtw-clear-btn {
                     display: inline-flex;
                     align-items: center;
                     gap: 0.4rem;

@@ -42,6 +42,36 @@ describe('lifeJourneyTableLogic', () => {
         expect(byYear[CURRENT_YEAR + 8][0].name).toBe('Home');
     });
 
+    it('includes only configured goals and extends constellation to latest goal year', () => {
+        const userGoals = [
+            { id: 'flat', name: 'Buying a Flat', yearsToGoal: '4', presentValue: 5000000, inflationRate: 6 },
+            { id: 'marriage_0', name: 'Marriage - Jay', yearsToGoal: '3', presentValue: 4000000, inflationRate: 6 },
+            { id: 'car', name: 'Buying Car', yearsToGoal: '2', presentValue: 800000, inflationRate: 6 },
+            { id: 'domestic_tour', name: 'Domestic Tour', yearsToGoal: '2', presentValue: 150000, inflationRate: 6 },
+            { id: 'retirement', name: 'Retirement Corpus', yearsToGoal: '31', presentValue: 20000000, inflationRate: 6 },
+            // Incomplete / auto-year-only — must not appear
+            { id: 'bike', name: 'Buying Bike', yearsToGoal: '5', presentValue: '', inflationRate: 6 },
+        ];
+        const projections = Array.from({ length: 20 }, (_, i) => makeProjection(CURRENT_YEAR + 1 + i));
+        const report = buildLifeJourneyReport({
+            familyMembers: [selfMember],
+            journeyProjections: projections,
+            goals: userGoals,
+        });
+
+        const names = Object.values(report.goalsByYear).flat().map((g) => g.name);
+        expect(names).toEqual(expect.arrayContaining([
+            'Buying a Flat',
+            'Marriage - Jay',
+            'Buying Car',
+            'Domestic Tour',
+            'Retirement Corpus',
+        ]));
+        expect(names).not.toContain('Buying Bike');
+        expect(report.goalsByYear[CURRENT_YEAR + 2]).toHaveLength(2);
+        expect(report.meta.constellationEndYear).toBe(CURRENT_YEAR + 31);
+    });
+
     it('excludes current year from life journey projections', () => {
         const projections = [
             makeProjection(CURRENT_YEAR),

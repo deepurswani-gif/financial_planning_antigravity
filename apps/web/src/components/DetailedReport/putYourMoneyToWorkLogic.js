@@ -10,10 +10,116 @@ import {
     draftAllocationsToItems,
     getTotalDraftAllocated,
 } from './instrumentAnalysisLogic';
+import { runLifeJourneyAllocationEngine } from './allocationEngine';
 
 export { INSTRUMENT_REGISTRY, createEmptyDraftAllocations, getTotalDraftAllocated, draftAllocationsToItems };
 
 const parseAmount = (value) => parseFloat(value) || 0;
+
+const RECURRING_ALLOC_TYPES = [
+    'SIP', 'PPF', 'NPS', 'Life Insurance', 'Term Insurance', 'Health Insurance',
+    'Life Insurance Saving Plans', 'Recurring Deposit', 'RD', 'Liquid Mutual Fund',
+];
+
+/** Studio apply stores recurring amounts as annual totals; convert to monthly. */
+export function getRecurringMonthlyAmount(alloc = {}) {
+    return parseAmount(alloc.amount) / 12;
+}
+
+export function allocationHasStartedByMonth(alloc = {}, calendarYear, monthIndex) {
+    const startYear = parseInt(alloc.startYear, 10);
+    const startMonth = parseInt(alloc.startMonth, 10);
+    if (!Number.isFinite(startYear) || !Number.isFinite(startMonth)) {
+        return true;
+    }
+    const month = monthIndex + 1;
+    if (startYear < calendarYear) return true;
+    if (startYear > calendarYear) return false;
+    return startMonth <= month;
+}
+
+export function isRecurringAllocationType(type) {
+    return RECURRING_ALLOC_TYPES.includes(type);
+}
+
+/**
+ * Surplus consumed by investment allocations in a single calendar month.
+ * Recurring: monthly amount every month on/after start.
+ * One-time: full amount only in the start month (skipped if no start — matches prior global-commit behavior).
+ */
+export function computeAllocationImpactForMonth(
+    investmentAllocations = [],
+    calendarYear,
+    monthIndex,
+) {
+    const month = monthIndex + 1;
+    let impact = 0;
+
+    investmentAllocations.forEach((alloc) => {
+        const type = alloc.type === 'RD' ? 'Recurring Deposit' : alloc.type;
+        if (isRecurringAllocationType(type) || isRecurringAllocationType(alloc.type)) {
+            if (!allocationHasStartedByMonth(alloc, calendarYear, monthIndex)) return;
+            impact += getRecurringMonthlyAmount(alloc);
+            return;
+        }
+
+        const startYear = parseInt(alloc.startYear, 10);
+        const startMonth = parseInt(alloc.startMonth, 10);
+        if (!Number.isFinite(startYear) || !Number.isFinite(startMonth)) return;
+        if (startYear === calendarYear && startMonth === month) {
+            impact += parseAmount(alloc.amount);
+        }
+    });
+
+    return Math.round(impact);
+}
+
+/**
+ * Walk months from plan start through selected, carrying leftover unallocated surplus forward.
+ */
+export function computeDeployableSurplusWithCarry({
+    unallocatedSurplusByMonth = [],
+    investmentAllocations = [],
+    journeyAdjustments = [],
+    calendarYear,
+    planStartMonth = 0,
+    selectedMonthIndex = 0,
+}) {
+    const start = Math.max(0, Math.min(11, planStartMonth));
+    const selected = Math.max(start, Math.min(11, selectedMonthIndex));
+    let carryIn = 0;
+    let deployableSurplus = 0;
+    let carriedForward = 0;
+
+    for (let m = start; m <= selected; m += 1) {
+        const ledger = parseAmount(unallocatedSurplusByMonth[m]);
+        const available = ledger + carryIn;
+        const allocImpact = computeAllocationImpactForMonth(
+            investmentAllocations,
+            calendarYear,
+            m,
+        );
+        const journeyImpact = computeJourneyAdjustmentImpactForMonth(
+            journeyAdjustments,
+            calendarYear,
+            m,
+        );
+        const leftover = Math.max(0, available - allocImpact - journeyImpact);
+
+        if (m < selected) {
+            carryIn = leftover;
+        } else {
+            carriedForward = carryIn;
+            deployableSurplus = leftover;
+        }
+    }
+
+    return {
+        deployableSurplus: Math.round(deployableSurplus),
+        carriedForward: Math.round(carriedForward),
+        monthlyFreeCash: Math.round(parseAmount(unallocatedSurplusByMonth[selected])),
+    };
+}
 
 export const INSTRUMENT_CATEGORIES = [
     {
@@ -25,19 +131,19 @@ export const INSTRUMENT_CATEGORIES = [
     {
         id: 'growth',
         label: 'Growth for most goals',
-        instruments: ['SIP', 'Lumpsum', 'Direct Equity & ETFs'],
+        instruments: ['SIP', 'Lumpsum', 'Direct Equity & ETFs', 'Life Insurance Saving Plans'],
         goalTags: ['Education', 'Home', 'Wealth', 'Retirement'],
     },
     {
         id: 'short_term',
         label: 'Short-term certainty',
-        instruments: ['Fixed Deposit', 'Recurring Deposit'],
+        instruments: ['Fixed Deposit', 'Recurring Deposit', 'Liquid Mutual Fund'],
         goalTags: ['Near-term goals'],
     },
     {
         id: 'protection',
         label: 'Protection',
-        instruments: ['Life Insurance'],
+        instruments: ['Term Insurance', 'Health Insurance', 'Life Insurance'],
         goalTags: ['Family security'],
     },
     {
@@ -53,8 +159,6 @@ export const INSTRUMENT_CATEGORIES = [
         goalTags: ['Your choice'],
     },
 ];
-
-const RECURRING_ALLOC_TYPES = ['SIP', 'PPF', 'NPS', 'Life Insurance', 'Recurring Deposit'];
 
 export function getGoalFutureValue(goal) {
     if (goal.futureValue) return parseAmount(goal.futureValue);
@@ -150,6 +254,44 @@ export function computeJourneyAdjustmentImpactForMonth(
     });
 
     return Math.round(deduction);
+}
+
+/**
+ * Ensures journey expense amounts + loan EMIs do not exceed each month's unallocated surplus.
+ * @returns {{ ok: true } | { ok: false, message: string, monthLabel: string, monthIndex: number, surplus: number, impact: number }}
+ */
+export function validateJourneyAdjustmentsAgainstSurplus(
+    adjustments = [],
+    unallocatedSurplusByMonth = [],
+    calendarYear = new Date().getFullYear(),
+) {
+    if (!adjustments.length) {
+        return { ok: true };
+    }
+
+    for (let monthIndex = 0; monthIndex < 12; monthIndex += 1) {
+        const impact = computeJourneyAdjustmentImpactForMonth(
+            adjustments,
+            calendarYear,
+            monthIndex,
+        );
+        if (impact <= 0) continue;
+
+        const surplus = Math.round(parseAmount(unallocatedSurplusByMonth[monthIndex]));
+        if (impact > surplus) {
+            const monthLabel = MONTH_LABELS_LONG[monthIndex] || 'Month';
+            return {
+                ok: false,
+                monthIndex,
+                monthLabel,
+                surplus,
+                impact,
+                message: `${monthLabel} surplus is ₹${surplus.toLocaleString('en-IN')}; planned impact is ₹${impact.toLocaleString('en-IN')}. Reduce expenses or loan EMI so they fit within the available surplus.`,
+            };
+        }
+    }
+
+    return { ok: true };
 }
 
 export function summarizeJourneyConstraints(journeyAdjustments = [], journeyProjections = [], calendarYear) {
@@ -435,83 +577,73 @@ export function compareSipGoalImpacts(baselineImpacts = [], scenarioImpacts = []
     });
 }
 
+/**
+ * Life Journey Allocation Engine entry for the studio.
+ * Replaces fixed-percentage bundles with FPI → waterfall → residual scoring.
+ * Returns studio-compatible bundles plus `engineResult` when called via buildLifeJourneyRecommendation.
+ */
 export function buildRecommendedBundles({
     deployableSurplus = 0,
     contingencyData = {},
     protectionData = {},
     goals = [],
-}) {
+    familyMembers = [],
+    expenseCategories = {},
+    assetCategories = {},
+    contingencyFund = '',
+    summaryLifeCover = '',
+    summaryHealthCover = '',
+    hasHealthInsurance = null,
+    cashFlowResults = null,
+    inflationRates = {},
+    surplusRate = 0,
+    netWorth = 0,
+    emiRatio = 0,
+    ppfMaxMonthly = 12500,
+} = {}) {
     const surplus = Math.max(0, deployableSurplus);
     if (surplus <= 0) return [];
 
-    const deploymentSlices = buildDeploymentSlices(surplus, protectionData);
-    const emergencyReserve = deploymentSlices.find((s) => s.name === 'Emergency fund')?.value || 0;
-    const protectionReserve = deploymentSlices.find((s) => s.name === 'Family protection')?.value || 0;
-    const wealthSlice = deploymentSlices.find((s) => s.name === 'Wealth building')?.value || surplus;
+    const engineResult = runLifeJourneyAllocationEngine({
+        deployableSurplus: surplus,
+        familyMembers,
+        expenseCategories,
+        assetCategories,
+        contingencyFund: contingencyFund
+            || contingencyData?.emergencyFundHave
+            || '',
+        summaryLifeCover: summaryLifeCover
+            || protectionData?.coverageHave
+            || '',
+        summaryHealthCover,
+        hasHealthInsurance,
+        goals,
+        cashFlowResults,
+        inflationRates,
+        surplusRate,
+        netWorth,
+        emiRatio,
+        ppfMaxMonthly,
+    });
 
-    const urgentGoal = goals
-        .filter((g) => getGoalFutureValue(g) > 0)
-        .sort((a, b) => parseAmount(a.yearsToGoal) - parseAmount(b.yearsToGoal))[0];
-    const urgentName = urgentGoal?.name || urgentGoal?.placeholder || 'your nearest goal';
+    const bundles = (engineResult.bundles || []).map((b) => {
+        const allocTotal = getTotalDraftAllocated(b.allocations);
+        return {
+            ...b,
+            sipAmount: Math.min(b.sipAmount || b.allocations?.SIP || 0, surplus),
+            unallocated: Math.max(0, surplus - allocTotal),
+            engineResult,
+        };
+    });
 
-    const bundles = [
-        {
-            id: 'safety_first',
-            label: 'Safety first',
-            tone: 'warning',
-            allocations: {
-                SIP: Math.max(0, Math.round(wealthSlice * 0.3)),
-                PPF: Math.max(0, Math.round(wealthSlice * 0.15)),
-                'Fixed Deposit': Math.max(0, Math.round(wealthSlice * 0.1)),
-                'Life Insurance': protectionData.hasGap ? Math.max(0, Math.round(wealthSlice * 0.1)) : 0,
-            },
-            sipAmount: Math.max(0, Math.round(wealthSlice * 0.3)),
-            reserves: { emergency: emergencyReserve, protection: protectionReserve },
-            narrative: contingencyData.gap > 0 || protectionData.hasGap
-                ? `Prioritize buffer and protection before growth. Remaining surplus targets ${urgentName} via SIP.`
-                : `Conservative mix across PPF, FD, and SIP for stability.`,
-            score: contingencyData.gap > 0 ? 95 : 70,
-        },
-        {
-            id: 'balanced',
-            label: 'Balanced growth',
-            tone: 'primary',
-            allocations: {
-                SIP: Math.max(0, Math.round(wealthSlice * 0.45)),
-                PPF: Math.max(0, Math.round(wealthSlice * 0.15)),
-                'Direct Equity & ETFs': Math.max(0, Math.round(wealthSlice * 0.1)),
-            },
-            sipAmount: Math.max(0, Math.round(wealthSlice * 0.45)),
-            reserves: { emergency: Math.round(emergencyReserve * 0.5), protection: 0 },
-            narrative: `Balanced path: SIP and PPF toward ${urgentName} while keeping a partial emergency reserve.`,
-            score: 88,
-        },
-        {
-            id: 'aggressive',
-            label: 'Aggressive growth',
-            tone: 'accent',
-            allocations: {
-                SIP: Math.max(0, Math.round(wealthSlice * 0.55)),
-                'Direct Equity & ETFs': Math.max(0, Math.round(wealthSlice * 0.2)),
-                Lumpsum: Math.max(0, Math.round(wealthSlice * 0.15)),
-            },
-            sipAmount: Math.max(0, Math.round(wealthSlice * 0.55)),
-            reserves: { emergency: 0, protection: 0 },
-            narrative: `Maximize growth via SIP and equity for long-horizon goals — best when buffers are adequate.`,
-            score: goals.length > 1 ? 82 : 75,
-        },
-    ];
+    return bundles;
+}
 
-    return bundles
-        .map((b) => {
-            const allocTotal = getTotalDraftAllocated(b.allocations);
-            return {
-                ...b,
-                sipAmount: Math.min(b.sipAmount, surplus),
-                unallocated: Math.max(0, surplus - allocTotal),
-            };
-        })
-        .sort((a, b) => b.score - a.score);
+/** Full engine payload for UI (FPI stack, explanations, diagnostics). */
+export function buildLifeJourneyRecommendation(params) {
+    const bundles = buildRecommendedBundles(params);
+    const engineResult = bundles[0]?.engineResult || null;
+    return { bundles, engineResult };
 }
 
 export function buildDraftAllocationPlan({
@@ -677,10 +809,19 @@ export function buildAllocationStudioContext({
         calendarYear,
         monthIndex,
     );
-    const deployableSurplus = Math.max(
-        0,
-        monthlyFreeCash - allocationsSummary.monthlyCommitted - journeyMonthDeduction,
-    );
+    const {
+        deployableSurplus,
+        carriedForward,
+    } = monthIndex >= planStartMonth
+        ? computeDeployableSurplusWithCarry({
+            unallocatedSurplusByMonth: ledger.unallocatedSurplus || [],
+            investmentAllocations,
+            journeyAdjustments,
+            calendarYear,
+            planStartMonth,
+            selectedMonthIndex: monthIndex,
+        })
+        : { deployableSurplus: 0, carriedForward: 0 };
 
     const protectionData = calculateProtectionData(expenseCategories, summaryLifeCover, familyMembers);
     const contingencyData = calculateContingencyData(
@@ -756,6 +897,7 @@ export function buildAllocationStudioContext({
         hero: {
             monthlyFreeCash,
             deployableSurplus,
+            carriedForward,
             monthlyCommitted: allocationsSummary.monthlyCommitted,
             journeyMonthDeduction,
             journeyYearSurplus,

@@ -10,6 +10,7 @@ import {
     applyLifeEntryUpdate,
     getLifeMemberMonthlyTotal,
     getInsuranceMonthlyTotal,
+    getEffectiveMonthlyInsurance,
 } from './insuranceDetailSync';
 
 describe('insuranceDetailSync cover reconciliation', () => {
@@ -135,5 +136,24 @@ describe('getInsuranceMonthlyTotal', () => {
             policyDocs: { health: 'policy.pdf' },
         });
         expect(total).toBe(4000);
+    });
+});
+
+describe('getEffectiveMonthlyInsurance', () => {
+    it('uses summaryInsuranceTotal when detailed insurance is empty', () => {
+        expect(getEffectiveMonthlyInsurance({
+            summaryInsuranceTotal: '5000',
+            insurance: { health: { value: '', frequency: 'Annual' }, life: {} },
+        })).toBe(5000);
+    });
+
+    it('prefers detailed insurance over summary snapshot', () => {
+        expect(getEffectiveMonthlyInsurance({
+            summaryInsuranceTotal: '5000',
+            insurance: {
+                health: { value: '12000', frequency: 'Annual' },
+                life: {},
+            },
+        })).toBe(1000);
     });
 });

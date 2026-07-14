@@ -45,6 +45,16 @@ export function getInsuranceMonthlyTotal(insurance = {}) {
     }, 0);
 }
 
+/**
+ * Prefer detailed insurance breakdown when entered; otherwise use summary snapshot.
+ * Mirrors getEffectiveMonthlyEmi / getEffectiveMonthlySavings.
+ */
+export function getEffectiveMonthlyInsurance(expenseCategories = {}) {
+    const detailed = getInsuranceMonthlyTotal(expenseCategories.insurance || {});
+    if (detailed > 0) return detailed;
+    return parseFloat(expenseCategories.summaryInsuranceTotal) || 0;
+}
+
 export function getLifeMemberMonthlyTotal(entry) {
     if (!entry) return 0;
     if (Array.isArray(entry.premiums) && entry.premiums.length > 0) {

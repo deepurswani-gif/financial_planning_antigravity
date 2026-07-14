@@ -1,3 +1,5 @@
+import { determineLifeStage, buildLifeStageContext } from '../DetailedReport/allocationEngine/lifeStageEngine';
+
 export const calculateAge = (dob) => {
     if (!dob) return 0;
     const birthDate = new Date(dob);
@@ -17,27 +19,51 @@ export const calculateRetirementYear = (dob, retirementAge) => {
     return birthYear + parseInt(retirementAge);
 };
 
-export const calculateProfile = (member) => {
-    const age = calculateAge(member.dob);
-    const yearsToRetire = member.retirementAge - age;
-    const retirementYear = calculateRetirementYear(member.dob, member.retirementAge);
+/**
+ * @param {object} member
+ * @param {object} [householdContext] - optional { familyMembers, surplusRate, netWorth, emiRatio, hasStableIncome }
+ */
+export const calculateProfile = (member, householdContext = {}) => {
+    const age = member.dob ? calculateAge(member.dob) : (parseFloat(member.age) || 0);
+    const retirementAge = parseInt(member.retirementAge, 10) || 60;
+    const yearsToRetire = retirementAge - age;
+    const retirementYear = member.dob
+        ? calculateRetirementYear(member.dob, retirementAge)
+        : '';
 
-    let lifeStage = '';
-    if (age < 25) lifeStage = 'Early Career / Foundation';
-    else if (age < 40) lifeStage = 'Wealth Accumulation / Family Building';
-    else if (age < 55) lifeStage = 'Peak Earnings / Maturity';
-    else lifeStage = 'Transition to Wisdom Years';
+    const familyMembers = householdContext.familyMembers?.length
+        ? householdContext.familyMembers
+        : [member];
+
+    const stage = determineLifeStage({
+        familyMembers,
+        age,
+        retirementAge,
+        surplusRate: householdContext.surplusRate,
+        netWorth: householdContext.netWorth,
+        emiRatio: householdContext.emiRatio,
+        hasStableIncome: householdContext.hasStableIncome,
+    });
 
     return {
         ...member,
         age,
         yearsToRetire,
         retirementYear,
-        lifeStage,
-        isLateStart: age > 40 && yearsToRetire < 15
+        lifeStage: stage.lifeStage,
+        lifeStageId: stage.lifeStageId,
+        stageSignals: stage.stageSignals,
+        stageSummary: stage.stageSummary,
+        isLateStart: age > 40 && yearsToRetire < 15,
     };
 };
 
-export const calculateFamilyProfile = (members) => {
-    return members.map(member => calculateProfile(member));
+export const calculateFamilyProfile = (members, householdContext = {}) => {
+    const familyMembers = members || [];
+    return familyMembers.map((member) => calculateProfile(member, {
+        ...householdContext,
+        familyMembers,
+    }));
 };
+
+export { determineLifeStage, buildLifeStageContext };

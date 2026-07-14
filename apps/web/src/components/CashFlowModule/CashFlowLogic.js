@@ -6,7 +6,7 @@ import {
 } from '../DetailedFlow/expenseDetailSync';
 import { resolveEmploymentType } from '../DetailedFlow/employmentTypeSync';
 import { shouldIncludeSpouseIncome } from '../DetailedFlow/incomeDetailSync';
-import { getLifeMemberMonthlyTotal } from '../DetailedFlow/insuranceDetailSync';
+import { getEffectiveMonthlyInsurance, getLifeMemberMonthlyTotal, getInsuranceMonthlyTotal } from '../DetailedFlow/insuranceDetailSync';
 import {
     getEffectiveMonthlySavings,
     getSavingsMonthlyAmount,
@@ -56,20 +56,7 @@ export const calculateCashFlow = (income, expenseCategories, familyMembers = [],
 
     const householdSum = getEffectiveMonthlyHousehold(expenseCategories, familyMembers);
     const emiSum = getEffectiveMonthlyEmi(expenseCategories);
-    
-    // Insurance specialized handling for nested life insurance
-    const insuranceSum = Object.entries(expenseCategories.insurance || {}).reduce((sum, [key, item]) => {
-        if (key === 'life') {
-            const lifeTotalMonthly = Object.values(item || {}).reduce(
-                (lSum, lItem) => lSum + getLifeMemberMonthlyTotal(lItem),
-                0,
-            );
-            return sum + lifeTotalMonthly;
-        }
-        if (key === 'policyDocs') return sum;
-        if (!item || typeof item !== 'object' || item.value === undefined) return sum;
-        return sum + convertToMonthly(item.value, item.frequency);
-    }, 0);
+    const insuranceSum = getEffectiveMonthlyInsurance(expenseCategories);
 
     const savingsSum = getEffectiveMonthlySavings(expenseCategories);
 
@@ -189,30 +176,41 @@ export const calculateCashFlow = (income, expenseCategories, familyMembers = [],
             value: parseFloat(expenseCategories.summaryEmiTotal),
         });
     }
-    // Insurance specialized handling
-    Object.entries(expenseCategories.insurance || {}).forEach(([itemKey, item]) => {
-        if (itemKey === 'life') {
-            Object.entries(item || {}).forEach(([memberName, lItem]) => {
-                const monthlyAmount = getLifeMemberMonthlyTotal(lItem);
+    const insuranceUsesSnapshot = insuranceSum > 0
+        && getInsuranceMonthlyTotal(expenseCategories.insurance || {}) === 0
+        && parseFloat(expenseCategories.summaryInsuranceTotal) > 0;
+    if (insuranceUsesSnapshot) {
+        expenseBreakdown.push({
+            name: 'Insurance Premiums (Summary)',
+            category: getCategoryLabel('insurance'),
+            value: parseFloat(expenseCategories.summaryInsuranceTotal),
+        });
+    } else {
+        // Insurance specialized handling
+        Object.entries(expenseCategories.insurance || {}).forEach(([itemKey, item]) => {
+            if (itemKey === 'life') {
+                Object.entries(item || {}).forEach(([memberName, lItem]) => {
+                    const monthlyAmount = getLifeMemberMonthlyTotal(lItem);
+                    if (monthlyAmount > 0) {
+                        expenseBreakdown.push({
+                            name: `Life Insurance Premium (${memberName})`,
+                            category: getCategoryLabel('insurance'),
+                            value: monthlyAmount
+                        });
+                    }
+                });
+            } else if (itemKey !== 'policyDocs' && item?.value !== undefined) {
+                const monthlyAmount = convertToMonthly(item.value, item.frequency);
                 if (monthlyAmount > 0) {
                     expenseBreakdown.push({
-                        name: `Life Insurance Premium (${memberName})`,
+                        name: getItemLabel(itemKey),
                         category: getCategoryLabel('insurance'),
                         value: monthlyAmount
                     });
                 }
-            });
-        } else if (itemKey !== 'policyDocs' && item?.value !== undefined) {
-            const monthlyAmount = convertToMonthly(item.value, item.frequency);
-            if (monthlyAmount > 0) {
-                expenseBreakdown.push({
-                    name: getItemLabel(itemKey),
-                    category: getCategoryLabel('insurance'),
-                    value: monthlyAmount
-                });
             }
-        }
-    });
+        });
+    }
 
     const totalSavings = savingsSum;
     const disposableIncome = surplus - totalSavings;

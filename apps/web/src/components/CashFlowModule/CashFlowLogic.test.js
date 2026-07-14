@@ -139,6 +139,45 @@ describe('CashFlowLogic', () => {
         expect(results.totalIncome).toBe(175000);
     });
 
+    it('uses summary insurance snapshot when detailed fields are empty', () => {
+        const income = { self: 100000 };
+        const expenseCategories = {
+            household: {},
+            emi: {},
+            insurance: { health: { value: '', frequency: 'Annual' }, life: {} },
+            savings: {},
+            summaryInsuranceTotal: '5000',
+        };
+
+        const results = calculateCashFlow(income, expenseCategories);
+
+        expect(results.categorySums.insurance).toBe(5000);
+        expect(results.totalExpenses).toBe(5000);
+        expect(results.expenseBreakdown).toContainEqual(expect.objectContaining({
+            name: 'Insurance Premiums (Summary)',
+            category: 'Insurance Premiums',
+            value: 5000,
+        }));
+    });
+
+    it('prefers detailed insurance over summary snapshot', () => {
+        const income = { self: 100000 };
+        const expenseCategories = {
+            household: {},
+            emi: {},
+            insurance: {
+                health: { value: '12000', frequency: 'Annual' },
+                life: {},
+            },
+            savings: {},
+            summaryInsuranceTotal: '5000',
+        };
+
+        const results = calculateCashFlow(income, expenseCategories);
+
+        expect(results.categorySums.insurance).toBe(1000);
+    });
+
     it('uses summary anchors when detail fields have stale partial digits', () => {
         const familyMembers = [{ relation: 'Self', occupation: 'Salaried' }];
         const income = {

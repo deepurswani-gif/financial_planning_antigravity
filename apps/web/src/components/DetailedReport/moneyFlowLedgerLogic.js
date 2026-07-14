@@ -14,7 +14,7 @@ import {
     getEffectiveMonthlyHousehold,
     getEffectiveMonthlyEmi,
 } from '../DetailedFlow/expenseDetailSync';
-import { getLifeMemberMonthlyTotal } from '../DetailedFlow/insuranceDetailSync';
+import { getEffectiveMonthlyInsurance } from '../DetailedFlow/insuranceDetailSync';
 import { getEffectiveMonthlySavings } from '../DetailedFlow/savingsDetailSync';
 import { convertToMonthly } from '../CashFlowModule/CashFlowLogic';
 
@@ -329,20 +329,7 @@ export function resolveLedgerMonthlyRow(ledgerArray, fallbackMonthly = 0) {
 }
 
 export function getMonthlyInsuranceTotal(expenseCategories = {}) {
-    const insurance = expenseCategories.insurance || {};
-    let total = 0;
-    Object.entries(insurance).forEach(([key, item]) => {
-        if (key === 'life') {
-            total += Object.values(item || {}).reduce(
-                (sum, entry) => sum + getLifeMemberMonthlyTotal(entry),
-                0,
-            );
-            return;
-        }
-        if (key === 'policyDocs' || !item || typeof item !== 'object' || item.value === undefined) return;
-        total += convertToMonthly(item.value, item.frequency);
-    });
-    return Math.round(total);
+    return Math.round(getEffectiveMonthlyInsurance(expenseCategories));
 }
 
 /** Effective income after tax adjustment for a month index. */

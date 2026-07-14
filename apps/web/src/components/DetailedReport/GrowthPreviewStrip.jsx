@@ -12,6 +12,9 @@ const ICONS = {
     'Fixed Deposit': Landmark,
     'Recurring Deposit': PiggyBank,
     'Life Insurance': Shield,
+    'Term Insurance': Shield,
+    'Health Insurance': Shield,
+    'Life Insurance Saving Plans': PiggyBank,
     Gold: Coins,
     'Other Investment': Coins,
 };

@@ -228,16 +228,32 @@ const LifeJourneySection = () => {
                 .lj-arc-today { z-index: 2; }
                 .lj-arc-golden { right: 0; left: auto; transform: translate(0, -50%); align-items: flex-end; }
                 .lj-arc-axis { display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); padding: 0 0.25rem; }
-                .lj-goal-strip { padding: 0.5rem 0; }
-                .lj-goal-track { position: relative; height: 4px; background: linear-gradient(90deg, var(--primary), #E2E8F0); border-radius: 2px; margin: 2rem 0.5rem 0.75rem; }
-                .lj-goal-node { position: absolute; top: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 0.35rem; }
-                .lj-goal-node-dot { width: 34px; height: 34px; border-radius: 50%; background: #fff; border: 2px solid var(--primary); color: var(--primary); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(37,99,235,0.15); }
-                .lj-goal-node-year { font-size: 0.68rem; font-weight: 700; color: var(--text-muted); }
+                .lj-goal-timeline { list-style: none; margin: 0.75rem 0 0; padding: 0; display: flex; flex-direction: column; }
+                .lj-goal-row { display: grid; grid-template-columns: 3.5rem 1.25rem minmax(0, 1fr); gap: 0.35rem 0.65rem; align-items: stretch; }
+                .lj-goal-year-col { display: flex; justify-content: flex-end; padding-top: 0.85rem; }
+                .lj-goal-year { font-size: 0.8rem; font-weight: 700; color: var(--text-main); line-height: 1; }
+                .lj-goal-year-same { display: block; width: 1px; height: 1px; }
+                .lj-goal-rail { position: relative; display: flex; justify-content: center; }
+                .lj-goal-rail::before { content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; transform: translateX(-50%); background: var(--border, #E2E8F0); }
+                .lj-goal-row:first-child .lj-goal-rail::before { top: 1.05rem; }
+                .lj-goal-row:last-child .lj-goal-rail::before { bottom: calc(100% - 1.35rem); }
+                .lj-goal-rail-dot { position: relative; z-index: 1; width: 10px; height: 10px; margin-top: 1.05rem; border-radius: 50%; background: var(--primary, #2563EB); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12); flex-shrink: 0; }
+                .lj-goal-body { padding: 0.55rem 0 0.75rem; min-width: 0; }
+                .lj-goal-body-top { display: flex; align-items: flex-start; gap: 0.65rem; }
+                .lj-goal-icon-wrap { width: 32px; height: 32px; border-radius: 8px; background: rgba(37, 99, 235, 0.08); color: var(--primary, #2563EB); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+                .lj-goal-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+                .lj-goal-name { font-size: 0.92rem; font-weight: 600; color: var(--text-main); line-height: 1.3; }
+                .lj-goal-meta { font-size: 0.75rem; color: var(--text-muted); }
+                .lj-goal-cost { font-size: 0.88rem; font-weight: 700; color: var(--text-main); white-space: nowrap; padding-top: 0.15rem; }
+                .lj-goal-range { display: flex; justify-content: space-between; margin-top: 0.35rem; padding-top: 0.65rem; border-top: 1px solid var(--border, #E2E8F0); font-size: 0.72rem; font-weight: 600; color: var(--text-muted); }
                 @media (max-width: 640px) {
                     .lj-section { padding: 0 0.5rem; }
                     .lj-sticky-col, .lj-th-label { min-width: 140px; max-width: 140px; }
                     .lj-visual-row { grid-template-columns: 1fr; }
                     .lj-arc-marker { font-size: 0.65rem; }
+                    .lj-goal-row { grid-template-columns: 2.75rem 1rem minmax(0, 1fr); gap: 0.25rem 0.45rem; }
+                    .lj-goal-body-top { flex-wrap: wrap; }
+                    .lj-goal-cost { width: 100%; padding-left: 2.5rem; padding-top: 0; }
                 }
             `}</style>
         </div>

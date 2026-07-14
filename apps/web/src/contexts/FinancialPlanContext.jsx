@@ -65,6 +65,7 @@ export const FinancialPlanProvider = ({ children }) => {
     savings: { sip: '', ppf: '', nps: '', rd: '', otherSaving: '' },
     summaryMonthlyInvestments: '',
     summaryOtherSavings: '',
+    summaryInsuranceTotal: '',
   });
 
   const [assetCategories, setAssetCategories] = useState({
@@ -367,6 +368,7 @@ export const FinancialPlanProvider = ({ children }) => {
       })(),
       summaryHouseholdTotal: loadedExpenseCategories.summaryHouseholdTotal ?? '',
       summaryEmiTotal: loadedExpenseCategories.summaryEmiTotal ?? '',
+      summaryInsuranceTotal: loadedExpenseCategories.summaryInsuranceTotal ?? '',
       summaryMonthlyInvestments: loadedExpenseCategories.summaryMonthlyInvestments ?? '',
       summaryOtherSavings: loadedExpenseCategories.summaryOtherSavings ?? '',
     })));

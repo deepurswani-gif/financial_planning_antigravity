@@ -5,19 +5,27 @@ import { getEmergencyFundAmount } from '../DetailedFlow/wealthDetailSync';
 
 const parseAmount = (value) => parseFloat(value) || 0;
 
-const RECURRING_ALLOC_TYPES = ['SIP', 'PPF', 'NPS', 'Life Insurance', 'Recurring Deposit'];
+const RECURRING_ALLOC_TYPES = [
+    'SIP', 'PPF', 'NPS', 'Life Insurance', 'Term Insurance', 'Health Insurance',
+    'Life Insurance Saving Plans', 'Recurring Deposit', 'Liquid Mutual Fund',
+];
 
 export function summarizeInvestmentAllocations(allocations = []) {
     const items = allocations.map((a) => {
-        const amount = parseAmount(a.amount);
+        const rawAmount = parseAmount(a.amount);
         const isMonthly = RECURRING_ALLOC_TYPES.includes(a.type);
+        // Studio / calculator rows store recurring amounts as annual totals.
+        const monthlyAmount = isMonthly ? rawAmount / 12 : 0;
         return {
             id: a.id,
             type: a.type,
             name: a.name || a.type,
-            amount,
+            amount: isMonthly ? monthlyAmount : rawAmount,
             isMonthly,
-            annualImpact: isMonthly ? amount * 12 : amount,
+            annualImpact: isMonthly ? rawAmount : rawAmount,
+            studioPlanKey: a.studioPlanKey || null,
+            startMonth: a.startMonth || null,
+            startYear: a.startYear || null,
         };
     });
 
@@ -28,21 +36,30 @@ export function summarizeInvestmentAllocations(allocations = []) {
     return { items, monthlyCommitted, count: items.length };
 }
 
-export function buildDeploymentSlices(monthlyFreeCash, protectionData) {
+export function buildDeploymentSlices(monthlyFreeCash, protectionData, contingencyData = {}) {
     const monthly = Math.max(0, monthlyFreeCash);
     if (monthly <= 0) return [];
 
     const slices = [];
     let remaining = monthly;
 
-    const emergencySlice = Math.min(remaining, monthly * 0.2);
+    const emergencyGapMonthly = contingencyData?.gap > 0
+        ? Math.ceil(contingencyData.gap / 12)
+        : 0;
+    const emergencySlice = Math.min(remaining, emergencyGapMonthly || (contingencyData?.isHealthy ? 0 : Math.round(monthly * 0.2)));
     if (emergencySlice > 0) {
         slices.push({ name: 'Emergency fund', value: Math.round(emergencySlice), fill: '#F59E0B' });
         remaining -= emergencySlice;
     }
 
     if (protectionData?.hasGap && remaining > 0) {
-        const protectionSlice = Math.min(remaining, remaining * 0.2);
+        // Prefer gap-driven premium estimate when available; else 20% of remaining
+        const protectionSlice = Math.min(
+            remaining,
+            protectionData.suggestedMonthly > 0
+                ? protectionData.suggestedMonthly
+                : Math.round(remaining * 0.2),
+        );
         slices.push({ name: 'Family protection', value: Math.round(protectionSlice), fill: '#6366F1' });
         remaining -= protectionSlice;
     }
@@ -87,7 +104,7 @@ export function buildInvestSurplusReport({
     const allocationsSummary = summarizeInvestmentAllocations(investmentAllocations);
     const deployableMonthly = Math.max(0, monthlyFreeCash - allocationsSummary.monthlyCommitted);
 
-    const deploymentSlices = buildDeploymentSlices(deployableMonthly, protectionData);
+    const deploymentSlices = buildDeploymentSlices(deployableMonthly, protectionData, contingencyData);
     const wealthMonthly = deploymentSlices
         .find((s) => s.name === 'Wealth building')?.value || deployableMonthly;
 

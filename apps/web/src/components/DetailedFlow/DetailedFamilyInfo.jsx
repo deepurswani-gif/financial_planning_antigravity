@@ -492,6 +492,7 @@ const DetailedFamilyInfo = () => {
             questions={questions}
             narrative={narrative}
             lastSectionLabel="Save & Continue"
+            contentWidth="wide"
         />
     );
 };

@@ -346,7 +346,7 @@ export const buildExecutiveSummaryReport = ({
     const monthlyExpenses = cashFlow.categorySums?.household || 0;
     const monthlyEmi = cashFlow.categorySums?.emi || 0;
     const monthlyInvestments = cashFlow.totalSavings || 0;
-    const monthlySurplus = monthlyIncome - monthlyExpenses - monthlyEmi;
+    const monthlySurplus = cashFlow.surplus;
     const surplusRatio = monthlyIncome > 0 ? monthlySurplus / monthlyIncome : 0;
     const dailyScore = monthlyIncome > 0 ? scoreSurplusRatio(Math.max(0, surplusRatio)) : 0;
 

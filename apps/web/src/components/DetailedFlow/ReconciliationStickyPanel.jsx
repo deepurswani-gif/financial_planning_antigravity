@@ -1,68 +1,29 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { RECONCILIATION_STACK_ID } from './reconciliationStackId';
 
-const STACK_ID = 'reconciliation-panel-stack';
-
-function getOrCreateStackHost() {
-    let host = document.getElementById(STACK_ID);
-    if (!host) {
-        host = document.createElement('div');
-        host.id = STACK_ID;
-        host.className = 'reconciliation-panel-stack';
-        host.setAttribute('aria-label', 'Reconciliation summaries');
-        document.body.appendChild(host);
-    }
-    return host;
-}
-
-function syncStackMetrics(host) {
-    const root = document.documentElement;
-    if (!host || host.childElementCount === 0) {
-        root.style.removeProperty('--reconciliation-stack-height');
-        root.classList.remove('reconciliation-stack-active');
-        return;
-    }
-    root.classList.add('reconciliation-stack-active');
-    const { height } = host.getBoundingClientRect();
-    root.style.setProperty('--reconciliation-stack-height', `${Math.ceil(height)}px`);
-}
-
-function removeStackHostIfEmpty() {
-    const host = document.getElementById(STACK_ID);
-    if (host && host.childElementCount === 0) {
-        host.remove();
-    }
-    syncStackMetrics(null);
+function getStackHost() {
+    if (typeof document === 'undefined') return null;
+    return document.getElementById(RECONCILIATION_STACK_ID);
 }
 
 /**
- * Fixed reconciliation panel — stays visible while the form scrolls.
- * Side-docked in the left gutter when space allows; top-docked on narrower screens.
+ * Portals reconciliation bar content into the fixed flow chrome (below step nav).
  */
 export default function ReconciliationStickyPanel({ children, visible = true }) {
-    const [mounted, setMounted] = useState(false);
-    const [host, setHost] = useState(null);
+    const host = getStackHost();
 
     useEffect(() => {
-        setMounted(true);
-        const stackHost = getOrCreateStackHost();
-        setHost(stackHost);
-
-        const observer = new ResizeObserver(() => syncStackMetrics(stackHost));
-        observer.observe(stackHost);
-
-        syncStackMetrics(stackHost);
-
+        if (!host) return undefined;
+        host.dispatchEvent(new CustomEvent('reconciliation-stack-change'));
         return () => {
-            observer.disconnect();
             requestAnimationFrame(() => {
-                removeStackHostIfEmpty();
+                host.dispatchEvent(new CustomEvent('reconciliation-stack-change'));
             });
         };
-    }, []);
+    }, [host, visible, children]);
 
-    if (!visible || !children) return null;
-    if (!mounted || !host) return null;
+    if (!visible || !children || !host) return null;
 
     return createPortal(
         <div className="reconciliation-fixed-panel" role="status" aria-live="polite">

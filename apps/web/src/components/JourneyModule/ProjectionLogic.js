@@ -284,7 +284,7 @@ export const generateProjections = ({
         // Add Future Life Insurance from Allocation Module
         let futureLifeAllocationsThisYear = 0;
         investmentAllocations.forEach(alloc => {
-            if (alloc.type !== 'Life Insurance') return;
+            if (!['Life Insurance', 'Term Insurance', 'Health Insurance'].includes(alloc.type)) return;
             
             const allocStartYear = parseInt(alloc.startYear);
             const allocStartMonth = parseInt(alloc.startMonth) || 1;
@@ -470,8 +470,8 @@ export const generateProjections = ({
 
             // 2. Calculate Monthly Allocation Deductions
             investmentAllocations.forEach(alloc => {
-                const isRecurring = ['SIP', 'PPF', 'NPS', 'Life Insurance', 'Recurring Deposit'].includes(alloc.type);
-                const isLifeInsurance = alloc.type === 'Life Insurance';
+                const isRecurring = ['SIP', 'PPF', 'NPS', 'Life Insurance', 'Term Insurance', 'Health Insurance', 'Life Insurance Saving Plans', 'Recurring Deposit'].includes(alloc.type);
+                const isLifeInsurance = ['Life Insurance', 'Term Insurance', 'Health Insurance'].includes(alloc.type);
 
                 if (isLifeInsurance) return; // Handled in savingsAndInvestments already as totalInsuranceOutflow
 
@@ -524,12 +524,12 @@ export const generateProjections = ({
             const allocStartMonth = parseInt(alloc.startMonth) || 1;
             const allocDuration = parseInt(alloc.duration) || 1;
             const type = alloc.type;
-            const isRecurring = ['SIP', 'PPF', 'NPS', 'Life Insurance', 'Recurring Deposit'].includes(type);
+            const isRecurring = ['SIP', 'PPF', 'NPS', 'Life Insurance', 'Term Insurance', 'Health Insurance', 'Life Insurance Saving Plans', 'Recurring Deposit'].includes(type);
             
             // If it's Life Insurance, it's already accounted for in totalInsuranceOutflow
             // We want it to show up in the Allocation Table, so we will add it to activeAllocations
             // but we MUST NOT subtract it from unallocatedSurplus (i.e., don't add to yearAllocationsTotal)
-            const isLifeInsurance = type === 'Life Insurance';
+            const isLifeInsurance = ['Life Insurance', 'Term Insurance', 'Health Insurance'].includes(type);
 
             let yearlyAmount = 0;
             let monthlyAmount = 0;

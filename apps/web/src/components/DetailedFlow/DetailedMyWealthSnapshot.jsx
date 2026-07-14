@@ -19,6 +19,7 @@ const DetailedMyWealthSnapshot = () => {
                 questions={questions}
                 narrative="Thank you. I now have a clear picture of what you've built — and what you're committed to."
                 nextSectionLabel="My Dreams & Goals"
+                contentWidth="wide"
             />
             {activeFdModal && (
                 <InvestmentDetailsModal

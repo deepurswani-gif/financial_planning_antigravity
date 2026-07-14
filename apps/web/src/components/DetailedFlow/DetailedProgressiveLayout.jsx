@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, ArrowRight, ArrowLeft, Sparkles } from 'lucide-react';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 import { detailedFlowSteps } from './detailedFlowSteps';
+import { useProgressiveShellWidth } from '../SummaryFlow/useProgressiveShellWidth';
 
 const useTypewriter = (text, speed = 30) => {
     const [displayed, setDisplayed] = useState('');
@@ -68,9 +69,11 @@ const DetailedProgressiveLayout = ({
     lastSectionLabel = 'Next Section',
     navigateToQuestionId,
     onNavigateToQuestionHandled,
+    contentWidth = 'default',
 }) => {
     const navigate = useNavigate();
     const { savePlanData } = useFinancialPlan();
+    const shellClassName = useProgressiveShellWidth(contentWidth);
     const [currentQuestionId, setCurrentQuestionId] = useState(() => questions[0]?.id ?? '');
     const [direction, setDirection] = useState(1);
     const [showNarrative, setShowNarrative] = useState(false);
@@ -175,7 +178,7 @@ const DetailedProgressiveLayout = ({
             'recap-household', 'household-breakup', 'recap-emi', 'emi-loans',
             'savings-snapshot', 'savings-breakdown',
             'wealth-recap', 'assets-breakdown', 'custom-assets', 'liabilities', 'custom-liabilities',
-            'goals-intro', 'goals-catalog', 'goals-review',
+            'goals-intro', 'goals-catalog', 'goals-years', 'goals-value', 'goals-review',
         ];
         const prevIdx = stepOrder.indexOf(currentQuestionId);
         for (let i = prevIdx >= 0 ? prevIdx : stepOrder.length - 1; i >= 0; i--) {
@@ -251,7 +254,7 @@ const DetailedProgressiveLayout = ({
                 <ChevronRight size={24} />
             </button>
 
-            <div className="progressive-question-shell">
+            <div className={shellClassName}>
                 <AnimatePresence mode="wait" custom={direction}>
                     <motion.div
                         key={`${currentStepId}-${currentQuestion?.id ?? resolvedIndex}`}

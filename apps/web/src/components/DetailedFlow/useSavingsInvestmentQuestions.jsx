@@ -6,8 +6,7 @@ import {
     sumConfiguredSavings,
     getSummarySavingsTotal,
 } from './savingsDetailSync';
-import ReconciliationStatus from './ReconciliationStatus';
-import ReconciliationStickyPanel from './ReconciliationStickyPanel';
+import ReconciliationBar from './ReconciliationBar';
 
 const formatInr = (val) => {
     if (!val || isNaN(val)) return '₹0';
@@ -241,19 +240,18 @@ export function useSavingsInvestmentQuestions() {
                     <p className="question-narrative">Split your monthly investments across the instruments you use.</p>
                     <h2 className="question-title">Savings &amp; investments</h2>
                     {summaryCombined > 0 && (
-                        <ReconciliationStickyPanel>
-                            <div className="reconciliation-sticky-panel__title">Summary vs detailed savings</div>
-                            <div>Your detailed total: <strong style={{ color: 'var(--primary)' }}>{formatInr(detailedTotal)}</strong> / month</div>
-                            <div>Summary combined: <strong>{formatInr(summaryCombined)}</strong> / month</div>
-                            <div style={{ marginTop: '0.35rem' }}>
-                                <ReconciliationStatus reconciliation={{
-                                    summaryTotal: summaryCombined,
-                                    detailTotal: detailedTotal,
-                                    delta: remainingToAllocate,
-                                    status: remainingToAllocate === 0 ? 'match' : remainingToAllocate > 0 ? 'under' : 'over',
-                                }} />
-                            </div>
-                        </ReconciliationStickyPanel>
+                        <ReconciliationBar
+                            summaryLabel="Summary Savings"
+                            detailLabel="Detailed savings"
+                            summaryAmount={summaryCombined}
+                            detailAmount={detailedTotal}
+                            reconciliation={{
+                                summaryTotal: summaryCombined,
+                                detailTotal: detailedTotal,
+                                delta: remainingToAllocate,
+                                status: remainingToAllocate === 0 ? 'match' : remainingToAllocate > 0 ? 'under' : 'over',
+                            }}
+                        />
                     )}
                     <div className="question-fields" style={{ maxWidth: '480px', margin: '0 auto', gap: '1.25rem' }}>
                         <CurrencyField

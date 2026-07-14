@@ -1,4 +1,5 @@
 import { formatCurrency } from '../CashFlowModule/CashFlowLogic';
+import { getActiveGoals } from '../DetailedFlow/goalsDetailSync';
 import { calculateFutureCost } from '../GoalModule/GoalLogic';
 import { calculateAge, calculateRetirementYear } from '../ProfileModule/ProfileLogic';
 
@@ -70,13 +71,20 @@ export function buildLifeJourneyReport({
         (p) => p.year > currentYear && retirementYear && p.year <= retirementYear,
     );
 
-    const goalsByYear = mapGoalsByYear(goals, currentYear);
+    // Only configured goals (years + amount) — matches Dreams & Goals review.
+    const goalsByYear = mapGoalsByYear(getActiveGoals(goals), currentYear);
+    const latestGoalYear = Object.keys(goalsByYear).reduce(
+        (max, year) => Math.max(max, parseInt(year, 10) || 0),
+        0,
+    );
+    const constellationEndYear = Math.max(retirementYear || 0, latestGoalYear);
 
     return {
         meta: {
             hasProfile: true,
             currentYear,
             retirementYear,
+            constellationEndYear: constellationEndYear || retirementYear,
             inflationRates,
         },
         hero: {

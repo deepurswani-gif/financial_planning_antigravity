@@ -11,6 +11,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { loadSummaryUiDraft, patchSummaryUiDraft } from '../../lib/summaryFlowStorage';
 import { calculateFutureCost } from '../GoalModule/GoalLogic';
 import QuestionProgressBar from './QuestionProgressBar';
+import { useProgressiveShellWidth } from './useProgressiveShellWidth';
 
 /* ─── Screen constants ─── */
 const INTRO   = 0;
@@ -106,6 +107,7 @@ const SummaryGoals = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
     const userId = user?.id ?? null;
+    const shellClassName = useProgressiveShellWidth('wide');
 
     const validGoals = goals.filter(isValidGoal);
     const savedGoalsUi = loadSummaryUiDraft(userId)?.goalsWizard;
@@ -353,7 +355,7 @@ const SummaryGoals = () => {
                 <ChevronRight size={24} />
             </button>
 
-            <div className="progressive-question-shell">
+            <div className={shellClassName}>
                 <QuestionProgressBar totalQuestions={SCREEN_COUNT} currentIndex={screen} />
 
                 <AnimatePresence mode="wait" custom={direction}>
@@ -385,7 +387,7 @@ const SummaryGoals = () => {
                                     Select all that apply. You&apos;ll enter timing and cost for each selected goal next.
                                 </p>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', maxWidth: '520px', margin: '0 auto 1.5rem' }}>
+                                <div className="goals-selection-grid">
                                     {goalTemplates.map((tmpl) => {
                                         const Icon = tmpl.icon;
                                         const isSelected = selectedTemplateIds.includes(tmpl.id);
@@ -430,7 +432,7 @@ const SummaryGoals = () => {
                                 </div>
 
                                 {customGoals.length > 0 && (
-                                    <div style={{ maxWidth: '520px', margin: '0 auto 1rem', textAlign: 'left' }}>
+                                    <div className="goals-catalog-panel" style={{ marginBottom: '1rem' }}>
                                         <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.65rem' }}>
                                             Your custom goals
                                         </div>
@@ -453,7 +455,7 @@ const SummaryGoals = () => {
                                 )}
 
                                 {showCustomInput && (
-                                    <div style={{ maxWidth: '420px', margin: '0 auto', display: 'flex', gap: '0.75rem' }}>
+                                    <div className="question-fields" style={{ margin: '0 auto', display: 'flex', gap: '0.75rem' }}>
                                         <input
                                             type="text"
                                             className="conversational-input"
@@ -558,7 +560,7 @@ const SummaryGoals = () => {
                                         No goals added yet. Add your first goal to continue.
                                     </div>
                                 ) : (
-                                    <div style={{ maxWidth: '500px', margin: '0 auto 1.5rem', textAlign: 'left' }}>
+                                    <div className="goals-review-panel">
                                         {validGoals.map((goal) => {
                                             const Icon = getGoalIcon(goal.name);
                                             const futureCost = calculateFutureCost(goal.presentValue, goal.yearsToGoal, goal.inflationRate);

@@ -9,20 +9,24 @@ import {
     TrendingUp,
     Shield,
     PiggyBank,
-    PieChart,
 } from 'lucide-react';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
-import { formatCurrency } from '../CashFlowModule/CashFlowLogic';
 import { resolveEmploymentType } from '../DetailedFlow/employmentTypeSync';
 import { buildYourMoneyFlowReport } from './moneyFlowLedgerLogic';
 import {
     buildInvestSurplusReport,
     computeInvestSurplusInsights,
 } from './investSurplusLogic';
+import {
+    clearStudioMonthPlan,
+    pruneAllocationPlansForAllocations,
+    removeInvestmentAllocationById,
+} from './instrumentAnalysisLogic';
 import { PUT_YOUR_MONEY_TO_WORK_PATH } from './detailedReportSteps';
 import ReportAnimatedCounter from './ReportAnimatedCounter';
 import ReportReveal from './ReportReveal';
 import InvestSurplusVisuals from './InvestSurplusVisuals';
+import PlannedInvestmentAllocationsPanel from './PlannedInvestmentAllocationsPanel';
 
 const InsightIcon = ({ tone }) => {
     if (tone === 'warning') return <AlertTriangle size={16} className="ius-insight-icon ius-insight-warning" />;
@@ -63,7 +67,34 @@ const InvestSurplusReportContent = () => {
         contingencyFund,
         summaryLifeCover,
         investmentAllocations,
+        setInvestmentAllocations,
+        allocationPlans,
+        setAllocationPlans,
     } = useFinancialPlan();
+
+    const handleRemoveAllocation = (id) => {
+        const nextAllocations = removeInvestmentAllocationById(investmentAllocations, id);
+        setInvestmentAllocations(nextAllocations);
+        setAllocationPlans(pruneAllocationPlansForAllocations(allocationPlans, nextAllocations));
+    };
+
+    const handleClearMonthPlan = (planKey) => {
+        if (!planKey) return;
+        const [yearStr, monthStr] = String(planKey).split('-');
+        const calendarYear = parseInt(yearStr, 10);
+        const monthIndex = parseInt(monthStr, 10);
+        if (!Number.isFinite(calendarYear) || !Number.isFinite(monthIndex)) return;
+
+        const nextAllocations = clearStudioMonthPlan({
+            investmentAllocations,
+            calendarYear,
+            monthIndex,
+        });
+        setInvestmentAllocations(nextAllocations);
+        const nextPlans = { ...allocationPlans };
+        delete nextPlans[planKey];
+        setAllocationPlans(pruneAllocationPlansForAllocations(nextPlans, nextAllocations));
+    };
 
     const moneyFlowReport = useMemo(
         () => buildYourMoneyFlowReport({
@@ -157,39 +188,11 @@ const InvestSurplusReportContent = () => {
                 </ReportReveal>
             )}
 
-            {allocationsSummary.count > 0 && (
-                <ReportReveal className="card ius-alloc-card" delay={200}>
-                    <h3 className="ius-section-title">
-                        <PieChart size={18} />
-                        Planned investment allocations
-                    </h3>
-                    <p className="ius-alloc-sub">
-                        ₹{Math.round(allocationsSummary.monthlyCommitted).toLocaleString('en-IN')}/month committed across {allocationsSummary.count} plan{allocationsSummary.count > 1 ? 's' : ''}.
-                    </p>
-                    <div className="ius-alloc-table-wrap">
-                        <table className="ius-alloc-table">
-                            <thead>
-                                <tr>
-                                    <th>Type</th>
-                                    <th>Name</th>
-                                    <th>Amount</th>
-                                    <th>Frequency</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {allocationsSummary.items.map((item) => (
-                                    <tr key={item.id}>
-                                        <td>{item.type}</td>
-                                        <td>{item.name}</td>
-                                        <td>{formatCurrency(item.amount)}</td>
-                                        <td>{item.isMonthly ? 'Monthly' : 'One-time (annual impact)'}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </ReportReveal>
-            )}
+            <PlannedInvestmentAllocationsPanel
+                allocationsSummary={allocationsSummary}
+                onRemove={handleRemoveAllocation}
+                onClearMonthPlan={handleClearMonthPlan}
+            />
 
             {insights.length > 0 && (
                 <div className="card ius-insights-card">
@@ -250,13 +253,6 @@ const InvestSurplusReportContent = () => {
                 .ius-suggestion-card p { margin: 0; font-size: 0.88rem; color: var(--text-muted); line-height: 1.55; }
                 .ius-suggestion-highlight { margin-top: 1rem; font-size: 1.35rem; font-weight: 800; color: var(--primary); }
                 .ius-suggestion-foot { margin-top: 0.25rem !important; font-size: 0.78rem !important; }
-
-                .ius-alloc-card { padding: 1.25rem; }
-                .ius-alloc-sub { margin: -0.5rem 0 1rem; font-size: 0.88rem; color: var(--text-muted); }
-                .ius-alloc-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
-                .ius-alloc-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-                .ius-alloc-table th, .ius-alloc-table td { padding: 0.65rem 0.75rem; border-bottom: 1px solid var(--border); text-align: left; }
-                .ius-alloc-table th { background: var(--bg-main); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
 
                 .ius-insights-card { padding: 1.25rem; }
                 .ius-insights-title { margin: 0 0 0.85rem; font-size: 1rem; display: flex; align-items: center; gap: 0.5rem; }

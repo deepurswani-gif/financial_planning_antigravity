@@ -21,6 +21,7 @@ const DetailedDreamsGoals = () => {
             onComplete={() => navigate(GROWTH_EXPECTATIONS_PATH)}
             navigateToQuestionId={navigateToQuestionId}
             onNavigateToQuestionHandled={clearNavigateToQuestion}
+            contentWidth="wide"
         />
     );
 };

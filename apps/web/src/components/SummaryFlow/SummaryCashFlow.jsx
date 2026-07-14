@@ -151,7 +151,7 @@ const SummaryCashFlow = () => {
                         Approximately how much does your household spend every month?
                     </h2>
                     <p className="question-helper">
-                        Including groceries, utilities, lifestyle, travel, medical, etc.
+                        Including groceries, utilities, lifestyle, travel, medical, etc. Exclude insurance premiums.
                     </p>
 
                     <div className="question-fields" style={{ maxWidth: '420px', margin: '0 auto' }}>
@@ -184,7 +184,45 @@ const SummaryCashFlow = () => {
                 </div>
             )
         },
-        // Q3: EMI Commitments
+        // Q3: Insurance Premiums
+        {
+            id: 'insurance-premiums',
+            content: (
+                <div className="question-container">
+                    <p className="question-narrative">
+                        Protection comes at a cost — let&apos;s capture your insurance premiums.
+                    </p>
+                    <h2 className="question-title">
+                        How much do you pay in insurance premiums every month?
+                    </h2>
+                    <p className="question-helper">
+                        Total monthly amount for life, health, car, two-wheeler, and other insurance. Enter 0 if none.
+                    </p>
+
+                    <div className="question-fields" style={{ maxWidth: '420px', margin: '0 auto' }}>
+                        <div className="currency-input-wrapper">
+                            <span className="currency-symbol">₹</span>
+                            <input
+                                type="number"
+                                className="conversational-input"
+                                placeholder="e.g. 5000"
+                                value={expenseCategories.summaryInsuranceTotal || ''}
+                                onChange={(e) => setExpenseCategories(prev => ({
+                                    ...prev,
+                                    summaryInsuranceTotal: e.target.value,
+                                }))}
+                            />
+                        </div>
+                        {expenseCategories.summaryInsuranceTotal && (
+                            <div className="currency-display">
+                                {formatInr(expenseCategories.summaryInsuranceTotal)} / month
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )
+        },
+        // Q4: EMI Commitments
         {
             id: 'emi-commitments',
             content: (

@@ -55,7 +55,7 @@ export const INSTRUMENT_REGISTRY = {
         goalKey: 'equity',
         inputMode: 'lumpsum',
         step: 1000,
-        defaultRate: 15,
+        defaultRate: 12,
         defaultDuration: 10,
     },
     PPF: {
@@ -81,15 +81,23 @@ export const INSTRUMENT_REGISTRY = {
         goalKey: 'fd',
         inputMode: 'lumpsum',
         step: 1000,
-        defaultRate: 7,
+        defaultRate: 6,
         defaultDuration: 5,
+    },
+    'Liquid Mutual Fund': {
+        allocType: 'Liquid Mutual Fund',
+        goalKey: null,
+        inputMode: 'monthly',
+        step: 500,
+        defaultRate: 5.5,
+        defaultDuration: 3,
     },
     'Recurring Deposit': {
         allocType: 'Recurring Deposit',
         goalKey: 'rd',
         inputMode: 'monthly',
         step: 500,
-        defaultRate: 7,
+        defaultRate: 6,
         defaultDuration: 5,
     },
     'Life Insurance': {
@@ -101,12 +109,38 @@ export const INSTRUMENT_REGISTRY = {
         defaultDuration: 10,
         isProtection: true,
     },
+    'Term Insurance': {
+        allocType: 'Term Insurance',
+        goalKey: null,
+        inputMode: 'monthly',
+        step: 500,
+        defaultRate: 0,
+        defaultDuration: 10,
+        isProtection: true,
+    },
+    'Health Insurance': {
+        allocType: 'Health Insurance',
+        goalKey: null,
+        inputMode: 'monthly',
+        step: 500,
+        defaultRate: 0,
+        defaultDuration: 10,
+        isProtection: true,
+    },
+    'Life Insurance Saving Plans': {
+        allocType: 'Life Insurance Saving Plans',
+        goalKey: null,
+        inputMode: 'monthly',
+        step: 500,
+        defaultRate: 5,
+        defaultDuration: 10,
+    },
     Gold: {
         allocType: 'Gold',
         goalKey: null,
         inputMode: 'lumpsum',
         step: 1000,
-        defaultRate: 8,
+        defaultRate: 10,
         defaultDuration: 10,
     },
     'Other Investment': {
@@ -503,6 +537,39 @@ export function applyAllocationPlan({
     });
 
     return [...filtered, ...additions];
+}
+
+export function clearStudioMonthPlan({
+    investmentAllocations = [],
+    calendarYear,
+    monthIndex,
+}) {
+    const planKey = getAllocationPlanKey(calendarYear, monthIndex);
+    return investmentAllocations.filter((a) => a.studioPlanKey !== planKey);
+}
+
+export function removeInvestmentAllocationById(investmentAllocations = [], id) {
+    return investmentAllocations.filter((a) => a.id !== id);
+}
+
+export function pruneAllocationPlansForAllocations(allocationPlans = {}, investmentAllocations = []) {
+    const activeKeys = new Set(
+        investmentAllocations
+            .map((a) => a.studioPlanKey)
+            .filter(Boolean),
+    );
+    const next = {};
+    Object.entries(allocationPlans).forEach(([key, plan]) => {
+        if (activeKeys.has(key) || plan?.status === 'draft') {
+            next[key] = plan;
+        }
+    });
+    return next;
+}
+
+export function monthHasStudioPlan(investmentAllocations = [], calendarYear, monthIndex) {
+    const planKey = getAllocationPlanKey(calendarYear, monthIndex);
+    return investmentAllocations.some((a) => a.studioPlanKey === planKey);
 }
 
 export function buildInstrumentAnalysisNarrative(analysis, isScenario = false) {

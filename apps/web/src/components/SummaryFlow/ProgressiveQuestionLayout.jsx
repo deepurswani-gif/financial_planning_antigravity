@@ -6,6 +6,7 @@ import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { loadSummaryUiDraft, patchSummaryUiDraft } from '../../lib/summaryFlowStorage';
 import QuestionProgressBar from './QuestionProgressBar';
+import { useProgressiveShellWidth } from './useProgressiveShellWidth';
 
 const steps = [
     { id: 'profile', label: 'Profile', path: '/summary-flow/profile' },
@@ -76,13 +77,15 @@ const ProgressiveQuestionLayout = ({
     currentStepId, 
     questions = [], 
     narrative,
-    onComplete 
+    onComplete,
+    contentWidth = 'default',
 }) => {
     const navigate = useNavigate();
     const location = useLocation();
     const { user } = useAuth();
     const { savePlanData } = useFinancialPlan();
     const userId = user?.id ?? null;
+    const shellClassName = useProgressiveShellWidth(contentWidth);
     const [currentIndex, setCurrentIndex] = useState(() => {
         const savedIndex = loadSummaryUiDraft(userId)?.questionIndexByStep?.[currentStepId];
         if (typeof savedIndex === 'number' && savedIndex >= 0 && savedIndex < questions.length) {
@@ -235,7 +238,7 @@ const ProgressiveQuestionLayout = ({
             </button>
 
             {/* Question content area */}
-            <div className="progressive-question-shell">
+            <div className={shellClassName}>
                 <QuestionProgressBar
                     totalQuestions={questions.length}
                     currentIndex={currentIndex}

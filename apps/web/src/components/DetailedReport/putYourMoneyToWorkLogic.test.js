@@ -8,6 +8,8 @@ import {
     buildInstrumentCards,
     buildRecommendedBundles,
     compareSipGoalImpacts,
+    computeAllocationImpactForMonth,
+    computeDeployableSurplusWithCarry,
     computeJourneyAdjustmentImpactForMonth,
     getAllocationPlanKey,
     getGoalFutureValue,
@@ -15,6 +17,7 @@ import {
     getLoanStartMonths,
     clampLoanStartMonth,
     summarizeJourneyConstraints,
+    validateJourneyAdjustmentsAgainstSurplus,
 } from './putYourMoneyToWorkLogic';
 
 const moneyFlowReport = {
@@ -113,13 +116,20 @@ describe('putYourMoneyToWorkLogic', () => {
 
     it('builds full allocation studio context', () => {
         const ctx = buildAllocationStudioContext({
-            moneyFlowReport,
+            moneyFlowReport: {
+                ...moneyFlowReport,
+                meta: { ...moneyFlowReport.meta, planStartMonth: 6 },
+                ledger: {
+                    unallocatedSurplus: [0, 0, 0, 0, 0, 0, 30000, 0, 0, 0, 0, 0],
+                },
+            },
             familyMembers: [{ relation: 'Self', name: 'Priya', dob: '1990-01-01', retirementAge: 60 }],
             expenseCategories: {},
             assetCategories: {},
             journeyAdjustments: [],
             journeyProjections: [],
-            investmentAllocations: [{ id: 1, type: 'SIP', name: 'MF', amount: '5000' }],
+            // Studio stores recurring amounts as annual totals (₹5,000/mo → ₹60,000).
+            investmentAllocations: [{ id: 1, type: 'SIP', name: 'MF', amount: '60000', startMonth: 7, startYear: 2026 }],
             goals: [{ id: 'g1', name: 'Home', presentValue: 5000000, yearsToGoal: 5 }],
             selectedMonthIndex: 6,
         });
@@ -127,8 +137,128 @@ describe('putYourMoneyToWorkLogic', () => {
         expect(ctx.meta.hasData).toBe(true);
         expect(ctx.meta.monthLabel).toBe('July');
         expect(ctx.hero.deployableSurplus).toBe(25000);
+        expect(ctx.hero.carriedForward).toBe(0);
         expect(ctx.briefing.lines.length).toBeGreaterThan(0);
         expect(ctx.sipAnalysis.totalMonthly).toBeGreaterThanOrEqual(0);
+    });
+
+    it('carries leftover unallocated surplus into later months with recurring SIP', () => {
+        const ledger = [0, 0, 0, 0, 0, 0, 20000, 20000, 20000, 0, 0, 0];
+        // ₹12,000/mo SIP stored as annual ₹144,000 starting July
+        const allocations = [{
+            id: 1,
+            type: 'SIP',
+            name: 'Studio SIP (Jul 2026)',
+            amount: 144000,
+            startMonth: 7,
+            startYear: 2026,
+            studioPlanKey: '2026-6',
+        }];
+
+        expect(computeAllocationImpactForMonth(allocations, 2026, 6)).toBe(12000);
+        expect(computeAllocationImpactForMonth(allocations, 2026, 7)).toBe(12000);
+
+        const july = computeDeployableSurplusWithCarry({
+            unallocatedSurplusByMonth: ledger,
+            investmentAllocations: allocations,
+            journeyAdjustments: [],
+            calendarYear: 2026,
+            planStartMonth: 6,
+            selectedMonthIndex: 6,
+        });
+        expect(july.deployableSurplus).toBe(8000);
+        expect(july.carriedForward).toBe(0);
+
+        const aug = computeDeployableSurplusWithCarry({
+            unallocatedSurplusByMonth: ledger,
+            investmentAllocations: allocations,
+            journeyAdjustments: [],
+            calendarYear: 2026,
+            planStartMonth: 6,
+            selectedMonthIndex: 7,
+        });
+        // Aug: 20000 + 8000 carry - 12000 recurring = 16000
+        expect(aug.carriedForward).toBe(8000);
+        expect(aug.deployableSurplus).toBe(16000);
+
+        const ctx = buildAllocationStudioContext({
+            moneyFlowReport: {
+                ...moneyFlowReport,
+                meta: { ...moneyFlowReport.meta, planStartMonth: 6, currentMonth: 6 },
+                ledger: { unallocatedSurplus: ledger },
+            },
+            familyMembers: [{ relation: 'Self', name: 'Priya', dob: '1990-01-01', retirementAge: 60 }],
+            expenseCategories: {},
+            assetCategories: {},
+            journeyAdjustments: [],
+            journeyProjections: [],
+            investmentAllocations: allocations,
+            goals: [],
+            selectedMonthIndex: 7,
+        });
+        expect(ctx.hero.deployableSurplus).toBe(16000);
+        expect(ctx.hero.carriedForward).toBe(8000);
+    });
+
+    it('carries unused one-time allocation leftovers across months', () => {
+        const ledger = [0, 0, 0, 0, 0, 0, 20000, 20000, 20000, 0, 0, 0];
+        const allocations = [{
+            id: 1,
+            type: 'Lumpsum',
+            name: 'Studio Lumpsum (Jul 2026)',
+            amount: 12000,
+            startMonth: 7,
+            startYear: 2026,
+            studioPlanKey: '2026-6',
+        }];
+
+        const aug = computeDeployableSurplusWithCarry({
+            unallocatedSurplusByMonth: ledger,
+            investmentAllocations: allocations,
+            journeyAdjustments: [],
+            calendarYear: 2026,
+            planStartMonth: 6,
+            selectedMonthIndex: 7,
+        });
+        // July leftover 8000 + Aug 20000 = 28000 (lumpsum does not recur)
+        expect(aug.carriedForward).toBe(8000);
+        expect(aug.deployableSurplus).toBe(28000);
+
+        const sep = computeDeployableSurplusWithCarry({
+            unallocatedSurplusByMonth: ledger,
+            investmentAllocations: allocations,
+            journeyAdjustments: [],
+            calendarYear: 2026,
+            planStartMonth: 6,
+            selectedMonthIndex: 8,
+        });
+        // Aug unused 28000 carries + Sep 20000 = 48000
+        expect(sep.carriedForward).toBe(28000);
+        expect(sep.deployableSurplus).toBe(48000);
+    });
+
+    it('rejects journey adjustments that exceed monthly unallocated surplus', () => {
+        const surplus = [0, 0, 0, 0, 0, 0, 20000, 20000, 20000, 20000, 20000, 20000];
+        const over = validateJourneyAdjustmentsAgainstSurplus([
+            { id: 1, type: 'expense', name: 'Trip', startYear: 2026, startMonth: 7, amount: 15000 },
+            {
+                id: 2, type: 'loan', name: 'Personal', startYear: 2026, startMonth: 7,
+                emi: 10000, tenure: 12, amount: 120000,
+            },
+        ], surplus, 2026);
+        expect(over.ok).toBe(false);
+        expect(over.monthLabel).toBe('July');
+        expect(over.surplus).toBe(20000);
+        expect(over.impact).toBe(25000);
+
+        const ok = validateJourneyAdjustmentsAgainstSurplus([
+            { id: 1, type: 'expense', name: 'Trip', startYear: 2026, startMonth: 7, amount: 15000 },
+            {
+                id: 2, type: 'loan', name: 'Personal', startYear: 2026, startMonth: 7,
+                emi: 5000, tenure: 6, amount: 60000,
+            },
+        ], surplus, 2026);
+        expect(ok).toEqual({ ok: true });
     });
 
     it('deducts one-time standard expenses from deployable surplus in the selected month', () => {
@@ -186,15 +316,26 @@ describe('putYourMoneyToWorkLogic', () => {
         expect(scenario.scenarioMonthly).toBe(20000);
     });
 
-    it('builds ranked recommended bundles', () => {
+    it('builds life journey recommended plan from engine', () => {
         const bundles = buildRecommendedBundles({
             deployableSurplus: 30000,
-            contingencyData: { gap: 100000 },
-            protectionData: { hasGap: true },
-            goals: [{ id: 'g1', name: 'Education', presentValue: 1000000, yearsToGoal: 5 }],
+            contingencyData: { gap: 100000, emergencyFundHave: 50000 },
+            protectionData: { hasGap: true, coverageHave: 1000000 },
+            goals: [{ id: 'g1', name: 'Education', presentValue: 1000000, yearsToGoal: 5, inflationRate: 8 }],
+            familyMembers: [{ relation: 'Self', dob: '1990-01-01', retirementAge: 60 }],
+            expenseCategories: {
+                household: { grocery: { value: 15000, frequency: 'Monthly' } },
+                savings: { sip: 3000 },
+            },
+            hasHealthInsurance: true,
+            summaryHealthCover: '1000000',
         });
-        expect(bundles).toHaveLength(3);
-        expect(bundles[0].allocations.SIP).toBeLessThanOrEqual(30000);
+        expect(bundles).toHaveLength(1);
+        expect(bundles[0].id).toBe('life_journey');
+        expect(bundles[0].engineResult).toBeTruthy();
+        const total = Object.values(bundles[0].allocations).reduce((s, v) => s + v, 0);
+        expect(total).toBeLessThanOrEqual(30000);
+        expect(total).toBeGreaterThan(0);
     });
 
     it('applies SIP allocation plan to investment allocations', () => {
@@ -209,15 +350,27 @@ describe('putYourMoneyToWorkLogic', () => {
         expect(result[0].studioPlanKey).toBe('2026-6');
     });
 
-    it('builds ranked bundles with multi-instrument allocations', () => {
+    it('builds engine allocations covering instruments', () => {
         const bundles = buildRecommendedBundles({
             deployableSurplus: 30000,
-            contingencyData: { gap: 100000 },
-            protectionData: { hasGap: true },
-            goals: [{ id: 'g1', name: 'Education', presentValue: 1000000, yearsToGoal: 5 }],
+            contingencyData: { gap: 0, isHealthy: true, emergencyFundHave: 500000 },
+            protectionData: { hasGap: false, coverageHave: 20000000 },
+            goals: [{ id: 'g1', name: 'Education', presentValue: 1000000, yearsToGoal: 5, inflationRate: 8 }],
+            familyMembers: [{ relation: 'Self', dob: '1990-01-01', retirementAge: 60 }],
+            expenseCategories: {
+                household: { grocery: { value: 10000, frequency: 'Monthly' } },
+                savings: { sip: 2000, ppf: 2000, nps: 2000 },
+            },
+            contingencyFund: '500000',
+            summaryLifeCover: '20000000',
+            summaryHealthCover: '1000000',
+            hasHealthInsurance: true,
         });
         expect(bundles[0].allocations).toBeDefined();
-        expect(bundles[0].allocations.SIP).toBeGreaterThan(0);
+        const total = Object.values(bundles[0].allocations).reduce((s, v) => s + v, 0);
+        expect(total).toBe(30000);
+        expect(bundles[0].id).toBe('life_journey');
+        expect(bundles[0].engineResult?.diagnostics?.sequence?.[0]).toBe('protection_policy');
     });
 
     it('builds draft allocation plan snapshot', () => {

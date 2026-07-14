@@ -10,8 +10,7 @@ import {
     getTotalLiabilityBreakdownTotal,
 } from './wealthDetailSync';
 import { reconcileAmounts } from './detailReconcile';
-import ReconciliationStatus from './ReconciliationStatus';
-import ReconciliationStickyPanel from './ReconciliationStickyPanel';
+import ReconciliationBar from './ReconciliationBar';
 
 const formatInr = (val) => {
     if (!val || isNaN(val)) return '₹0';
@@ -222,27 +221,25 @@ export function useWealthSnapshotQuestions() {
 
     const renderAssetReconciliationPanel = () => (
         summaryAssetTotal > 0 ? (
-            <ReconciliationStickyPanel>
-                <div className="reconciliation-sticky-panel__title">Summary vs detailed assets</div>
-                <div>Summary assets total: <strong>{formatInr(summaryAssetTotal)}</strong></div>
-                <div>Detailed assets total: <strong style={{ color: 'var(--primary)' }}>{formatInr(assetBreakdownTotal)}</strong></div>
-                <div style={{ marginTop: '0.35rem' }}>
-                    <ReconciliationStatus reconciliation={assetReconciliation} />
-                </div>
-            </ReconciliationStickyPanel>
+            <ReconciliationBar
+                summaryLabel="Summary Assets"
+                detailLabel="Detailed assets"
+                summaryAmount={summaryAssetTotal}
+                detailAmount={assetBreakdownTotal}
+                reconciliation={assetReconciliation}
+            />
         ) : null
     );
 
     const renderLiabilityReconciliationPanel = () => (
         summaryLiabilityTotal > 0 ? (
-            <ReconciliationStickyPanel>
-                <div className="reconciliation-sticky-panel__title">Summary vs detailed liabilities</div>
-                <div>Summary liabilities total: <strong>{formatInr(summaryLiabilityTotal)}</strong></div>
-                <div>Detailed liabilities total: <strong style={{ color: 'var(--primary)' }}>{formatInr(liabilityBreakdownTotal)}</strong></div>
-                <div style={{ marginTop: '0.35rem' }}>
-                    <ReconciliationStatus reconciliation={liabilityReconciliation} />
-                </div>
-            </ReconciliationStickyPanel>
+            <ReconciliationBar
+                summaryLabel="Summary Liabilities"
+                detailLabel="Detailed liabilities"
+                summaryAmount={summaryLiabilityTotal}
+                detailAmount={liabilityBreakdownTotal}
+                reconciliation={liabilityReconciliation}
+            />
         ) : null
     );
 

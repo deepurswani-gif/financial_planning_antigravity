@@ -1,9 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     Banknote, Home, AlertCircle, Info, Plus, Trash2, CheckCircle2,
 } from 'lucide-react';
 import { formatCurrency } from '../CashFlowModule/CashFlowLogic';
-import { clampLoanStartMonth, getLoanStartMonths } from './putYourMoneyToWorkLogic';
+import {
+    clampLoanStartMonth,
+    getLoanStartMonths,
+    validateJourneyAdjustmentsAgainstSurplus,
+} from './putYourMoneyToWorkLogic';
 import ReportReveal from './ReportReveal';
 
 const JourneyConstraintsRail = ({
@@ -13,18 +17,28 @@ const JourneyConstraintsRail = ({
     defaultStartMonthIndex = new Date().getMonth(),
     defaultCalendarYear = new Date().getFullYear(),
     selectableMonths = [],
+    unallocatedSurplusByMonth = [],
     onSaveAdjustments,
     adjustmentsSaved = false,
     saveMessage = '',
 }) => {
+    const [draftAdjustments, setDraftAdjustments] = useState([]);
+    const [saveError, setSaveError] = useState('');
+
     const defaultStartMonth = Math.min(12, Math.max(1, defaultStartMonthIndex + 1));
     const monthLabel = (month) => new Date(2000, Math.max(0, (month || 1) - 1), 1)
         .toLocaleString('default', { month: 'short' });
     const standardExpenseMonths = selectableMonths.length > 0
         ? selectableMonths
         : [{ monthIndex: defaultStartMonthIndex, label: monthLabel(defaultStartMonth) }];
-    const standardExpenses = journeyAdjustments.filter((adj) => (adj.type || 'expense') !== 'loan');
-    const futureLoans = journeyAdjustments.filter((adj) => (adj.type || 'expense') === 'loan');
+
+    const visibleDrafts = draftAdjustments.filter((adj) => {
+        const startMonth = parseInt(adj.startMonth, 10) || defaultStartMonth;
+        const startYear = parseInt(adj.startYear, 10) || defaultCalendarYear;
+        return startMonth === defaultStartMonth && startYear === defaultCalendarYear;
+    });
+    const standardExpenses = visibleDrafts.filter((adj) => (adj.type || 'expense') !== 'loan');
+    const futureLoans = visibleDrafts.filter((adj) => (adj.type || 'expense') === 'loan');
 
     const calculateEmi = (principal, rate, tenure) => {
         const p = parseFloat(principal) || 0;
@@ -37,16 +51,15 @@ const JourneyConstraintsRail = ({
         return 0;
     };
 
-    const updateAdjustment = (id, field, value) => {
-        if (!setJourneyAdjustments) return;
-        setJourneyAdjustments((prev) => prev.map((adj) => (
+    const updateDraft = (id, field, value) => {
+        setDraftAdjustments((prev) => prev.map((adj) => (
             adj.id === id ? { ...adj, [field]: value } : adj
         )));
+        setSaveError('');
     };
 
     const updateLoanStartYear = (id, startYear) => {
-        if (!setJourneyAdjustments) return;
-        setJourneyAdjustments((prev) => prev.map((adj) => {
+        setDraftAdjustments((prev) => prev.map((adj) => {
             if (adj.id !== id) return adj;
             const nextYear = parseInt(startYear, 10) || defaultCalendarYear;
             const startMonth = clampLoanStartMonth(
@@ -57,20 +70,20 @@ const JourneyConstraintsRail = ({
             );
             return { ...adj, startYear: nextYear, startMonth };
         }));
+        setSaveError('');
     };
 
     const updateStandardExpense = (id, field, value) => {
-        if (!setJourneyAdjustments) return;
-        setJourneyAdjustments((prev) => prev.map((adj) => (
+        setDraftAdjustments((prev) => prev.map((adj) => (
             adj.id === id
                 ? { ...adj, [field]: value, startYear: defaultCalendarYear }
                 : adj
         )));
+        setSaveError('');
     };
 
     const addStandardExpense = () => {
-        if (!setJourneyAdjustments) return;
-        setJourneyAdjustments((prev) => [
+        setDraftAdjustments((prev) => [
             ...prev,
             {
                 id: Date.now(),
@@ -87,11 +100,11 @@ const JourneyConstraintsRail = ({
                 emi: 0,
             },
         ]);
+        setSaveError('');
     };
 
     const addFutureLoan = () => {
-        if (!setJourneyAdjustments) return;
-        setJourneyAdjustments((prev) => [
+        setDraftAdjustments((prev) => [
             ...prev,
             {
                 id: Date.now() + 1,
@@ -108,11 +121,37 @@ const JourneyConstraintsRail = ({
                 emi: 0,
             },
         ]);
+        setSaveError('');
     };
 
-    const removeAdjustment = (id) => {
+    const removeDraft = (id) => {
+        setDraftAdjustments((prev) => prev.filter((adj) => adj.id !== id));
+        setSaveError('');
+    };
+
+    const removeCommitted = (id) => {
         if (!setJourneyAdjustments) return;
         setJourneyAdjustments((prev) => prev.filter((adj) => adj.id !== id));
+    };
+
+    const handleSave = () => {
+        const combined = [...journeyAdjustments, ...draftAdjustments];
+        const validation = validateJourneyAdjustmentsAgainstSurplus(
+            combined,
+            unallocatedSurplusByMonth,
+            defaultCalendarYear,
+        );
+        if (!validation.ok) {
+            setSaveError(validation.message);
+            return;
+        }
+
+        if (draftAdjustments.length > 0 && setJourneyAdjustments) {
+            setJourneyAdjustments((prev) => [...prev, ...draftAdjustments]);
+        }
+        setDraftAdjustments([]);
+        setSaveError('');
+        onSaveAdjustments?.();
     };
 
     return (
@@ -175,8 +214,7 @@ const JourneyConstraintsRail = ({
                                         type="number"
                                         value={adj.amount || ''}
                                         onChange={(e) => {
-                                            if (!setJourneyAdjustments) return;
-                                            setJourneyAdjustments((prev) => prev.map((item) => (
+                                            setDraftAdjustments((prev) => prev.map((item) => (
                                                 item.id === adj.id
                                                     ? {
                                                         ...item,
@@ -186,13 +224,14 @@ const JourneyConstraintsRail = ({
                                                     }
                                                     : item
                                             )));
+                                            setSaveError('');
                                         }}
                                     />
                                 </div>
                                 <button
                                     type="button"
                                     className="btn btn-outline pymtw-adjust-remove-btn"
-                                    onClick={() => removeAdjustment(adj.id)}
+                                    onClick={() => removeDraft(adj.id)}
                                 >
                                     <Trash2 size={16} />
                                     Remove
@@ -225,9 +264,10 @@ const JourneyConstraintsRail = ({
                                             const loanCategory = e.target.value;
                                             const name = e.target.options[e.target.selectedIndex].text;
                                             const nextName = loanCategory ? name : '';
-                                            setJourneyAdjustments((prev) => prev.map((item) => (
+                                            setDraftAdjustments((prev) => prev.map((item) => (
                                                 item.id === adj.id ? { ...item, loanCategory, name: nextName } : item
                                             )));
+                                            setSaveError('');
                                         }}
                                     >
                                         <option value="">Select loan type</option>
@@ -247,9 +287,10 @@ const JourneyConstraintsRail = ({
                                         onChange={(e) => {
                                             const principal = e.target.value;
                                             const emi = calculateEmi(principal, adj.rate, adj.tenure);
-                                            setJourneyAdjustments((prev) => prev.map((item) => (
+                                            setDraftAdjustments((prev) => prev.map((item) => (
                                                 item.id === adj.id ? { ...item, principal, emi, amount: emi * 12 } : item
                                             )));
+                                            setSaveError('');
                                         }}
                                     />
                                 </div>
@@ -261,9 +302,10 @@ const JourneyConstraintsRail = ({
                                         onChange={(e) => {
                                             const rate = e.target.value;
                                             const emi = calculateEmi(adj.principal, rate, adj.tenure);
-                                            setJourneyAdjustments((prev) => prev.map((item) => (
+                                            setDraftAdjustments((prev) => prev.map((item) => (
                                                 item.id === adj.id ? { ...item, rate, emi, amount: emi * 12 } : item
                                             )));
+                                            setSaveError('');
                                         }}
                                     />
                                 </div>
@@ -275,7 +317,7 @@ const JourneyConstraintsRail = ({
                                         onChange={(e) => {
                                             const tenure = e.target.value;
                                             const emi = calculateEmi(adj.principal, adj.rate, tenure);
-                                            setJourneyAdjustments((prev) => prev.map((item) => (
+                                            setDraftAdjustments((prev) => prev.map((item) => (
                                                 item.id === adj.id
                                                     ? {
                                                         ...item,
@@ -286,6 +328,7 @@ const JourneyConstraintsRail = ({
                                                     }
                                                     : item
                                             )));
+                                            setSaveError('');
                                         }}
                                     />
                                 </div>
@@ -298,7 +341,7 @@ const JourneyConstraintsRail = ({
                                             defaultCalendarYear,
                                             defaultStartMonthIndex,
                                         )}
-                                        onChange={(e) => updateAdjustment(adj.id, 'startMonth', parseInt(e.target.value, 10))}
+                                        onChange={(e) => updateDraft(adj.id, 'startMonth', parseInt(e.target.value, 10))}
                                     >
                                         {getLoanStartMonths(
                                             adj.startYear || defaultCalendarYear,
@@ -327,7 +370,7 @@ const JourneyConstraintsRail = ({
                                 <button
                                     type="button"
                                     className="btn btn-outline pymtw-adjust-remove-btn"
-                                    onClick={() => removeAdjustment(adj.id)}
+                                    onClick={() => removeDraft(adj.id)}
                                 >
                                     <Trash2 size={16} />
                                     Remove
@@ -343,10 +386,16 @@ const JourneyConstraintsRail = ({
                     </div>
 
                     <div className="pymtw-adjust-save">
-                        <button type="button" className="btn btn-primary" onClick={onSaveAdjustments}>
+                        <button type="button" className="btn btn-primary" onClick={handleSave}>
                             Save
                         </button>
-                        {adjustmentsSaved && (
+                        {saveError && (
+                            <div className="pymtw-adjust-save-error" role="alert">
+                                <AlertCircle size={16} />
+                                <span>{saveError}</span>
+                            </div>
+                        )}
+                        {adjustmentsSaved && !saveError && (
                             <div className="pymtw-adjust-saved-msg" role="status">
                                 <CheckCircle2 size={16} />
                                 <span>
@@ -391,6 +440,17 @@ const JourneyConstraintsRail = ({
                                         </span>
                                         <span className="pymtw-constraint-note">{item.projectionNote}</span>
                                     </div>
+                                    {setJourneyAdjustments && (
+                                        <button
+                                            type="button"
+                                            className="btn btn-outline pymtw-constraint-remove-btn"
+                                            onClick={() => removeCommitted(item.id)}
+                                            aria-label={`Remove ${item.name || 'adjustment'}`}
+                                        >
+                                            <Trash2 size={16} />
+                                            Remove
+                                        </button>
+                                    )}
                                 </div>
                             ))}
                         </div>

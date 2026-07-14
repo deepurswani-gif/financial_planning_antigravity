@@ -139,18 +139,10 @@ export function reconcileHousehold(expenseCategories = {}, familyMembers = []) {
     return reconcileAmounts(summaryTotal, detailTotal);
 }
 
-/** Summary household anchor vs detailed household + insurance (premiums may sit inside summary total). */
-export function reconcileHouseholdWithInsurance(expenseCategories = {}, familyMembers = []) {
-    const summaryTotal = parseFloat(expenseCategories.summaryHouseholdTotal) || 0;
-    const householdDetailTotal = getHouseholdBreakdownTotal(expenseCategories, familyMembers);
-    const insuranceDetailTotal = getInsuranceMonthlyTotal(expenseCategories.insurance || {});
-    const combinedDetailTotal = householdDetailTotal + insuranceDetailTotal;
-    return {
-        householdDetailTotal,
-        insuranceDetailTotal,
-        combinedDetailTotal,
-        reconciliation: reconcileAmounts(summaryTotal, combinedDetailTotal),
-    };
+export function reconcileInsurance(expenseCategories = {}) {
+    const summaryTotal = parseFloat(expenseCategories.summaryInsuranceTotal) || 0;
+    const detailTotal = getInsuranceMonthlyTotal(expenseCategories.insurance || {});
+    return reconcileAmounts(summaryTotal, detailTotal);
 }
 
 export function reconcileEmi(expenseCategories = {}) {
@@ -202,6 +194,7 @@ export function initializeExpenseSnapshots(expenseCategories = {}) {
         ...expenseCategories,
         summaryHouseholdTotal: summaryHousehold,
         summaryEmiTotal: summaryEmi,
+        summaryInsuranceTotal: expenseCategories.summaryInsuranceTotal ?? '',
         selectedEmiLoanTypes,
         household: breakdownStarted ? h : {
             ...h,

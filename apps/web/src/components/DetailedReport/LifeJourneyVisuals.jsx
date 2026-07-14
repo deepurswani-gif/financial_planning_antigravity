@@ -41,13 +41,17 @@ const LifeJourneyVisuals = ({ report }) => {
     const { meta, hero, projections, goalsByYear } = report;
     const hasGoals = Object.keys(goalsByYear).length > 0;
 
+    const constellationEndYear = meta.constellationEndYear
+        || meta.retirementYear
+        || meta.currentYear + 20;
+
     const timelineGoals = useMemo(
         () => flattenGoalsForTimeline(
             goalsByYear,
             meta.currentYear,
-            meta.retirementYear || meta.currentYear + 20,
+            constellationEndYear,
         ),
-        [goalsByYear, meta.currentYear, meta.retirementYear],
+        [goalsByYear, meta.currentYear, constellationEndYear],
     );
 
     const arcMeta = useMemo(() => buildJourneyArcMeta(hero, meta), [hero, meta]);
@@ -97,30 +101,47 @@ const LifeJourneyVisuals = ({ report }) => {
                         <Award size={18} />
                         Goal constellation
                     </h3>
-                    <p className="dr-chart-sub">Life goals mapped across your journey to retirement.</p>
-                    <div className="lj-goal-strip">
-                        <div className="lj-goal-track">
-                            {timelineGoals.map((goal) => {
-                                const Icon = getGoalIcon(goal);
-                                return (
-                                    <div
-                                        key={goal.id}
-                                        className="lj-goal-node"
-                                        style={{ left: `${goal.positionPct}%` }}
-                                        title={`${goal.name} (${goal.targetYear}) — ${formatCurrency(goal.futureCost)}`}
-                                    >
-                                        <div className="lj-goal-node-dot">
-                                            <Icon size={14} />
-                                        </div>
-                                        <span className="lj-goal-node-year">{goal.targetYear}</span>
+                    <p className="dr-chart-sub">
+                        {timelineGoals.length} life goal{timelineGoals.length === 1 ? '' : 's'} in order — soonest first.
+                    </p>
+                    <ol className="lj-goal-timeline">
+                        {timelineGoals.map((goal, index) => {
+                            const Icon = getGoalIcon(goal);
+                            const yearsAway = goal.targetYear - meta.currentYear;
+                            const showYear = index === 0 || timelineGoals[index - 1].targetYear !== goal.targetYear;
+                            return (
+                                <li key={goal.id} className="lj-goal-row">
+                                    <div className="lj-goal-year-col">
+                                        {showYear ? (
+                                            <span className="lj-goal-year">{goal.targetYear}</span>
+                                        ) : (
+                                            <span className="lj-goal-year lj-goal-year-same" aria-hidden="true" />
+                                        )}
                                     </div>
-                                );
-                            })}
-                        </div>
-                        <div className="lj-arc-axis">
-                            <span>{meta.currentYear + 1}</span>
-                            <span>{meta.retirementYear}</span>
-                        </div>
+                                    <div className="lj-goal-rail" aria-hidden="true">
+                                        <span className="lj-goal-rail-dot" />
+                                    </div>
+                                    <div className="lj-goal-body">
+                                        <div className="lj-goal-body-top">
+                                            <span className="lj-goal-icon-wrap">
+                                                <Icon size={16} />
+                                            </span>
+                                            <div className="lj-goal-copy">
+                                                <strong className="lj-goal-name">{goal.name}</strong>
+                                                <span className="lj-goal-meta">
+                                                    {yearsAway === 1 ? 'in 1 year' : `in ${yearsAway} years`}
+                                                </span>
+                                            </div>
+                                            <span className="lj-goal-cost">{formatCurrency(goal.futureCost)}</span>
+                                        </div>
+                                    </div>
+                                </li>
+                            );
+                        })}
+                    </ol>
+                    <div className="lj-goal-range">
+                        <span>From {meta.currentYear + 1}</span>
+                        <span>Through {constellationEndYear}</span>
                     </div>
                 </ReportReveal>
             )}

@@ -28,17 +28,42 @@ const moneyFlowReport = {
 describe('investSurplusLogic', () => {
     it('summarizes monthly allocation commitments', () => {
         const summary = summarizeInvestmentAllocations([
-            { id: 1, type: 'SIP', name: 'MF SIP', amount: '5000' },
+            {
+                id: 1,
+                type: 'SIP',
+                name: 'MF SIP',
+                // Annual stored amount for ₹5,000/mo
+                amount: '60000',
+                studioPlanKey: '2026-6',
+                startMonth: 7,
+                startYear: 2026,
+            },
             { id: 2, type: 'Lumpsum', name: 'Bonus', amount: '100000' },
         ]);
         expect(summary.monthlyCommitted).toBe(5000);
         expect(summary.count).toBe(2);
+        expect(summary.items[0].amount).toBe(5000);
+        expect(summary.items[0].annualImpact).toBe(60000);
+        expect(summary.items[0].studioPlanKey).toBe('2026-6');
+        expect(summary.items[0].startMonth).toBe(7);
+        expect(summary.items[0].startYear).toBe(2026);
+        expect(summary.items[1].studioPlanKey).toBeNull();
     });
 
     it('builds deployment slices from surplus', () => {
-        const slices = buildDeploymentSlices(20000, { hasGap: true });
+        const slices = buildDeploymentSlices(20000, { hasGap: true }, {});
         expect(slices.length).toBe(3);
         expect(slices.find((s) => s.name === 'Emergency fund')?.value).toBe(4000);
+        expect(slices.reduce((s, x) => s + x.value, 0)).toBe(20000);
+    });
+
+    it('uses contingency gap for emergency slice when provided', () => {
+        const slices = buildDeploymentSlices(
+            20000,
+            { hasGap: false },
+            { gap: 60000, isHealthy: false },
+        );
+        expect(slices.find((s) => s.name === 'Emergency fund')?.value).toBe(5000);
         expect(slices.reduce((s, x) => s + x.value, 0)).toBe(20000);
     });
 

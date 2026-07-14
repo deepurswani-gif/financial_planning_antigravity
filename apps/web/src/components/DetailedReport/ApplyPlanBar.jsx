@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, Save, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, Save, AlertTriangle, Trash2 } from 'lucide-react';
 import { formatCurrency } from '../CashFlowModule/CashFlowLogic';
 
 const ApplyPlanBar = ({
@@ -11,6 +11,8 @@ const ApplyPlanBar = ({
     validation,
     onSaveDraft,
     onApply,
+    onClearMonthPlan,
+    hasMonthPlan = false,
     isApplied,
 }) => {
     const isOverAllocated = remaining < 0;
@@ -46,6 +48,17 @@ const ApplyPlanBar = ({
                         <Save size={16} />
                         Save draft
                     </button>
+                    {onClearMonthPlan && (
+                        <button
+                            type="button"
+                            className="btn btn-secondary pymtw-clear-btn"
+                            onClick={onClearMonthPlan}
+                            disabled={!hasMonthPlan}
+                        >
+                            <Trash2 size={16} />
+                            Clear month plan
+                        </button>
+                    )}
                     <button
                         type="button"
                         className="btn btn-primary pymtw-apply-btn"

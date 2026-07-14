@@ -13,8 +13,12 @@ const ICONS = {
     PPF: Landmark,
     NPS: PiggyBank,
     'Fixed Deposit': Landmark,
+    'Liquid Mutual Fund': Coins,
     'Recurring Deposit': PiggyBank,
     'Life Insurance': Shield,
+    'Term Insurance': Shield,
+    'Health Insurance': Shield,
+    'Life Insurance Saving Plans': PiggyBank,
     Gold: Coins,
     'Other Investment': Coins,
 };

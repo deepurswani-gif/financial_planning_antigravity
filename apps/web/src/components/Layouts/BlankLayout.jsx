@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { signOut } from '../../services/authService';
 import finbrellaLogo from '../../assets/finbrella_logo.png';
 import { detailedFlowSteps, GROWTH_EXPECTATIONS_PATH } from '../DetailedFlow/detailedFlowSteps';
+import { RECONCILIATION_STACK_ID } from '../DetailedFlow/reconciliationStackId';
 import { DEFAULT_SUMMARY_REPORT_PATH } from '../SummaryReport/summaryReportSteps';
 import { DEFAULT_DETAILED_REPORT_PATH } from '../DetailedReport/detailedReportSteps';
 import { useBreakpoints } from '../../hooks';
@@ -88,6 +89,33 @@ const BlankLayout = () => {
         navigate(isGrowthExpectations ? DEFAULT_DETAILED_REPORT_PATH : GROWTH_EXPECTATIONS_PATH);
     };
 
+    const useFixedFlowChrome = isSummaryFlow || isDetailedFlow;
+    const [flowChromeEl, setFlowChromeEl] = useState(null);
+
+    useEffect(() => {
+        if (!useFixedFlowChrome || !flowChromeEl) return undefined;
+
+        const syncChromeOffset = () => {
+            const height = Math.ceil(flowChromeEl.getBoundingClientRect().height);
+            document.documentElement.style.setProperty('--flow-chrome-offset', `${height}px`);
+        };
+
+        syncChromeOffset();
+
+        const observer = new ResizeObserver(syncChromeOffset);
+        observer.observe(flowChromeEl);
+
+        const stackHost = document.getElementById(RECONCILIATION_STACK_ID);
+        const onStackChange = () => syncChromeOffset();
+        stackHost?.addEventListener('reconciliation-stack-change', onStackChange);
+
+        return () => {
+            observer.disconnect();
+            stackHost?.removeEventListener('reconciliation-stack-change', onStackChange);
+            document.documentElement.style.removeProperty('--flow-chrome-offset');
+        };
+    }, [useFixedFlowChrome, flowChromeEl, location.pathname]);
+
     if (!isSummaryExperience && !isDetailedExperience) {
         return (
             <div style={{ minHeight: '100vh', padding: '2rem', background: 'var(--bg-main)' }}>
@@ -96,145 +124,166 @@ const BlankLayout = () => {
         );
     }
 
-    const shellClass = isSummaryReport || isDetailedReport
-        ? 'summary-shell summary-shell-report'
-        : isDetailedExperience
-            ? 'summary-shell summary-shell-detailed'
-            : 'summary-shell';
+    const shellClass = [
+        isSummaryReport || isDetailedReport
+            ? 'summary-shell summary-shell-report'
+            : isDetailedExperience
+                ? 'summary-shell summary-shell-detailed'
+                : 'summary-shell',
+        (isSummaryFlow || isDetailedFlow) ? 'summary-shell-flow' : '',
+        (isSummaryFlow || isDetailedFlow) ? 'summary-shell-with-nav' : '',
+    ].filter(Boolean).join(' ');
+
+    const headerBlock = (
+        <header className="summary-header">
+            <div className="summary-header-logo">
+                <img src={finbrellaLogo} alt="Finbrella" />
+            </div>
+            <div className="summary-header-right">
+                {(isDreamsGoals || isGrowthExpectations) && (
+                    <button
+                        type="button"
+                        className="summary-view-report-btn"
+                        onClick={handleViewDetailedReport}
+                    >
+                        <FileText size={16} />
+                        {lg ? 'View Detailed Report' : 'Report'}
+                    </button>
+                )}
+                {(isSummaryFlow || (isDetailedFlow && !isDreamsGoals)) && summaryReportGeneratedAt && (
+                    <button
+                        type="button"
+                        className="summary-view-report-btn"
+                        onClick={handleViewSummaryReport}
+                    >
+                        <FileText size={16} />
+                        {lg ? 'View Summary Report' : 'Report'}
+                    </button>
+                )}
+                {saving && (
+                    <div className="summary-save-indicator">
+                        <Save size={13} /> Saving...
+                    </div>
+                )}
+                {!saving && lastSaved && (
+                    <div className="summary-save-indicator">
+                        <Check size={13} /> Saved
+                    </div>
+                )}
+                <div className="summary-profile-wrap" ref={profileRef}>
+                    <button
+                        type="button"
+                        className="summary-profile-btn"
+                        title="Profile"
+                        aria-expanded={profileOpen}
+                        aria-haspopup="true"
+                        onClick={() => setProfileOpen((open) => !open)}
+                    >
+                        {userInitials || <User size={18} />}
+                    </button>
+                    {profileOpen && (
+                        <div className="summary-profile-dropdown" role="menu">
+                            <div className="summary-profile-dropdown-email" title={user?.email || ''}>
+                                {user?.email || 'Signed in'}
+                            </div>
+                            <button
+                                type="button"
+                                className="summary-profile-dropdown-logout"
+                                role="menuitem"
+                                onClick={handleLogout}
+                            >
+                                Logout
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </header>
+    );
+
+    const summaryNav = isSummaryFlow && (
+        <nav className="summary-horizontal-nav">
+            {steps.map((step, idx) => {
+                const isActive = idx === currentStepIndex;
+                const isCompleted = isStepCompleted(idx);
+                const StepIcon = step.icon;
+
+                return (
+                    <React.Fragment key={step.id}>
+                        {idx > 0 && (
+                            <span className="summary-step-separator">
+                                <ChevronRight size={14} />
+                            </span>
+                        )}
+                        <div
+                            className={`summary-step-item ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}
+                            onClick={() => navigate(step.path)}
+                        >
+                            <div className="summary-step-icon">
+                                <StepIcon size={14} />
+                            </div>
+                            <span>{step.label}</span>
+                            {isCompleted && (
+                                <div className="summary-step-complete-arrow">
+                                    <ArrowRight size={14} />
+                                </div>
+                            )}
+                        </div>
+                    </React.Fragment>
+                );
+            })}
+        </nav>
+    );
+
+    const detailedNav = isDetailedFlow && (
+        <nav className="summary-horizontal-nav">
+            {detailedFlowSteps.map((step, idx) => {
+                const isActive = idx === detailedStepIndex;
+                const isCompleted = idx < detailedStepIndex;
+                const StepIcon = step.icon;
+
+                return (
+                    <React.Fragment key={step.id}>
+                        {idx > 0 && (
+                            <span className="summary-step-separator">
+                                <ChevronRight size={14} />
+                            </span>
+                        )}
+                        <div
+                            className={`summary-step-item ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}
+                            onClick={() => navigate(step.path)}
+                        >
+                            <div className="summary-step-icon">
+                                <StepIcon size={14} />
+                            </div>
+                            <span>{step.label}</span>
+                            {isCompleted && (
+                                <div className="summary-step-complete-arrow">
+                                    <ArrowRight size={14} />
+                                </div>
+                            )}
+                        </div>
+                    </React.Fragment>
+                );
+            })}
+        </nav>
+    );
 
     return (
         <div className={shellClass}>
-            <header className="summary-header">
-                <div className="summary-header-logo">
-                    <img src={finbrellaLogo} alt="Finbrella" />
+            {useFixedFlowChrome ? (
+                <div className="summary-flow-chrome" ref={setFlowChromeEl}>
+                    {headerBlock}
+                    {summaryNav}
+                    {detailedNav}
+                    <div
+                        id={RECONCILIATION_STACK_ID}
+                        className="reconciliation-panel-stack"
+                        aria-label="Reconciliation summaries"
+                    />
                 </div>
-                <div className="summary-header-right">
-                    {(isDreamsGoals || isGrowthExpectations) && (
-                        <button
-                            type="button"
-                            className="summary-view-report-btn"
-                            onClick={handleViewDetailedReport}
-                        >
-                            <FileText size={16} />
-                            {lg ? 'View Detailed Report' : 'Report'}
-                        </button>
-                    )}
-                    {(isSummaryFlow || (isDetailedFlow && !isDreamsGoals)) && summaryReportGeneratedAt && (
-                        <button
-                            type="button"
-                            className="summary-view-report-btn"
-                            onClick={handleViewSummaryReport}
-                        >
-                            <FileText size={16} />
-                            {lg ? 'View Summary Report' : 'Report'}
-                        </button>
-                    )}
-                    {saving && (
-                        <div className="summary-save-indicator">
-                            <Save size={13} /> Saving...
-                        </div>
-                    )}
-                    {!saving && lastSaved && (
-                        <div className="summary-save-indicator">
-                            <Check size={13} /> Saved
-                        </div>
-                    )}
-                    <div className="summary-profile-wrap" ref={profileRef}>
-                        <button
-                            type="button"
-                            className="summary-profile-btn"
-                            title="Profile"
-                            aria-expanded={profileOpen}
-                            aria-haspopup="true"
-                            onClick={() => setProfileOpen((open) => !open)}
-                        >
-                            {userInitials || <User size={18} />}
-                        </button>
-                        {profileOpen && (
-                            <div className="summary-profile-dropdown" role="menu">
-                                <div className="summary-profile-dropdown-email" title={user?.email || ''}>
-                                    {user?.email || 'Signed in'}
-                                </div>
-                                <button
-                                    type="button"
-                                    className="summary-profile-dropdown-logout"
-                                    role="menuitem"
-                                    onClick={handleLogout}
-                                >
-                                    Logout
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </header>
-
-            {isSummaryFlow && (
-                <nav className="summary-horizontal-nav">
-                    {steps.map((step, idx) => {
-                        const isActive = idx === currentStepIndex;
-                        const isCompleted = isStepCompleted(idx);
-                        const StepIcon = step.icon;
-
-                        return (
-                            <React.Fragment key={step.id}>
-                                {idx > 0 && (
-                                    <span className="summary-step-separator">
-                                        <ChevronRight size={14} />
-                                    </span>
-                                )}
-                                <div
-                                    className={`summary-step-item ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}
-                                    onClick={() => navigate(step.path)}
-                                >
-                                    <div className="summary-step-icon">
-                                        <StepIcon size={14} />
-                                    </div>
-                                    <span>{step.label}</span>
-                                    {isCompleted && (
-                                        <div className="summary-step-complete-arrow">
-                                            <ArrowRight size={14} />
-                                        </div>
-                                    )}
-                                </div>
-                            </React.Fragment>
-                        );
-                    })}
-                </nav>
-            )}
-
-            {isDetailedFlow && (
-                <nav className="summary-horizontal-nav">
-                    {detailedFlowSteps.map((step, idx) => {
-                        const isActive = idx === detailedStepIndex;
-                        const isCompleted = idx < detailedStepIndex;
-                        const StepIcon = step.icon;
-
-                        return (
-                            <React.Fragment key={step.id}>
-                                {idx > 0 && (
-                                    <span className="summary-step-separator">
-                                        <ChevronRight size={14} />
-                                    </span>
-                                )}
-                                <div
-                                    className={`summary-step-item ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}
-                                    onClick={() => navigate(step.path)}
-                                >
-                                    <div className="summary-step-icon">
-                                        <StepIcon size={14} />
-                                    </div>
-                                    <span>{step.label}</span>
-                                    {isCompleted && (
-                                        <div className="summary-step-complete-arrow">
-                                            <ArrowRight size={14} />
-                                        </div>
-                                    )}
-                                </div>
-                            </React.Fragment>
-                        );
-                    })}
-                </nav>
+            ) : (
+                headerBlock
             )}
 
             <div className="summary-body">

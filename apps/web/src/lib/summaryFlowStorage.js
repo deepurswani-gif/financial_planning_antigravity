@@ -131,6 +131,7 @@ export function hasMeaningfulSummaryDraft(draft) {
   const expenses = draft.expenseCategories || {};
   if (
     expenses.summaryHouseholdTotal ||
+    expenses.summaryInsuranceTotal ||
     expenses.summaryEmiTotal ||
     expenses.summaryMonthlyInvestments ||
     expenses.summaryOtherSavings

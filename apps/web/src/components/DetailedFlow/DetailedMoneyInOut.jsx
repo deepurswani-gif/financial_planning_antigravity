@@ -18,8 +18,7 @@ import {
     TDS_ASSUMPTION_NOTE,
     TDS_ALREADY_DEDUCTED_NOTE,
 } from './incomeDetailSync';
-import ReconciliationStatus from './ReconciliationStatus';
-import ReconciliationStickyPanel from './ReconciliationStickyPanel';
+import ReconciliationBar from './ReconciliationBar';
 import { guessEmploymentTypeFromSummaryOccupation } from './employmentTypeSync';
 import { useExpenseEmiQuestions } from './useExpenseEmiQuestions';
 import { useInsurancePremiumQuestions } from './useInsurancePremiumQuestions';
@@ -310,17 +309,16 @@ const DetailedMoneyInOut = () => {
                 <p className="question-narrative">{personLabel} income details</p>
                 <h2 className="question-title">Money coming in</h2>
                 {parseFloat(summaryAmount) > 0 && (
-                    <ReconciliationStickyPanel>
-                        <div className="reconciliation-sticky-panel__title">Summary vs detailed income</div>
-                        <div>Summary total: <strong>{formatInr(summaryAmount)}</strong> / month</div>
-                        <div>Detailed total: <strong style={{ color: 'var(--primary)' }}>{formatInr(detailTotal)}</strong> / month</div>
-                        <div style={{ marginTop: '0.35rem' }}>
-                            <ReconciliationStatus reconciliation={memberReconciliation} matchLabel="Matches summary" />
-                        </div>
-                    </ReconciliationStickyPanel>
+                    <ReconciliationBar
+                        summaryLabel="Summary Income"
+                        detailLabel="Detailed income"
+                        summaryAmount={summaryAmount}
+                        detailAmount={detailTotal}
+                        reconciliation={memberReconciliation}
+                    />
                 )}
                 <div
-                    className="question-fields"
+                    className={`question-fields${showTaxSlip ? ' question-fields--expanded' : ''}`}
                     style={{
                         maxWidth: showTaxSlip ? '820px' : '420px',
                         margin: '0 auto',
@@ -481,7 +479,8 @@ const DetailedMoneyInOut = () => {
     }, [income.summarySelfInHand, income.summarySpouseInHand, income.self, income.spouse]);
 
     const {
-        expenseQuestions,
+        householdQuestions,
+        emiQuestions,
         activeLoanModal,
         setActiveLoanModal,
         emi,
@@ -567,8 +566,9 @@ const DetailedMoneyInOut = () => {
             list.push(...buildMemberQuestions('spouse', spouseDetail, spouseEmploymentType, spouseMember?.name || 'Spouse'));
         }
 
-        list.push(...expenseQuestions);
+        list.push(...householdQuestions);
         list.push(...insuranceQuestions);
+        list.push(...emiQuestions);
         list.push(...savingsQuestions);
 
         return list;
@@ -576,7 +576,7 @@ const DetailedMoneyInOut = () => {
         editingRecap, income.self, income.spouse, income.summarySelfInHand, income.summarySpouseInHand,
         selfDetail, spouseDetail,
         selfEmploymentType, spouseEmploymentType, includeSpouse, selfMember.name,
-        spouseMember?.name, recapSelf, recapSpouse, expenseQuestions, insuranceQuestions, savingsQuestions,
+        spouseMember?.name, recapSelf, recapSpouse, householdQuestions, emiQuestions, insuranceQuestions, savingsQuestions,
         updateDetail, updateTaxField, updateOtherIncome, addOtherIncome, removeOtherIncome,
     ]);
 
@@ -589,6 +589,7 @@ const DetailedMoneyInOut = () => {
                 questions={questions}
                 narrative="Thank you. I now have a clearer picture of your money in and money out — including your savings and investments."
                 lastSectionLabel="Save & Continue"
+                contentWidth="wide"
             />
             {lifeUploadHelpModal}
             {showPolicyDetailsModal && (

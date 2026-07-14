@@ -16,9 +16,8 @@ import {
     toggleEmiLoanTypeSelection,
     clearEmiLoansNotInSelection,
 } from './expenseDetailSync';
-import HouseholdInsuranceReconciliationPanel from './HouseholdInsuranceReconciliationPanel';
-import ReconciliationStatus from './ReconciliationStatus';
-import ReconciliationStickyPanel from './ReconciliationStickyPanel';
+import HouseholdReconciliationPanel from './HouseholdReconciliationPanel';
+import ReconciliationBar from './ReconciliationBar';
 
 const formatInr = (val) => {
     if (!val || isNaN(val)) return '₹0';
@@ -209,8 +208,8 @@ export function useExpenseEmiQuestions() {
         );
     };
 
-    const questions = useMemo(() => {
-        const list = [{
+    const { householdQuestions, emiQuestions } = useMemo(() => {
+        const householdQuestions = [{
             id: 'household-breakup',
             content: (
                 <div className="question-container">
@@ -242,12 +241,10 @@ export function useExpenseEmiQuestions() {
                             </>
                         )}
                     </div>
-                    {summaryHouseholdTotal > 0 && (
-                        <HouseholdInsuranceReconciliationPanel
-                            expenseCategories={expenseCategories}
-                            familyMembers={familyMembers}
-                        />
-                    )}
+                    <HouseholdReconciliationPanel
+                        expenseCategories={expenseCategories}
+                        familyMembers={familyMembers}
+                    />
                     <div className="question-fields" style={{ maxWidth: '420px', margin: '0 auto', gap: '1rem' }}>
                         <CurrencyField label="Household (Grocery, LPG, Fuel etc.)" value={household.grocery} onChange={(v) => handleHouseholdChange('grocery', v)} />
                         <CurrencyField label="House Rent" value={household.rent} onChange={(v) => handleHouseholdChange('rent', v)} />
@@ -260,13 +257,13 @@ export function useExpenseEmiQuestions() {
             ),
         }];
 
-        list.push({
+        const emiQuestions = [{
             id: 'recap-emi',
             content: (
                 <div className="question-container">
                     <p className="question-narrative">Now let&apos;s look at your loan commitments.</p>
                     <h2 className="question-title">Do you have ongoing EMIs?</h2>
-                    <div style={{ maxWidth: '420px', margin: '0 auto' }}>
+                    <div className="question-fields" style={{ margin: '0 auto' }}>
                         {yesNoToggle(
                             hasEMI ? true : hasEMI === false ? false : null,
                             () => setHasEMI(true),
@@ -290,22 +287,21 @@ export function useExpenseEmiQuestions() {
                             </div>
                         )}
                         {summaryEmiTotal > 0 && emiTotal > 0 && (
-                            <ReconciliationStickyPanel>
-                                <div className="reconciliation-sticky-panel__title">Summary vs detailed EMI</div>
-                                <div>Summary EMI: <strong>{formatInr(summaryEmiTotal)}</strong> / month</div>
-                                <div>Your configured loans total: {formatInr(emiTotal)} / month</div>
-                                <div style={{ marginTop: '0.35rem' }}>
-                                    <ReconciliationStatus reconciliation={emiReconciliation} />
-                                </div>
-                            </ReconciliationStickyPanel>
+                            <ReconciliationBar
+                                summaryLabel="Summary EMI"
+                                detailLabel="Detailed EMI"
+                                summaryAmount={summaryEmiTotal}
+                                detailAmount={emiTotal}
+                                reconciliation={emiReconciliation}
+                            />
                         )}
                     </div>
                 </div>
             ),
-        });
+        }];
 
         if (hasEMI === true) {
-            list.push({
+            emiQuestions.push({
                 id: 'emi-loan-types',
                 content: (
                     <div className="question-container">
@@ -314,7 +310,7 @@ export function useExpenseEmiQuestions() {
                         <p className="question-helper" style={{ maxWidth: '420px', margin: '0 auto 1.25rem', textAlign: 'center' }}>
                             You can select more than one loan type.
                         </p>
-                        <div style={{ maxWidth: '420px', margin: '0 auto', display: 'grid', gap: '0.65rem', textAlign: 'left' }}>
+                        <div className="question-fields" style={{ margin: '0 auto', display: 'grid', gap: '0.65rem', textAlign: 'left' }}>
                             {EMI_LOAN_KEYS.map(({ key, label }) => {
                                 const isSelected = selectedEmiLoanTypes.includes(key);
                                 return (
@@ -350,21 +346,21 @@ export function useExpenseEmiQuestions() {
                 ),
             });
 
-            list.push({
+            emiQuestions.push({
                 id: 'emi-loans',
                 content: (
                     <div className="question-container">
                         <p className="question-narrative">Configure each loan below. Start dates cannot be in the future.</p>
                         <h2 className="question-title">EMIs (monthly)</h2>
                         {summaryEmiTotal > 0 && (
-                            <ReconciliationStickyPanel visible={emiTotal > 0}>
-                                <div className="reconciliation-sticky-panel__title">Summary vs detailed EMI</div>
-                                <div>Summary EMI: <strong>{formatInr(summaryEmiTotal)}</strong> / month</div>
-                                <div>Total configured EMI: <strong style={{ color: 'var(--primary)' }}>{formatInr(emiTotal)}</strong> / month</div>
-                                <div style={{ marginTop: '0.35rem' }}>
-                                    <ReconciliationStatus reconciliation={emiReconciliation} />
-                                </div>
-                            </ReconciliationStickyPanel>
+                            <ReconciliationBar
+                                summaryLabel="Summary EMI"
+                                detailLabel="Detailed EMI"
+                                summaryAmount={summaryEmiTotal}
+                                detailAmount={emiTotal}
+                                reconciliation={emiReconciliation}
+                                visible={emiTotal > 0}
+                            />
                         )}
                         <div className="question-fields" style={{ maxWidth: '480px', margin: '0 auto', gap: '1rem' }}>
                             {selectedEmiLoans.length === 0 ? (
@@ -422,7 +418,7 @@ export function useExpenseEmiQuestions() {
             });
         }
 
-        return list;
+        return { householdQuestions, emiQuestions };
     }, [
         editingHouseholdSummary, household, childMembers, hasEMI, emi, emiTotal,
         selectedEmiLoanTypes, selectedEmiLoans,
@@ -434,7 +430,8 @@ export function useExpenseEmiQuestions() {
     ]);
 
     return {
-        expenseQuestions: questions,
+        householdQuestions,
+        emiQuestions,
         activeLoanModal,
         setActiveLoanModal,
         emi,
