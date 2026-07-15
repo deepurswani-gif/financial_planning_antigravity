@@ -96,6 +96,147 @@ describe('ProjectionLogic', () => {
         expect(results[0].totalOutflow).toBe(420000);
     });
 
+    it('does not double-count studio term when linked policy carries the premium', () => {
+        const params = {
+            ...mockParams,
+            expenseCategories: { ...mockParams.expenseCategories, insurance: { life: {} } },
+            investmentAllocations: [
+                {
+                    id: 101,
+                    type: 'Term Insurance',
+                    amount: 5000,
+                    startMonth: 1,
+                    startYear: 2026,
+                    duration: 10,
+                    frequency: 'Monthly',
+                },
+            ],
+            policies: [
+                {
+                    id: 'p-term',
+                    sourceAllocationId: 101,
+                    planType: 'Term Insurance',
+                    premium: '5000',
+                    frequency: 'Monthly',
+                    paymentTerm: '15',
+                    startDate: '2026-01-01',
+                    isProposed: false,
+                },
+            ],
+        };
+        const results = generateProjections(params);
+        // Policy only: 5000 * 12 = 60k (studio row skipped via exclusivity)
+        expect(results[0].insurancePremium).toBe(60000);
+        expect(results[0].unallocatedSurplus).toBe(
+            generateProjections({
+                ...params,
+                investmentAllocations: [],
+            })[0].unallocatedSurplus,
+        );
+    });
+
+    it('does not double-count studio life when linked policy carries the premium', () => {
+        const params = {
+            ...mockParams,
+            expenseCategories: { ...mockParams.expenseCategories, insurance: { life: {} } },
+            investmentAllocations: [
+                {
+                    id: 202,
+                    type: 'Life Insurance',
+                    amount: 3000,
+                    startMonth: 1,
+                    startYear: 2026,
+                    duration: 10,
+                    frequency: 'Monthly',
+                    insuredMember: 'Self',
+                },
+            ],
+            policies: [
+                {
+                    id: 'p-life',
+                    sourceAllocationId: 202,
+                    planType: 'Saving Plan',
+                    insuredName: 'Self',
+                    premium: '3000',
+                    frequency: 'Monthly',
+                    paymentTerm: '12',
+                    startDate: '2026-01-01',
+                    isProposed: true,
+                },
+            ],
+        };
+        const results = generateProjections(params);
+        expect(results[0].insurancePremium).toBe(36000);
+    });
+
+    it('keeps studio term in surplus when linked policy has no premium details yet', () => {
+        const params = {
+            ...mockParams,
+            expenseCategories: { ...mockParams.expenseCategories, insurance: { life: {} } },
+            investmentAllocations: [
+                {
+                    id: 101,
+                    type: 'Term Insurance',
+                    amount: 5000,
+                    startMonth: 1,
+                    startYear: 2026,
+                    duration: 10,
+                    frequency: 'Monthly',
+                },
+            ],
+            policies: [
+                {
+                    id: 'p-term',
+                    sourceAllocationId: 101,
+                    planType: 'Term Insurance',
+                    premium: '',
+                    paymentTerm: '',
+                    startDate: '',
+                },
+            ],
+        };
+        const results = generateProjections(params);
+        expect(results[0].insurancePremium).toBe(60000);
+    });
+
+    it('uses written-back payment term on policy for later projection years', () => {
+        const params = {
+            ...mockParams,
+            expenseCategories: { ...mockParams.expenseCategories, insurance: { life: {} } },
+            inflationRates: { incomeIncrement: 0, householdInflation: 0, educationInflation: 0 },
+            investmentAllocations: [
+                {
+                    id: 101,
+                    type: 'Term Insurance',
+                    amount: 5000,
+                    startMonth: 1,
+                    startYear: 2026,
+                    duration: 15,
+                    frequency: 'Monthly',
+                },
+            ],
+            policies: [
+                {
+                    id: 'p-term',
+                    sourceAllocationId: 101,
+                    planType: 'Term Insurance',
+                    premium: '5000',
+                    frequency: 'Monthly',
+                    paymentTerm: '15',
+                    startDate: '2026-01-01',
+                },
+            ],
+        };
+        const results = generateProjections(params);
+        const year2035 = results.find((p) => p.year === 2035);
+        const year2040 = results.find((p) => p.year === 2040);
+        const year2041 = results.find((p) => p.year === 2041);
+        // paymentTerm 15 from 2026 → active while year < 2026+15 (2041)
+        expect(year2035.insurancePremium).toBe(60000);
+        expect(year2040.insurancePremium).toBe(60000);
+        expect(year2041.insurancePremium).toBe(0);
+    });
+
     it('uses Step 8 tax logic with selfDetail and standard deduction', () => {
         const params = {
             ...mockParams,

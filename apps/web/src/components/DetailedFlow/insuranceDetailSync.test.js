@@ -11,6 +11,12 @@ import {
     getLifeMemberMonthlyTotal,
     getInsuranceMonthlyTotal,
     getEffectiveMonthlyInsurance,
+    mapPlanTypeToAllocType,
+    policyDetailsToAllocationFields,
+    findStudioAllocationForPolicy,
+    syncPolicyToStudioAllocations,
+    shouldIncludeStudioInsuranceInProjections,
+    policyHasProjectionPremium,
 } from './insuranceDetailSync';
 
 describe('insuranceDetailSync cover reconciliation', () => {
@@ -155,5 +161,135 @@ describe('getEffectiveMonthlyInsurance', () => {
                 life: {},
             },
         })).toBe(1000);
+    });
+});
+
+describe('studio policy sync helpers', () => {
+    const studioTerm = {
+        id: 101,
+        type: 'Term Insurance',
+        amount: 5000,
+        frequency: 'Monthly',
+        duration: 10,
+        startYear: 2026,
+        startMonth: 7,
+        studioPlanKey: '2026-6',
+    };
+
+    const studioLife = {
+        id: 202,
+        type: 'Life Insurance',
+        amount: 3000,
+        frequency: 'Monthly',
+        duration: 10,
+        startYear: 2026,
+        startMonth: 7,
+        insuredMember: 'Self',
+        studioPlanKey: '2026-6',
+    };
+
+    it('mapPlanTypeToAllocType maps term, life, and health plan types', () => {
+        expect(mapPlanTypeToAllocType('Term Insurance')).toBe('Term Insurance');
+        expect(mapPlanTypeToAllocType('Saving Plan')).toBe('Life Insurance');
+        expect(mapPlanTypeToAllocType('ULIP')).toBe('Life Insurance');
+        expect(mapPlanTypeToAllocType('Health Insurance')).toBe('Health Insurance');
+    });
+
+    it('policyDetailsToAllocationFields maps premium term and start date', () => {
+        expect(policyDetailsToAllocationFields({
+            premium: '4500',
+            frequency: 'Annually',
+            paymentTerm: '15',
+            startDate: '2026-07-01',
+            insuredName: 'Self',
+        })).toEqual({
+            amount: 4500,
+            frequency: 'Annual',
+            duration: 15,
+            startYear: 2026,
+            startMonth: 7,
+            insuredMember: 'Self',
+        });
+    });
+
+    it('findStudioAllocationForPolicy prefers sourceAllocationId', () => {
+        const policy = {
+            planType: 'Term Insurance',
+            sourceAllocationId: 101,
+            insuredName: 'Self',
+        };
+        expect(findStudioAllocationForPolicy(policy, [studioLife, studioTerm])).toEqual(studioTerm);
+    });
+
+    it('syncPolicyToStudioAllocations writes payment term and premium onto term row', () => {
+        const next = syncPolicyToStudioAllocations(
+            {
+                planType: 'Term Insurance',
+                sourceAllocationId: 101,
+                premium: '4500',
+                frequency: 'Monthly',
+                paymentTerm: '15',
+                startDate: '2026-07-01',
+                insuredName: 'Self',
+            },
+            [studioTerm, studioLife],
+        );
+        expect(next[0]).toMatchObject({
+            id: 101,
+            amount: 4500,
+            duration: 15,
+            frequency: 'Monthly',
+            startYear: 2026,
+            startMonth: 7,
+        });
+        expect(next[1]).toBe(studioLife);
+    });
+
+    it('syncPolicyToStudioAllocations writes life policy back by insured member', () => {
+        const next = syncPolicyToStudioAllocations(
+            {
+                planType: 'Saving Plan',
+                premium: '8000',
+                frequency: 'Annually',
+                paymentTerm: '12',
+                startDate: '2027-01-15',
+                insuredName: 'Self',
+            },
+            [studioTerm, studioLife],
+        );
+        expect(next[1]).toMatchObject({
+            id: 202,
+            amount: 8000,
+            frequency: 'Annual',
+            duration: 12,
+            startYear: 2027,
+            startMonth: 1,
+            insuredMember: 'Self',
+        });
+    });
+
+    it('shouldIncludeStudioInsuranceInProjections skips alloc when linked policy has premium', () => {
+        const policies = [{
+            id: 'p1',
+            sourceAllocationId: 101,
+            premium: '4500',
+            paymentTerm: '15',
+            startDate: '2026-07-01',
+            frequency: 'Monthly',
+        }];
+        expect(policyHasProjectionPremium(policies[0])).toBe(true);
+        expect(shouldIncludeStudioInsuranceInProjections(studioTerm, policies)).toBe(false);
+        expect(shouldIncludeStudioInsuranceInProjections(studioTerm, [])).toBe(true);
+    });
+
+    it('shouldIncludeStudioInsuranceInProjections keeps alloc when linked policy is incomplete', () => {
+        const policies = [{
+            id: 'p1',
+            sourceAllocationId: 101,
+            premium: '',
+            paymentTerm: '',
+            startDate: '',
+        }];
+        expect(shouldIncludeStudioInsuranceInProjections(studioTerm, policies)).toBe(true);
     });
 });

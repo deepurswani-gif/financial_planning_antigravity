@@ -16,7 +16,10 @@ import {
     computeHouseholdProjectedTaxReconciliation,
 } from '../DetailedReport/moneyFlowLedgerLogic';
 import { hasConfiguredLoan } from '../DetailedFlow/expenseDetailSync';
-import { getLifeMemberMonthlyTotal } from '../DetailedFlow/insuranceDetailSync';
+import {
+    getLifeMemberMonthlyTotal,
+    shouldIncludeStudioInsuranceInProjections,
+} from '../DetailedFlow/insuranceDetailSync';
 import { getEffectiveMonthlySavings, buildSavingsBreakdownAnnual } from '../DetailedFlow/savingsDetailSync';
 
 const resolveAnnualInflowBases = ({
@@ -281,11 +284,12 @@ export const generateProjections = ({
             }
         });
 
-        // Add Future Life Insurance from Allocation Module
+        // Add Future Life Insurance from Allocation / Studio — skip when a linked
+        // policy already carries the premium (Detailed Flow write-back exclusivity).
         let futureLifeAllocationsThisYear = 0;
         investmentAllocations.forEach(alloc => {
-            if (!['Life Insurance', 'Term Insurance', 'Health Insurance'].includes(alloc.type)) return;
-            
+            if (!shouldIncludeStudioInsuranceInProjections(alloc, policies)) return;
+
             const allocStartYear = parseInt(alloc.startYear);
             const allocStartMonth = parseInt(alloc.startMonth) || 1;
             const allocDuration = parseInt(alloc.duration) || 1;

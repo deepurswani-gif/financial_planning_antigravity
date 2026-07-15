@@ -7,7 +7,7 @@ const parseAmount = (value) => parseFloat(value) || 0;
 
 const RECURRING_ALLOC_TYPES = [
     'SIP', 'PPF', 'NPS', 'Life Insurance', 'Term Insurance', 'Health Insurance',
-    'Life Insurance Saving Plans', 'Recurring Deposit', 'Liquid Mutual Fund',
+    'Life Insurance Saving Plans', 'Recurring Deposit',
 ];
 
 export function summarizeInvestmentAllocations(allocations = []) {

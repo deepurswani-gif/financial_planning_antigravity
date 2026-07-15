@@ -1,23 +1,7 @@
-import React, { useMemo } from 'react';
-import { TrendingUp, Shield, Coins, Landmark, PiggyBank, BarChart2 } from 'lucide-react';
+import React from 'react';
+import { TrendingUp } from 'lucide-react';
 import { formatCurrency } from '../CashFlowModule/CashFlowLogic';
 import ReportReveal from './ReportReveal';
-
-const ICONS = {
-    SIP: TrendingUp,
-    Lumpsum: Coins,
-    'Direct Equity & ETFs': BarChart2,
-    PPF: Landmark,
-    NPS: PiggyBank,
-    'Fixed Deposit': Landmark,
-    'Recurring Deposit': PiggyBank,
-    'Life Insurance': Shield,
-    'Term Insurance': Shield,
-    'Health Insurance': Shield,
-    'Life Insurance Saving Plans': PiggyBank,
-    Gold: Coins,
-    'Other Investment': Coins,
-};
 
 const GrowthPreviewStrip = ({ growthPreview }) => {
     if (!growthPreview?.hasDraft) return null;
@@ -29,43 +13,26 @@ const GrowthPreviewStrip = ({ growthPreview }) => {
                 Growth preview
             </h3>
             <p className="pymtw-zone-sub">
-                Projected instrument values by {growthPreview.retirementYear} — before vs with your draft plan.
+                Projected corpus till your retirement by {growthPreview.retirementYear}
             </p>
 
             <div className="pymtw-growth-totals">
                 <div>
-                    <span>Current path</span>
+                    <span>Current corpus</span>
                     <strong>{formatCurrency(growthPreview.baselineTotal)}</strong>
                 </div>
                 <div>
-                    <span>With draft plan</span>
+                    <span>Corpus after Allocation</span>
                     <strong className="pymtw-growth-scenario">{formatCurrency(growthPreview.scenarioTotal)}</strong>
                 </div>
-                {growthPreview.totalDelta > 0 && (
-                    <div>
-                        <span>Net uplift</span>
-                        <strong className="pymtw-delta-positive">+{formatCurrency(growthPreview.totalDelta)}</strong>
-                    </div>
-                )}
-            </div>
-
-            <div className="pymtw-growth-rows">
-                {growthPreview.rows.map((row) => {
-                    const Icon = ICONS[row.type] || TrendingUp;
-                    return (
-                        <div key={row.type} className="pymtw-growth-row">
-                            <Icon size={16} />
-                            <span className="pymtw-growth-type">{row.type}</span>
-                            <span className="pymtw-growth-draft">
-                                +{formatCurrency(row.draftAmount)}
-                                {row.type !== 'Lumpsum' && row.type !== 'Fixed Deposit' && row.type !== 'Gold' && row.type !== 'Other Investment' && row.type !== 'Direct Equity & ETFs' ? '/mo' : ''}
-                            </span>
-                            <span className="pymtw-growth-delta">
-                                {row.delta > 0 ? `+${formatCurrency(row.delta)}` : '—'}
-                            </span>
-                        </div>
-                    );
-                })}
+                <div>
+                    <span>Net Uplift</span>
+                    <strong className={growthPreview.totalDelta > 0 ? 'pymtw-delta-positive' : undefined}>
+                        {growthPreview.totalDelta > 0
+                            ? `+${formatCurrency(growthPreview.totalDelta)}`
+                            : formatCurrency(growthPreview.totalDelta || 0)}
+                    </strong>
+                </div>
             </div>
         </ReportReveal>
     );

@@ -6,6 +6,7 @@ import {
     buildAllocationStudioContext,
     buildDraftAllocationPlan,
     buildRecommendedBundles,
+    computeAllocationImpactForMonth,
     createEmptyDraftAllocations,
     getAllocationPlanKey,
     getTotalDraftAllocated,
@@ -16,7 +17,9 @@ import {
     buildGrowthPreview,
     clearStudioMonthPlan,
     compareInstrumentGoalImpacts,
+    INSTRUMENT_REGISTRY,
     monthHasStudioPlan,
+    normalizeAllocType,
     pruneAllocationPlansForAllocations,
     removeInvestmentAllocationById,
 } from './instrumentAnalysisLogic';
@@ -26,10 +29,7 @@ import InstrumentCardGrid from './InstrumentCardGrid';
 import RecommendedBundles from './RecommendedBundles';
 import InstrumentAnalysisPanel from './InstrumentAnalysisPanel';
 import GrowthPreviewStrip from './GrowthPreviewStrip';
-import OutcomeTheater from './OutcomeTheater';
-import ApplyPlanBar from './ApplyPlanBar';
 import StudioInsightsRail from './StudioInsightsRail';
-import ScenarioComparePanel from './ScenarioComparePanel';
 import PlannedInvestmentAllocationsPanel from './PlannedInvestmentAllocationsPanel';
 import { summarizeInvestmentAllocations } from './investSurplusLogic';
 import {
@@ -41,7 +41,29 @@ import {
 
 const PPF_ANNUAL_CAP = 150000;
 const PPF_MAX_MONTHLY = 12500;
+const PYMTW_GATE_KEY = '__pymtwGate';
 const parseAmount = (value) => parseFloat(value) || 0;
+
+const getPymtwGate = (allocationPlans = {}) => ({
+    adjustmentsSaved: Boolean(allocationPlans[PYMTW_GATE_KEY]?.adjustmentsSaved),
+    showInvestmentAvenues: Boolean(allocationPlans[PYMTW_GATE_KEY]?.showInvestmentAvenues),
+});
+
+const withPymtwGate = (allocationPlans = {}, patch = {}) => ({
+    ...allocationPlans,
+    [PYMTW_GATE_KEY]: {
+        ...(allocationPlans[PYMTW_GATE_KEY] || {}),
+        ...patch,
+    },
+});
+
+const hasUnlockedInvestmentAvenues = (allocationPlans = {}, investmentAllocations = []) => {
+    const hasStudioPlan = (investmentAllocations || []).some((a) => a?.studioPlanKey);
+    const hasMonthPlan = Object.entries(allocationPlans || {}).some(
+        ([key, plan]) => key !== PYMTW_GATE_KEY && plan && (plan.status === 'applied' || plan.status === 'draft'),
+    );
+    return hasStudioPlan || hasMonthPlan;
+};
 
 const getMonthlyPpfCap = (expenseCategories = {}, investmentAllocations = [], draftAllocations = {}) => {
     const existingPpfAnnual = parseAmount(expenseCategories?.savings?.ppf?.amount) * 12
@@ -81,6 +103,21 @@ const draftFromPlanItems = (items) => {
     items?.forEach((item) => {
         if (item.instrumentType) draft[item.instrumentType] = item.amount || 0;
     });
+    return draft;
+};
+
+const draftFromStudioAllocations = (investmentAllocations = [], studioPlanKey) => {
+    const draft = createEmptyDraftAllocations();
+    investmentAllocations
+        .filter((alloc) => alloc.studioPlanKey === studioPlanKey)
+        .forEach((alloc) => {
+            const type = normalizeAllocType(alloc.type) || alloc.type;
+            const def = INSTRUMENT_REGISTRY[type];
+            if (!def || !(type in draft)) return;
+            const raw = Math.round(parseAmount(alloc.amount));
+            const amount = def.inputMode === 'monthly' ? Math.round(raw / 12) : raw;
+            draft[type] = (draft[type] || 0) + Math.max(0, amount);
+        });
     return draft;
 };
 
@@ -141,9 +178,12 @@ const PutYourMoneyToWorkSection = () => {
     const [draftAllocations, setDraftAllocations] = useState(() => createEmptyDraftAllocations());
     const [activeBundleId, setActiveBundleId] = useState(null);
     const [appliedPlanKey, setAppliedPlanKey] = useState(null);
-    const [adjustmentsSaved, setAdjustmentsSaved] = useState(false);
+    const [avenuesMode, setAvenuesMode] = useState('choose');
     const [adjustmentSaveMessage, setAdjustmentSaveMessage] = useState('');
-    const [showInvestmentAvenues, setShowInvestmentAvenues] = useState(false);
+    const persistedGate = getPymtwGate(allocationPlans);
+    const inferredUnlocked = hasUnlockedInvestmentAvenues(allocationPlans, investmentAllocations);
+    const adjustmentsSaved = persistedGate.adjustmentsSaved || inferredUnlocked;
+    const showInvestmentAvenues = persistedGate.showInvestmentAvenues || inferredUnlocked;
     const effectiveMonth = selectedMonthIndex ?? defaultMonth;
 
     const studio = useMemo(
@@ -187,17 +227,22 @@ const PutYourMoneyToWorkSection = () => {
         if (!planKey) return;
         const saved = allocationPlans[planKey];
         if (saved?.status === 'draft') {
+            const hasItems = (saved.items || []).some((item) => (item.amount || 0) > 0);
             setDraftAllocations(draftFromPlanItems(saved.items));
             setActiveBundleId(saved.selectedBundleId || null);
             setAppliedPlanKey(null);
+            // Empty / AI-prefilled drafts stay on chooser; only user drafts with amounts open manual edit.
+            setAvenuesMode(hasItems && !saved.selectedBundleId ? 'manual_edit' : 'choose');
         } else if (saved?.status === 'applied') {
             setDraftAllocations(createEmptyDraftAllocations());
             setActiveBundleId(saved.selectedBundleId || null);
             setAppliedPlanKey(planKey);
+            setAvenuesMode(saved.selectedBundleId ? 'ai_applied' : 'manual_applied');
         } else {
             setDraftAllocations(createEmptyDraftAllocations());
             setActiveBundleId(null);
             setAppliedPlanKey(null);
+            setAvenuesMode('choose');
         }
     }, [planKey, allocationPlans]);
 
@@ -225,8 +270,17 @@ const PutYourMoneyToWorkSection = () => {
     ]);
 
     const totalAllocated = getTotalDraftAllocated(draftAllocations);
-    const remaining = (studio.hero?.deployableSurplus || 0) - totalAllocated;
-    const allocatedCount = Object.values(draftAllocations).filter((v) => v > 0).length;
+    const editingStudioImpact = useMemo(() => {
+        if (!studio.meta?.hasData || !planKey) return 0;
+        if (avenuesMode !== 'manual_edit') return 0;
+        return computeAllocationImpactForMonth(
+            (investmentAllocations || []).filter((a) => a.studioPlanKey === planKey),
+            studio.meta.calendarYear,
+            effectiveMonth,
+        );
+    }, [avenuesMode, investmentAllocations, planKey, studio.meta, effectiveMonth]);
+    const availableSurplus = (studio.hero?.deployableSurplus || 0) + editingStudioImpact;
+    const remaining = availableSurplus - totalAllocated;
     const ppfMaxByCap = useMemo(
         () => getMonthlyPpfCap(expenseCategories, investmentAllocations, { ...draftAllocations, PPF: 0 }),
         [expenseCategories, investmentAllocations, draftAllocations],
@@ -245,6 +299,20 @@ const PutYourMoneyToWorkSection = () => {
             monthIndex: effectiveMonth,
         });
     }, [analysisBase, draftAllocations, effectiveMonth, studio.meta]);
+
+    const appliedGrowthPreview = useMemo(() => {
+        if (avenuesMode !== 'ai_applied' && avenuesMode !== 'manual_applied') return null;
+        const snap = allocationPlans[planKey]?.computedSnapshot;
+        if (!snap) return null;
+        return {
+            hasDraft: true,
+            baselineTotal: snap.retirementCorpusBefore || 0,
+            scenarioTotal: snap.retirementCorpusAfter || 0,
+            totalDelta: snap.retirementCorpusDelta || 0,
+            retirementYear: snap.retirementYear || growthPreview?.retirementYear,
+            rows: [],
+        };
+    }, [avenuesMode, allocationPlans, planKey, growthPreview?.retirementYear]);
 
     const recommendedBundles = useMemo(
         () => buildRecommendedBundles({
@@ -284,7 +352,7 @@ const PutYourMoneyToWorkSection = () => {
         if (!studio.meta?.hasData) return { issues: [], hasBlockingErrors: false, canApply: false };
         return validateDraftPlan({
             draftAllocations,
-            deployableSurplus: studio.hero.deployableSurplus,
+            deployableSurplus: availableSurplus,
             journeyProjections,
             planStartMonth: studio.meta.planStartMonth,
             calendarYear: studio.meta.calendarYear,
@@ -294,7 +362,7 @@ const PutYourMoneyToWorkSection = () => {
         });
     }, [
         draftAllocations,
-        studio.hero,
+        availableSurplus,
         studio.meta,
         journeyProjections,
         effectiveMonth,
@@ -401,35 +469,41 @@ const PutYourMoneyToWorkSection = () => {
         const requested = Math.max(0, Math.round(amount));
         const rounded = instrumentType === 'PPF'
             ? Math.min(requested, maxForInstrument('PPF'))
-            : requested;
+            : Math.min(requested, maxForInstrument(instrumentType));
         const next = { ...draftAllocations, [instrumentType]: rounded };
         setDraftAllocations(next);
         setActiveBundleId(null);
         setAppliedPlanKey(null);
+        setAvenuesMode('manual_edit');
         persistDraft(next, null);
     }, [draftAllocations, persistDraft, maxForInstrument]);
 
-    const handleSelectBundle = useCallback((bundle) => {
-        const next = { ...createEmptyDraftAllocations(), ...bundle.allocations };
-        if (next.PPF > 0) {
-            next.PPF = Math.min(Math.max(0, Math.round(next.PPF)), ppfMaxByCap);
-        }
-        setDraftAllocations(next);
-        setActiveBundleId(bundle.id);
-        setAppliedPlanKey(null);
-        persistDraft(next, bundle.id);
-    }, [persistDraft, ppfMaxByCap]);
+    const commitAppliedPlan = useCallback((allocations, bundleId) => {
+        if (!planKey || !studio.meta?.hasData) return false;
 
-    const handleSaveDraft = useCallback(() => {
-        persistDraft(draftAllocations, activeBundleId);
-    }, [persistDraft, draftAllocations, activeBundleId]);
+        const planValidation = validateDraftPlan({
+            draftAllocations: allocations,
+            deployableSurplus: availableSurplus,
+            journeyProjections,
+            planStartMonth: studio.meta.planStartMonth,
+            calendarYear: studio.meta.calendarYear,
+            monthIndex: effectiveMonth,
+            expenseCategories,
+            investmentAllocations,
+        });
+        if (!planValidation.canApply) return false;
 
-    const handleApply = useCallback(() => {
-        if (!planKey || !validation.canApply) return;
+        const preview = analysisBase
+            ? buildGrowthPreview({
+                ...analysisBase,
+                draftAllocations: allocations,
+                monthIndex: effectiveMonth,
+            })
+            : growthPreview;
 
         const updatedAllocations = applyAllocationPlan({
             investmentAllocations,
-            draftAllocations,
+            draftAllocations: allocations,
             calendarYear: studio.meta.calendarYear,
             monthIndex: effectiveMonth,
         });
@@ -439,37 +513,63 @@ const PutYourMoneyToWorkSection = () => {
             ...buildDraftAllocationPlan({
                 planKey,
                 deployableSurplus: studio.hero.deployableSurplus,
-                draftAllocations,
-                selectedBundleId: activeBundleId,
+                draftAllocations: allocations,
+                selectedBundleId: bundleId,
                 calendarYear: studio.meta.calendarYear,
                 monthIndex: effectiveMonth,
                 monthLabel: studio.meta.monthLabel,
-                growthPreview,
+                growthPreview: preview,
             }),
             status: 'applied',
             appliedAt: new Date().toISOString(),
         };
         setAllocationPlans({ ...allocationPlans, [planKey]: applied });
-        setAppliedPlanKey(planKey);
         setDraftAllocations(createEmptyDraftAllocations());
+        setActiveBundleId(bundleId);
+        setAppliedPlanKey(planKey);
+        setAvenuesMode(bundleId ? 'ai_applied' : 'manual_applied');
+        return true;
     }, [
         planKey,
-        validation,
+        studio,
+        journeyProjections,
+        effectiveMonth,
+        expenseCategories,
         investmentAllocations,
         setInvestmentAllocations,
-        studio,
-        effectiveMonth,
-        activeBundleId,
-        draftAllocations,
+        analysisBase,
         growthPreview,
         allocationPlans,
         setAllocationPlans,
+        availableSurplus,
     ]);
 
-    const handleUseAiPlan = useCallback((aiColumn) => {
-        const bundle = recommendedBundles.find((b) => b.id === aiColumn.bundleId);
-        if (bundle) handleSelectBundle(bundle);
-    }, [recommendedBundles, handleSelectBundle]);
+    const handleApplyAiRecommendations = useCallback(() => {
+        const bundle = recommendedBundles[0];
+        if (!bundle) return;
+        const next = { ...createEmptyDraftAllocations(), ...bundle.allocations };
+        if (next.PPF > 0) {
+            next.PPF = Math.min(Math.max(0, Math.round(next.PPF)), ppfMaxByCap);
+        }
+        const applied = commitAppliedPlan(next, bundle.id);
+        if (!applied) {
+            setDraftAllocations(next);
+            setActiveBundleId(bundle.id);
+            setAppliedPlanKey(null);
+            persistDraft(next, bundle.id);
+        }
+    }, [recommendedBundles, ppfMaxByCap, commitAppliedPlan, persistDraft]);
+
+    const handleStartManualAllocation = useCallback(() => {
+        setDraftAllocations(createEmptyDraftAllocations());
+        setActiveBundleId(null);
+        setAppliedPlanKey(null);
+        setAvenuesMode('manual_edit');
+    }, []);
+
+    const handleApplyManualAllocations = useCallback(() => {
+        commitAppliedPlan(draftAllocations, null);
+    }, [commitAppliedPlan, draftAllocations]);
 
     const allocationsSummary = useMemo(
         () => summarizeInvestmentAllocations(investmentAllocations),
@@ -478,13 +578,18 @@ const PutYourMoneyToWorkSection = () => {
 
     const hasMonthPlan = Boolean(
         studio.meta?.hasData
-        && monthHasStudioPlan(investmentAllocations, studio.meta.calendarYear, effectiveMonth),
+        && (
+            monthHasStudioPlan(investmentAllocations, studio.meta.calendarYear, effectiveMonth)
+            || allocationPlans[planKey]?.status === 'applied'
+            || appliedPlanKey === planKey
+        ),
     );
 
     const resetLocalDraftState = useCallback(() => {
         setDraftAllocations(createEmptyDraftAllocations());
         setActiveBundleId(null);
         setAppliedPlanKey(null);
+        setAvenuesMode('choose');
     }, []);
 
     const handleClearMonthPlan = useCallback((planKeyOverride) => {
@@ -520,6 +625,97 @@ const PutYourMoneyToWorkSection = () => {
         resetLocalDraftState,
     ]);
 
+    const handleEditMonthPlan = useCallback((planKeyOverride) => {
+        const targetKey = planKeyOverride || planKey;
+        if (!targetKey || !studio.meta?.hasData) return;
+
+        const [yearStr, monthStr] = String(targetKey).split('-');
+        const calendarYear = parseInt(yearStr, 10);
+        const monthIndex = parseInt(monthStr, 10);
+        if (!Number.isFinite(calendarYear) || !Number.isFinite(monthIndex)) return;
+
+        const saved = allocationPlans[targetKey];
+        const draftFromItems = draftFromPlanItems(saved?.items);
+        const hasSavedItems = Object.values(draftFromItems).some((amount) => amount > 0);
+        const nextDraft = hasSavedItems
+            ? draftFromItems
+            : draftFromStudioAllocations(investmentAllocations, targetKey);
+
+        const monthLabel = studio.selectableMonths?.find((m) => m.monthIndex === monthIndex)?.label
+            || studio.meta.monthLabel
+            || `Month ${monthIndex + 1}`;
+
+        const draftPlan = {
+            ...buildDraftAllocationPlan({
+                planKey: targetKey,
+                deployableSurplus: studio.hero?.deployableSurplus || 0,
+                draftAllocations: nextDraft,
+                selectedBundleId: null,
+                calendarYear,
+                monthIndex,
+                monthLabel,
+                growthPreview: analysisBase
+                    ? buildGrowthPreview({
+                        ...analysisBase,
+                        draftAllocations: nextDraft,
+                        monthIndex,
+                    })
+                    : null,
+            }),
+            status: 'draft',
+        };
+
+        setAllocationPlans(withPymtwGate({
+            ...allocationPlans,
+            [targetKey]: draftPlan,
+        }, {
+            adjustmentsSaved: true,
+            showInvestmentAvenues: true,
+        }));
+
+        setSelectedMonthIndex(monthIndex);
+        setDraftAllocations(nextDraft);
+        setActiveBundleId(null);
+        setAppliedPlanKey(null);
+        setAvenuesMode('manual_edit');
+
+        requestAnimationFrame(() => {
+            document.getElementById('pymtw-allocate-surplus')?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start',
+            });
+        });
+    }, [
+        planKey,
+        studio,
+        allocationPlans,
+        investmentAllocations,
+        setAllocationPlans,
+        analysisBase,
+    ]);
+
+    const handleBackToAiRecommendations = useCallback(() => {
+        // Prefer a soft return when nothing was applied yet (manual edit only).
+        if (avenuesMode === 'manual_edit' && !hasMonthPlan) {
+            if (planKey && allocationPlans[planKey]?.status === 'draft') {
+                const nextPlans = { ...allocationPlans };
+                delete nextPlans[planKey];
+                setAllocationPlans(nextPlans);
+            }
+            resetLocalDraftState();
+            return;
+        }
+        handleClearMonthPlan(planKey);
+    }, [
+        avenuesMode,
+        hasMonthPlan,
+        planKey,
+        allocationPlans,
+        setAllocationPlans,
+        resetLocalDraftState,
+        handleClearMonthPlan,
+    ]);
+
     const handleRemoveAllocation = useCallback((id) => {
         const removed = investmentAllocations.find((a) => a.id === id);
         const nextAllocations = removeInvestmentAllocationById(investmentAllocations, id);
@@ -543,15 +739,28 @@ const PutYourMoneyToWorkSection = () => {
 
     const handleJourneyAdjustmentsChange = useCallback((updater) => {
         setJourneyAdjustments(updater);
-        setAdjustmentsSaved(false);
-        setShowInvestmentAvenues(false);
+        setAllocationPlans((prev) => withPymtwGate(prev, {
+            adjustmentsSaved: false,
+            showInvestmentAvenues: false,
+        }));
+        setAvenuesMode('choose');
         setAdjustmentSaveMessage('');
-    }, [setJourneyAdjustments]);
+    }, [setJourneyAdjustments, setAllocationPlans]);
 
     const handleSaveAdjustments = useCallback(() => {
-        setAdjustmentsSaved(true);
+        setAllocationPlans((prev) => withPymtwGate(prev, {
+            adjustmentsSaved: true,
+            showInvestmentAvenues: Boolean(prev?.[PYMTW_GATE_KEY]?.showInvestmentAvenues),
+        }));
         setAdjustmentSaveMessage('Future financial adjustments saved. You can now proceed.');
-    }, []);
+    }, [setAllocationPlans]);
+
+    const handleProceedToInvestmentAvenues = useCallback(() => {
+        setAllocationPlans((prev) => withPymtwGate(prev, {
+            adjustmentsSaved: true,
+            showInvestmentAvenues: true,
+        }));
+    }, [setAllocationPlans]);
 
     useEffect(() => {
         if (!showInvestmentAvenues) {
@@ -611,7 +820,7 @@ const PutYourMoneyToWorkSection = () => {
                     <button
                         type="button"
                         className="btn btn-primary"
-                        onClick={() => setShowInvestmentAvenues(true)}
+                        onClick={handleProceedToInvestmentAvenues}
                     >
                         Proceed to Investment Avenues to allocate the surplus
                     </button>
@@ -628,40 +837,38 @@ const PutYourMoneyToWorkSection = () => {
                 <>
                     <RecommendedBundles
                         bundles={recommendedBundles}
-                        activeBundleId={activeBundleId}
-                        onSelectBundle={handleSelectBundle}
                         deployableSurplus={studio.hero.deployableSurplus}
                         engineResult={engineResult}
+                        avenuesMode={avenuesMode}
+                        onApplyAiRecommendations={handleApplyAiRecommendations}
+                        onStartManualAllocation={handleStartManualAllocation}
+                        onBackToAiRecommendations={handleBackToAiRecommendations}
+                        canApplyAi={Boolean(recommendedBundles[0]) && studio.hero.deployableSurplus > 0}
                     />
 
-                    <InstrumentCardGrid
-                        instrumentCategories={studio.instrumentCategories}
-                        draftAllocations={draftAllocations}
-                        remainingSurplus={remaining}
-                        getMaxAmountForInstrument={maxForInstrument}
-                        onDraftChange={handleDraftChange}
-                        onAnalyze={setActivePanelType}
-                    />
+                    {avenuesMode === 'manual_edit' && (
+                        <div id="pymtw-allocate-surplus">
+                            <InstrumentCardGrid
+                                instrumentCategories={studio.instrumentCategories}
+                                draftAllocations={draftAllocations}
+                                remainingSurplus={remaining}
+                                getMaxAmountForInstrument={maxForInstrument}
+                                onDraftChange={handleDraftChange}
+                                onApplyManualAllocations={handleApplyManualAllocations}
+                                canApplyManual={validation.canApply}
+                            />
+                        </div>
+                    )}
 
-                    <ScenarioComparePanel
-                        comparison={scenarioComparison}
-                        onUseAiPlan={handleUseAiPlan}
-                        activeBundleId={activeBundleId}
-                    />
-
-                    <GrowthPreviewStrip growthPreview={growthPreview} />
+                    {(avenuesMode === 'ai_applied' || avenuesMode === 'manual_applied') && (
+                        <GrowthPreviewStrip growthPreview={appliedGrowthPreview || growthPreview} />
+                    )}
 
                     <PlannedInvestmentAllocationsPanel
                         allocationsSummary={allocationsSummary}
                         onRemove={handleRemoveAllocation}
+                        onEditMonthPlan={handleEditMonthPlan}
                         onClearMonthPlan={handleClearMonthPlan}
-                    />
-
-                    <OutcomeTheater
-                        growthPreview={growthPreview}
-                        hero={studio.hero}
-                        meta={studio.meta}
-                        totalAllocated={totalAllocated}
                     />
 
                     <div className="card pymtw-analysis-summary">
@@ -675,20 +882,6 @@ const PutYourMoneyToWorkSection = () => {
                     </div>
 
                     <StudioInsightsRail insights={studioInsights} />
-
-                    <ApplyPlanBar
-                        deployableSurplus={studio.hero.deployableSurplus}
-                        totalAllocated={totalAllocated}
-                        remaining={remaining}
-                        monthLabel={studio.meta.monthLabel}
-                        allocatedCount={allocatedCount}
-                        validation={validation}
-                        onSaveDraft={handleSaveDraft}
-                        onApply={handleApply}
-                        onClearMonthPlan={() => handleClearMonthPlan(planKey)}
-                        hasMonthPlan={hasMonthPlan}
-                        isApplied={appliedPlanKey === planKey}
-                    />
                 </>
             )}
 
@@ -709,7 +902,7 @@ const PutYourMoneyToWorkSection = () => {
                     display: flex;
                     flex-direction: column;
                     gap: 1.5rem;
-                    padding: 0 1rem calc(6rem + var(--summary-report-action-bar-offset, 4.75rem));
+                    padding: 0 1rem 2rem;
                 }
                 .pymtw-empty-state {
                     padding: 2rem;
@@ -872,6 +1065,61 @@ const PutYourMoneyToWorkSection = () => {
                 }
 
                 .pymtw-bundles { padding: 1.25rem; }
+                .pymtw-surplus-kpi-row {
+                    display: flex;
+                    flex-wrap: wrap;
+                    align-items: baseline;
+                    gap: 0.75rem 1.25rem;
+                    margin: 0.75rem 0 1rem;
+                }
+                .pymtw-surplus-kpi {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.25rem;
+                }
+                .pymtw-surplus-kpi-label {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.35rem;
+                    font-size: 0.82rem;
+                    color: var(--text-muted);
+                }
+                .pymtw-surplus-kpi-value {
+                    font-size: 1.45rem;
+                    font-weight: 700;
+                    line-height: 1.2;
+                    color: var(--text-main);
+                }
+                .pymtw-surplus-kpi-divider {
+                    color: var(--text-muted);
+                    font-size: 1.25rem;
+                    font-weight: 300;
+                    align-self: center;
+                }
+                .pymtw-avenue-line {
+                    margin: 0 0 1.15rem;
+                    font-size: 0.92rem;
+                    line-height: 1.55;
+                    color: var(--text-main);
+                }
+                .pymtw-avenue-amount {
+                    font-size: 1.05rem;
+                    font-weight: 700;
+                }
+                .pymtw-avenue-sep { color: var(--text-muted); }
+                .pymtw-surplus-actions {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 0.75rem;
+                    margin-top: 1rem;
+                    padding-top: 1rem;
+                    border-top: 1px solid var(--border);
+                }
+                .pymtw-clear-plan-btn { margin-left: auto; }
+                @media (max-width: 640px) {
+                    .pymtw-clear-plan-btn { margin-left: 0; width: 100%; }
+                    .pymtw-surplus-actions .btn { width: 100%; }
+                }
 
                 .pymtw-insights-rail { padding: 1.25rem; }
                 .pymtw-insights-list {
@@ -1209,14 +1457,126 @@ const PutYourMoneyToWorkSection = () => {
                     color: var(--text-muted);
                 }
 
-                .pymtw-category-block { margin-bottom: 1.5rem; }
+                .pymtw-category-block { margin-bottom: 0.75rem; }
+                .pymtw-category-toggle {
+                    width: 100%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 0.85rem;
+                    padding: 0.95rem 1.05rem;
+                    margin: 0;
+                    border: 1px solid var(--border);
+                    border-radius: 10px;
+                    background: var(--bg-card);
+                    cursor: pointer;
+                    text-align: left;
+                    color: inherit;
+                    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+                    transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+                }
+                .pymtw-category-toggle:hover {
+                    border-color: rgba(16,185,129,0.55);
+                    background: rgba(16,185,129,0.04);
+                    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.08);
+                }
+                .pymtw-category-toggle:focus-visible {
+                    outline: 2px solid rgba(16,185,129,0.55);
+                    outline-offset: 2px;
+                }
+                .pymtw-category-open .pymtw-category-toggle {
+                    border-bottom-left-radius: 0;
+                    border-bottom-right-radius: 0;
+                    border-color: rgba(16,185,129,0.45);
+                    border-bottom-color: transparent;
+                    background: rgba(16,185,129,0.06);
+                }
+                .pymtw-category-toggle-main {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.2rem;
+                    min-width: 0;
+                }
                 .pymtw-category-label {
-                    margin: 0 0 0.75rem;
-                    font-size: 0.82rem;
-                    text-transform: uppercase;
-                    letter-spacing: 0.05em;
+                    margin: 0;
+                    font-size: 1rem;
+                    text-transform: none;
+                    letter-spacing: 0;
+                    color: var(--text-main);
+                    font-weight: 700;
+                }
+                .pymtw-category-meta {
+                    font-size: 0.78rem;
                     color: var(--text-muted);
-                    font-weight: 600;
+                    line-height: 1.4;
+                    display: -webkit-box;
+                    -webkit-line-clamp: 2;
+                    -webkit-box-orient: vertical;
+                    overflow: hidden;
+                }
+                .pymtw-category-action {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.35rem;
+                    flex-shrink: 0;
+                    padding: 0.35rem 0.65rem;
+                    border-radius: 999px;
+                    background: rgba(16,185,129,0.12);
+                    color: #047857;
+                    font-size: 0.78rem;
+                    font-weight: 650;
+                }
+                .pymtw-category-action-open {
+                    background: rgba(15, 23, 42, 0.06);
+                    color: var(--text-muted);
+                }
+                .pymtw-category-action-label { white-space: nowrap; }
+                .pymtw-category-chevron {
+                    flex-shrink: 0;
+                    transition: transform 0.2s ease;
+                }
+                .pymtw-category-chevron-open { transform: rotate(180deg); }
+                .pymtw-category-open .pymtw-instrument-grid {
+                    border: 1px solid rgba(16,185,129,0.45);
+                    border-top: none;
+                    border-radius: 0 0 10px 10px;
+                    padding: 0.85rem;
+                }
+                @media (max-width: 520px) {
+                    .pymtw-category-action-label { display: none; }
+                }
+                .pymtw-instrument-note {
+                    margin: 0;
+                    font-size: 0.8rem;
+                    line-height: 1.4;
+                    color: var(--text-muted);
+                }
+                .pymtw-amount-input-wrap {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.2rem;
+                    font-weight: 700;
+                }
+                .pymtw-amount-prefix,
+                .pymtw-amount-suffix {
+                    font-size: 0.85rem;
+                    color: var(--text-muted);
+                }
+                .pymtw-amount-input {
+                    width: 6.5rem;
+                    padding: 0.2rem 0.35rem;
+                    border: 1px solid var(--border);
+                    border-radius: 6px;
+                    background: var(--bg-main);
+                    color: var(--text-main);
+                    font-size: 0.95rem;
+                    font-weight: 700;
+                    text-align: right;
+                }
+                .pymtw-manual-apply-row {
+                    display: flex;
+                    justify-content: flex-end;
+                    margin-top: 0.5rem;
                 }
                 .pymtw-instrument-grid {
                     display: grid;
@@ -1327,25 +1687,11 @@ const PutYourMoneyToWorkSection = () => {
                     display: grid;
                     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
                     gap: 1rem;
-                    margin-bottom: 1rem;
+                    margin-bottom: 0;
                 }
                 .pymtw-growth-totals span { display: block; font-size: 0.72rem; color: var(--text-muted); }
                 .pymtw-growth-totals strong { font-size: 1.05rem; }
                 .pymtw-growth-scenario { color: #10B981; }
-                .pymtw-growth-rows { display: flex; flex-direction: column; gap: 0.5rem; }
-                .pymtw-growth-row {
-                    display: grid;
-                    grid-template-columns: 20px 1fr auto auto;
-                    gap: 0.65rem;
-                    align-items: center;
-                    padding: 0.55rem 0.65rem;
-                    background: var(--bg-main);
-                    border-radius: 8px;
-                    font-size: 0.82rem;
-                }
-                .pymtw-growth-type { font-weight: 600; }
-                .pymtw-growth-draft { color: var(--text-muted); }
-                .pymtw-growth-delta { font-weight: 700; color: #059669; text-align: right; min-width: 72px; }
 
                 .pymtw-outcome-grid {
                     display: grid;

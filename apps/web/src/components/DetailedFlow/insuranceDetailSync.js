@@ -352,3 +352,163 @@ export function reconcileMemberLifePremiumSummary(summaryMonthly, memberEntry) {
     const detail = getLifeMemberMonthlyTotal(migrateLifeEntry(memberEntry));
     return reconcileAmounts(summary, detail);
 }
+
+/** Studio / allocation types that mirror life-cover policy premiums in projections. */
+export const STUDIO_PROTECTION_ALLOC_TYPES = [
+    'Term Insurance',
+    'Life Insurance',
+    'Health Insurance',
+];
+
+export function mapPlanTypeToAllocType(planType = '') {
+    const type = String(planType).toLowerCase();
+    if (type.includes('health') || type.includes('medical')) return 'Health Insurance';
+    if (type.includes('term')) return 'Term Insurance';
+    if (type.includes('life') || type.includes('saving') || type.includes('ulip') || !planType) {
+        return 'Life Insurance';
+    }
+    return 'Life Insurance';
+}
+
+export function mapPolicyFrequencyToAlloc(freq) {
+    const normalized = normalizeToCashFlowFrequency(freq);
+    if (normalized === 'Annual') return 'Annual';
+    if (normalized === 'Half Yearly') return 'Half-Yearly';
+    if (normalized === 'Quarterly') return 'Quarterly';
+    return 'Monthly';
+}
+
+export function policyHasProjectionPremium(policy = {}) {
+    const startDate = new Date(policy.startDate);
+    if (Number.isNaN(startDate.getTime())) return false;
+    const payTerm = parseInt(policy.paymentTerm, 10) || 0;
+    const premium = parseFloat(policy.premium) || 0;
+    return payTerm > 0 && premium > 0;
+}
+
+export function findStudioAllocationForPolicy(policy = {}, investmentAllocations = []) {
+    if (policy == null) return null;
+    const list = investmentAllocations || [];
+
+    if (policy.sourceAllocationId != null && policy.sourceAllocationId !== '') {
+        const byId = list.find((a) => String(a.id) === String(policy.sourceAllocationId));
+        if (byId) return byId;
+    }
+
+    if (policy.absorbedAllocationId != null && policy.absorbedAllocationId !== '') {
+        const byAbsorbed = list.find((a) => String(a.id) === String(policy.absorbedAllocationId));
+        if (byAbsorbed) return byAbsorbed;
+    }
+
+    const allocType = mapPlanTypeToAllocType(policy.planType);
+    const memberName = policy.insuredName || '';
+    const candidates = list.filter((a) => {
+        if (!STUDIO_PROTECTION_ALLOC_TYPES.includes(a.type)) return false;
+        if (a.type !== allocType) return false;
+        if (allocType === 'Life Insurance' && memberName) {
+            return (a.insuredMember || '') === memberName;
+        }
+        return true;
+    });
+
+    if (candidates.length === 1) return candidates[0];
+    if (policy.studioPlanKey) {
+        return candidates.find((a) => a.studioPlanKey === policy.studioPlanKey) || null;
+    }
+    return candidates[0] || null;
+}
+
+/**
+ * Map Detailed Flow / Insurance policy fields onto studio allocation shape.
+ * Amount follows ProjectionLogic insurance convention: installment + frequency
+ * (not annualized), matching Allocation Module Life Insurance rows.
+ */
+export function policyDetailsToAllocationFields(policy = {}) {
+    const startDate = new Date(policy.startDate);
+    const hasStart = !Number.isNaN(startDate.getTime());
+    const startYear = hasStart
+        ? startDate.getFullYear()
+        : (parseInt(policy.startYear, 10) || undefined);
+    const startMonth = hasStart
+        ? startDate.getMonth() + 1
+        : (parseInt(policy.startMonth, 10) || undefined);
+
+    const fields = {
+        amount: parseFloat(policy.premium) || 0,
+        frequency: mapPolicyFrequencyToAlloc(policy.frequency),
+        duration: Math.max(1, parseInt(policy.paymentTerm, 10) || 1),
+    };
+
+    if (Number.isFinite(startYear)) fields.startYear = startYear;
+    if (Number.isFinite(startMonth)) fields.startMonth = startMonth;
+    if (policy.insuredName) fields.insuredMember = policy.insuredName;
+
+    return fields;
+}
+
+/**
+ * Write policy premium / term / start back onto the linked studio Term or Life row.
+ * Returns a new allocations array (unchanged reference if no match / no changes).
+ */
+export function syncPolicyToStudioAllocations(policy, investmentAllocations = []) {
+    const match = findStudioAllocationForPolicy(policy, investmentAllocations);
+    if (!match) return investmentAllocations;
+
+    const patch = policyDetailsToAllocationFields(policy);
+    let changed = false;
+    const next = investmentAllocations.map((alloc) => {
+        if (String(alloc.id) !== String(match.id)) return alloc;
+        const updated = { ...alloc, ...patch };
+        if (
+            updated.amount !== alloc.amount
+            || updated.frequency !== alloc.frequency
+            || updated.duration !== alloc.duration
+            || updated.startYear !== alloc.startYear
+            || updated.startMonth !== alloc.startMonth
+            || updated.insuredMember !== alloc.insuredMember
+        ) {
+            changed = true;
+            return updated;
+        }
+        return alloc;
+    });
+    return changed ? next : investmentAllocations;
+}
+
+/** True when a policy is linked to this studio allocation id. */
+export function isAllocationLinkedToPolicy(alloc = {}, policies = []) {
+    if (alloc?.id == null) return false;
+    const allocId = String(alloc.id);
+    if (alloc.absorbedByPolicyId != null && alloc.absorbedByPolicyId !== '') return true;
+    return (policies || []).some((p) => (
+        String(p.sourceAllocationId) === allocId
+        || String(p.absorbedAllocationId) === allocId
+    ));
+}
+
+/**
+ * Studio Term / Life / Health rows should contribute to projections only while no
+ * linked policy already carries the premium (avoids double-counting surplus).
+ */
+export function shouldIncludeStudioInsuranceInProjections(alloc = {}, policies = []) {
+    if (!STUDIO_PROTECTION_ALLOC_TYPES.includes(alloc.type)) return false;
+
+    const allocId = alloc.id != null ? String(alloc.id) : null;
+    const linked = (policies || []).filter((p) => {
+        if (allocId == null) return false;
+        return String(p.sourceAllocationId) === allocId
+            || String(p.absorbedAllocationId) === allocId;
+    });
+
+    if (alloc.absorbedByPolicyId != null && alloc.absorbedByPolicyId !== '') {
+        const absorbed = (policies || []).find(
+            (p) => String(p.id) === String(alloc.absorbedByPolicyId),
+        );
+        if (absorbed && policyHasProjectionPremium(absorbed)) return false;
+        if (!absorbed && linked.some(policyHasProjectionPremium)) return false;
+        if (absorbed) return false;
+    }
+
+    if (linked.length === 0) return true;
+    return !linked.some(policyHasProjectionPremium);
+}

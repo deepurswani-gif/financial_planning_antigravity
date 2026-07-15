@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { PieChart, Trash2 } from 'lucide-react';
+import { PieChart, Trash2, Pencil } from 'lucide-react';
 import { formatCurrency } from '../CashFlowModule/CashFlowLogic';
 import { MONTH_LABELS_LONG } from './moneyFlowLedgerLogic';
 import ReportReveal from './ReportReveal';
@@ -18,6 +18,7 @@ const PlannedInvestmentAllocationsPanel = ({
     allocationsSummary,
     onRemove,
     onClearMonthPlan,
+    onEditMonthPlan,
     delay = 200,
     className = '',
 }) => {
@@ -41,17 +42,31 @@ const PlannedInvestmentAllocationsPanel = ({
                 ₹{Math.round(allocationsSummary.monthlyCommitted).toLocaleString('en-IN')}/month committed across {allocationsSummary.count} plan{allocationsSummary.count > 1 ? 's' : ''}.
             </p>
 
-            {studioPlanKeys.length > 0 && onClearMonthPlan && (
+            {studioPlanKeys.length > 0 && (onClearMonthPlan || onEditMonthPlan) && (
                 <div className="ius-alloc-clear-row">
                     {studioPlanKeys.map((planKey) => (
-                        <button
-                            key={planKey}
-                            type="button"
-                            className="btn btn-secondary ius-alloc-clear-btn"
-                            onClick={() => onClearMonthPlan(planKey)}
-                        >
-                            Clear {labelForPlanKey(planKey)} plan
-                        </button>
+                        <React.Fragment key={planKey}>
+                            {onEditMonthPlan && (
+                                <button
+                                    type="button"
+                                    className="btn btn-primary ius-alloc-plan-btn ius-alloc-edit-btn"
+                                    onClick={() => onEditMonthPlan(planKey)}
+                                >
+                                    <Pencil size={14} />
+                                    Edit {labelForPlanKey(planKey)} plan
+                                </button>
+                            )}
+                            {onClearMonthPlan && (
+                                <button
+                                    type="button"
+                                    className="btn ius-alloc-plan-btn ius-alloc-clear-btn"
+                                    onClick={() => onClearMonthPlan(planKey)}
+                                >
+                                    <Trash2 size={14} />
+                                    Clear {labelForPlanKey(planKey)} plan
+                                </button>
+                            )}
+                        </React.Fragment>
                     ))}
                 </div>
             )}
@@ -103,9 +118,26 @@ const PlannedInvestmentAllocationsPanel = ({
                     gap: 0.5rem;
                     margin-bottom: 0.85rem;
                 }
-                .ius-alloc-clear-btn {
+                .ius-alloc-plan-btn {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.4rem;
                     font-size: 0.82rem;
-                    padding: 0.4rem 0.75rem;
+                    padding: 0.45rem 0.85rem;
+                    font-weight: 600;
+                }
+                .ius-alloc-edit-btn {
+                    box-shadow: 0 1px 2px rgba(16, 185, 129, 0.25);
+                }
+                .ius-alloc-clear-btn {
+                    border: 1px solid rgba(185, 28, 28, 0.35);
+                    background: rgba(254, 226, 226, 0.55);
+                    color: #b91c1c;
+                }
+                .ius-alloc-clear-btn:hover {
+                    background: rgba(254, 202, 202, 0.85);
+                    border-color: rgba(185, 28, 28, 0.55);
+                    color: #991b1b;
                 }
                 .ius-alloc-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
                 .ius-alloc-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }

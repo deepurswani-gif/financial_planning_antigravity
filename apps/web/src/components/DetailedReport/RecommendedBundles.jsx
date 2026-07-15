@@ -1,47 +1,83 @@
 import React from 'react';
-import { Sparkles, Shield, PiggyBank, TrendingUp, Heart } from 'lucide-react';
+import { Sparkles, Shield, Target } from 'lucide-react';
 import { formatCurrency } from '../CashFlowModule/CashFlowLogic';
 import ReportReveal from './ReportReveal';
 import { getTotalDraftAllocated } from './instrumentAnalysisLogic';
 
-const BundleIcon = ({ id }) => {
-    if (id === 'life_journey') return <Heart size={20} />;
-    if (id === 'safety_first') return <Shield size={20} />;
-    if (id === 'aggressive') return <TrendingUp size={20} />;
-    return <PiggyBank size={20} />;
-};
-
 const formatAllocLine = (allocations) => Object.entries(allocations || {})
     .filter(([, v]) => v > 0)
-    .map(([k, v]) => `${k} ${formatCurrency(v)}`)
-    .join(' · ');
+    .map(([k, v]) => ({ type: k, amount: v }));
 
 const RecommendedBundles = ({
     bundles,
-    activeBundleId,
-    onSelectBundle,
     deployableSurplus,
     engineResult = null,
+    avenuesMode = 'choose',
+    onApplyAiRecommendations,
+    onStartManualAllocation,
+    onBackToAiRecommendations,
+    canApplyAi = true,
 }) => {
     if (!bundles?.length || deployableSurplus <= 0) return null;
 
-    const goalCards = engineResult?.goalCards || engineResult?.objectiveCards || bundles[0]?.goalCards || [];
-    const headline = engineResult?.headline || bundles[0]?.narrative;
+    const topBundle = bundles[0];
+    const goalCards = engineResult?.goalCards || engineResult?.objectiveCards || topBundle?.goalCards || [];
+    const protectionFirst = Math.round(
+        engineResult?.diagnostics?.protectionTotal
+        ?? engineResult?.protection?.monthlyTotal
+        ?? ((topBundle?.reserves?.emergency || 0) + (topBundle?.reserves?.protection || 0)),
+    );
+    const grandTotal = Math.round(
+        engineResult?.diagnostics?.grandTotal
+        ?? getTotalDraftAllocated(topBundle?.allocations),
+    );
+    const nearestGoals = Math.max(0, grandTotal - protectionFirst);
+    const avenueItems = formatAllocLine(topBundle?.allocations);
+    const showActionButtons = avenuesMode === 'choose';
+    const showBackButton = avenuesMode === 'ai_applied'
+        || avenuesMode === 'manual_applied'
+        || avenuesMode === 'manual_edit';
 
     return (
-        <ReportReveal className="pymtw-bundles card">
+        <ReportReveal className="pymtw-bundles card pymtw-surplus-allocation">
             <div className="pymtw-bundles-header">
                 <h3 className="pymtw-zone-title">
                     <Sparkles size={18} />
-                    Life Journey plan
+                    Recommended Surplus Allocation
                 </h3>
-                <p className="pymtw-zone-sub pymtw-bundles-sub">
-                    Protection first, then the nearest goals — select to pre-fill all sliders.
-                </p>
-                {headline && (
-                    <p className="pymtw-bundles-headline">{headline}</p>
-                )}
             </div>
+
+            <div className="pymtw-surplus-kpi-row">
+                <div className="pymtw-surplus-kpi">
+                    <span className="pymtw-surplus-kpi-label">
+                        <Shield size={14} />
+                        Protection first
+                    </span>
+                    <strong className="pymtw-surplus-kpi-value">{formatCurrency(protectionFirst)}</strong>
+                </div>
+                <span className="pymtw-surplus-kpi-divider" aria-hidden="true">|</span>
+                <div className="pymtw-surplus-kpi">
+                    <span className="pymtw-surplus-kpi-label">
+                        <Target size={14} />
+                        Nearest Goals
+                    </span>
+                    <strong className="pymtw-surplus-kpi-value">{formatCurrency(nearestGoals)}</strong>
+                </div>
+            </div>
+
+            {avenueItems.length > 0 && (
+                <p className="pymtw-avenue-line" aria-label="Recommended avenues">
+                    {avenueItems.map((item, idx) => (
+                        <React.Fragment key={item.type}>
+                            {idx > 0 && <span className="pymtw-avenue-sep"> · </span>}
+                            <span className="pymtw-avenue-item">
+                                {item.type}{' '}
+                                <strong className="pymtw-avenue-amount">{formatCurrency(item.amount)}</strong>
+                            </span>
+                        </React.Fragment>
+                    ))}
+                </p>
+            )}
 
             {goalCards.length > 0 && (
                 <div className="pymtw-fpi-stack">
@@ -63,44 +99,38 @@ const RecommendedBundles = ({
                 </div>
             )}
 
-            <div className="pymtw-bundle-grid">
-                {bundles.map((bundle, idx) => {
-                    const isActive = activeBundleId === bundle.id;
-                    const allocTotal = getTotalDraftAllocated(bundle.allocations);
-                    return (
+            {(showActionButtons || showBackButton) && (
+                <div className="pymtw-surplus-actions">
+                    {showActionButtons && (
+                        <>
+                            <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={onApplyAiRecommendations}
+                                disabled={!canApplyAi}
+                            >
+                                Apply the AI recommendations
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-secondary"
+                                onClick={onStartManualAllocation}
+                            >
+                                Let me make the allocation myself
+                            </button>
+                        </>
+                    )}
+                    {showBackButton && onBackToAiRecommendations && (
                         <button
-                            key={bundle.id}
                             type="button"
-                            className={`pymtw-bundle-card pymtw-bundle-${bundle.tone} ${isActive ? 'pymtw-bundle-active' : ''}`}
-                            onClick={() => onSelectBundle(bundle)}
+                            className="btn btn-secondary pymtw-clear-plan-btn"
+                            onClick={onBackToAiRecommendations}
                         >
-                            {idx === 0 && <span className="pymtw-bundle-rank">Top pick</span>}
-                            <div className="pymtw-bundle-icon">
-                                <BundleIcon id={bundle.id} />
-                            </div>
-                            <h4>{bundle.label}</h4>
-                            <p className="pymtw-bundle-narrative">{bundle.narrative}</p>
-                            <p className="pymtw-bundle-alloc-line">{formatAllocLine(bundle.allocations)}</p>
-                            <div className="pymtw-bundle-amounts">
-                                <div>
-                                    <span>Total</span>
-                                    <strong>{formatCurrency(allocTotal)}</strong>
-                                </div>
-                                {((bundle.reserves?.emergency || 0) > 0 || (bundle.reserves?.protection || 0) > 0) && (
-                                    <div>
-                                        <span>Protection &amp; emergency</span>
-                                        <strong>
-                                            {formatCurrency(
-                                                (bundle.reserves?.emergency || 0) + (bundle.reserves?.protection || 0),
-                                            )}
-                                        </strong>
-                                    </div>
-                                )}
-                            </div>
+                            Back to AI Recommendations
                         </button>
-                    );
-                })}
-            </div>
+                    )}
+                </div>
+            )}
         </ReportReveal>
     );
 };

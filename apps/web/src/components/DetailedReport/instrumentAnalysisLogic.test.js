@@ -137,11 +137,16 @@ describe('instrumentAnalysisLogic', () => {
             '2026-6': { status: 'applied', items: [] },
             '2026-7': { status: 'draft', items: [] },
             '2026-8': { status: 'applied', items: [] },
+            __pymtwGate: { adjustmentsSaved: true, showInvestmentAvenues: true },
         };
         const allocations = [{ id: 1, type: 'SIP', studioPlanKey: '2026-8' }];
         const pruned = pruneAllocationPlansForAllocations(plans, allocations);
         expect(pruned['2026-6']).toBeUndefined();
         expect(pruned['2026-7']?.status).toBe('draft');
         expect(pruned['2026-8']?.status).toBe('applied');
+        expect(pruned.__pymtwGate).toEqual({
+            adjustmentsSaved: true,
+            showInvestmentAvenues: true,
+        });
     });
 });

@@ -18,7 +18,7 @@ const parseAmount = (value) => parseFloat(value) || 0;
 
 const RECURRING_ALLOC_TYPES = [
     'SIP', 'PPF', 'NPS', 'Life Insurance', 'Term Insurance', 'Health Insurance',
-    'Life Insurance Saving Plans', 'Recurring Deposit', 'RD', 'Liquid Mutual Fund',
+    'Life Insurance Saving Plans', 'Recurring Deposit', 'RD',
 ];
 
 /** Studio apply stores recurring amounts as annual totals; convert to monthly. */
@@ -123,40 +123,34 @@ export function computeDeployableSurplusWithCarry({
 
 export const INSTRUMENT_CATEGORIES = [
     {
-        id: 'retirement',
-        label: 'Retirement & long horizon',
-        instruments: ['PPF', 'NPS'],
-        goalTags: ['Retirement', 'Legacy'],
+        id: 'protection',
+        label: 'Protection',
+        instruments: ['Term Insurance', 'Health Insurance', 'Liquid Mutual Fund'],
+        instrumentLabels: {
+            'Liquid Mutual Fund': 'Emergency Fund',
+        },
+        instrumentNotes: {
+            'Liquid Mutual Fund': 'These funds will be invested in Liquid Mutual Funds.',
+        },
+        goalTags: ['Family security'],
     },
     {
         id: 'growth',
         label: 'Growth for most goals',
-        instruments: ['SIP', 'Lumpsum', 'Direct Equity & ETFs', 'Life Insurance Saving Plans'],
+        instruments: ['SIP', 'Lumpsum', 'Direct Equity & ETFs'],
         goalTags: ['Education', 'Home', 'Wealth', 'Retirement'],
     },
     {
         id: 'short_term',
         label: 'Short-term certainty',
-        instruments: ['Fixed Deposit', 'Recurring Deposit', 'Liquid Mutual Fund'],
+        instruments: ['Fixed Deposit', 'Recurring Deposit'],
         goalTags: ['Near-term goals'],
     },
     {
-        id: 'protection',
-        label: 'Protection',
-        instruments: ['Term Insurance', 'Health Insurance', 'Life Insurance'],
-        goalTags: ['Family security'],
-    },
-    {
-        id: 'legacy',
-        label: 'Legacy & diversification',
-        instruments: ['Gold'],
-        goalTags: ['Legacy', 'Inflation hedge'],
-    },
-    {
-        id: 'flexible',
-        label: 'Flexible',
-        instruments: ['Other Investment'],
-        goalTags: ['Your choice'],
+        id: 'retirement',
+        label: 'Retirement & long horizon',
+        instruments: ['PPF', 'NPS', 'Life Insurance Saving Plans'],
+        goalTags: ['Retirement', 'Legacy'],
     },
 ];
 
@@ -678,6 +672,7 @@ export function buildDraftAllocationPlan({
             retirementCorpusAfter: scenarioAnalysis?.retirementCorpus || growthPreview?.scenarioTotal || 0,
             retirementCorpusDelta: (scenarioAnalysis?.retirementCorpus || growthPreview?.scenarioTotal || 0)
                 - (baselineAnalysis?.retirementCorpus || growthPreview?.baselineTotal || 0),
+            retirementYear: growthPreview?.retirementYear || null,
             goalDeltas: goalDeltas?.filter((g) => g.projectedFundedDelta !== 0).slice(0, 6) || [],
             growthPreview: growthPreview?.rows || [],
         },

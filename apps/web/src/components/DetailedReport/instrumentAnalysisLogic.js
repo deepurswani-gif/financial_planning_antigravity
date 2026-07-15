@@ -87,8 +87,8 @@ export const INSTRUMENT_REGISTRY = {
     'Liquid Mutual Fund': {
         allocType: 'Liquid Mutual Fund',
         goalKey: null,
-        inputMode: 'monthly',
-        step: 500,
+        inputMode: 'lumpsum',
+        step: 1000,
         defaultRate: 5.5,
         defaultDuration: 3,
     },
@@ -560,6 +560,10 @@ export function pruneAllocationPlansForAllocations(allocationPlans = {}, investm
     );
     const next = {};
     Object.entries(allocationPlans).forEach(([key, plan]) => {
+        if (key === '__pymtwGate') {
+            next[key] = plan;
+            return;
+        }
         if (activeKeys.has(key) || plan?.status === 'draft') {
             next[key] = plan;
         }
