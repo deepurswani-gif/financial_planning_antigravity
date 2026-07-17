@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { PieChart, Trash2, Pencil } from 'lucide-react';
 import { formatCurrency } from '../CashFlowModule/CashFlowLogic';
 import { MONTH_LABELS_LONG } from './moneyFlowLedgerLogic';
@@ -14,6 +14,22 @@ function labelForPlanKey(planKey) {
     return `${monthLabel} ${year}`;
 }
 
+function monthKeyForItem(item) {
+    if (item.studioPlanKey) return item.studioPlanKey;
+    const startYear = parseInt(item.startYear, 10);
+    const startMonth = parseInt(item.startMonth, 10);
+    if (Number.isFinite(startYear) && Number.isFinite(startMonth) && startMonth >= 1 && startMonth <= 12) {
+        return `${startYear}-${startMonth - 1}`;
+    }
+    return 'other';
+}
+
+function monthLabelForItem(item) {
+    const key = monthKeyForItem(item);
+    if (key === 'other') return 'Other';
+    return labelForPlanKey(key);
+}
+
 const PlannedInvestmentAllocationsPanel = ({
     allocationsSummary,
     onRemove,
@@ -22,52 +38,108 @@ const PlannedInvestmentAllocationsPanel = ({
     delay = 200,
     className = '',
 }) => {
-    const studioPlanKeys = useMemo(() => {
-        const keys = new Set();
+    const monthChips = useMemo(() => {
+        const order = [];
+        const seen = new Set();
         (allocationsSummary?.items || []).forEach((item) => {
-            if (item.studioPlanKey) keys.add(item.studioPlanKey);
+            const key = monthKeyForItem(item);
+            if (seen.has(key)) return;
+            seen.add(key);
+            order.push({
+                key,
+                label: key === 'other' ? 'Other' : labelForPlanKey(key),
+                planKey: item.studioPlanKey || (key !== 'other' ? key : null),
+            });
         });
-        return [...keys];
+        return order;
     }, [allocationsSummary]);
+
+    const [selectedMonthKey, setSelectedMonthKey] = useState(null);
+
+    useEffect(() => {
+        if (!monthChips.length) {
+            setSelectedMonthKey(null);
+            return;
+        }
+        setSelectedMonthKey((prev) => (
+            monthChips.some((chip) => chip.key === prev) ? prev : monthChips[0].key
+        ));
+    }, [monthChips]);
+
+    const selectedChip = monthChips.find((chip) => chip.key === selectedMonthKey) || monthChips[0] || null;
+
+    const filteredItems = useMemo(() => {
+        if (!selectedChip) return [];
+        return (allocationsSummary?.items || []).filter(
+            (item) => monthKeyForItem(item) === selectedChip.key,
+        );
+    }, [allocationsSummary, selectedChip]);
+
+    const selectedMonthCommitted = useMemo(
+        () => filteredItems.reduce((sum, item) => sum + (item.amount || 0), 0),
+        [filteredItems],
+    );
 
     if (!allocationsSummary?.count) return null;
 
     return (
         <ReportReveal className={`card ius-alloc-card ${className}`.trim()} delay={delay}>
-            <h3 className="ius-section-title">
-                <PieChart size={18} />
-                Planned investment allocations
-            </h3>
+            <div className="ius-alloc-header">
+                <h3 className="ius-section-title">
+                    <PieChart size={18} />
+                    Planned investment allocations
+                </h3>
+                {monthChips.length > 0 && (
+                    <div className="ius-alloc-month-chips" role="tablist" aria-label="Allocation months">
+                        {monthChips.map((chip) => (
+                            <button
+                                key={chip.key}
+                                type="button"
+                                role="tab"
+                                aria-selected={selectedChip?.key === chip.key}
+                                className={`ius-alloc-month-chip ${selectedChip?.key === chip.key ? 'ius-alloc-month-chip-active' : ''}`}
+                                onClick={() => setSelectedMonthKey(chip.key)}
+                            >
+                                {chip.label}
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
             <p className="ius-alloc-sub">
-                ₹{Math.round(allocationsSummary.monthlyCommitted).toLocaleString('en-IN')}/month committed across {allocationsSummary.count} plan{allocationsSummary.count > 1 ? 's' : ''}.
+                ₹{Math.round(allocationsSummary.monthlyCommitted).toLocaleString('en-IN')}/month committed
+                across {allocationsSummary.count} plan{allocationsSummary.count > 1 ? 's' : ''}.
+                {selectedChip && selectedChip.key !== 'other' && (
+                    <>
+                        {' '}
+                        ₹{Math.round(selectedMonthCommitted).toLocaleString('en-IN')}/month committed for{' '}
+                        {selectedChip.label}.
+                    </>
+                )}
             </p>
 
-            {studioPlanKeys.length > 0 && (onClearMonthPlan || onEditMonthPlan) && (
+            {selectedChip?.planKey && (onClearMonthPlan || onEditMonthPlan) && (
                 <div className="ius-alloc-clear-row">
-                    {studioPlanKeys.map((planKey) => (
-                        <React.Fragment key={planKey}>
-                            {onEditMonthPlan && (
-                                <button
-                                    type="button"
-                                    className="btn btn-primary ius-alloc-plan-btn ius-alloc-edit-btn"
-                                    onClick={() => onEditMonthPlan(planKey)}
-                                >
-                                    <Pencil size={14} />
-                                    Edit {labelForPlanKey(planKey)} plan
-                                </button>
-                            )}
-                            {onClearMonthPlan && (
-                                <button
-                                    type="button"
-                                    className="btn ius-alloc-plan-btn ius-alloc-clear-btn"
-                                    onClick={() => onClearMonthPlan(planKey)}
-                                >
-                                    <Trash2 size={14} />
-                                    Clear {labelForPlanKey(planKey)} plan
-                                </button>
-                            )}
-                        </React.Fragment>
-                    ))}
+                    {onClearMonthPlan && (
+                        <button
+                            type="button"
+                            className="btn ius-alloc-plan-btn ius-alloc-clear-btn"
+                            onClick={() => onClearMonthPlan(selectedChip.planKey)}
+                        >
+                            <Trash2 size={14} />
+                            Clear {selectedChip.label} plan
+                        </button>
+                    )}
+                    {onEditMonthPlan && (
+                        <button
+                            type="button"
+                            className="btn btn-primary ius-alloc-plan-btn ius-alloc-edit-btn"
+                            onClick={() => onEditMonthPlan(selectedChip.planKey)}
+                        >
+                            <Pencil size={14} />
+                            Edit – Show Investment Avenues
+                        </button>
+                    )}
                 </div>
             )}
 
@@ -76,17 +148,17 @@ const PlannedInvestmentAllocationsPanel = ({
                     <thead>
                         <tr>
                             <th>Type</th>
-                            <th>Name</th>
+                            <th>Month</th>
                             <th>Amount</th>
                             <th>Frequency</th>
                             {onRemove && <th className="ius-alloc-actions-col">Actions</th>}
                         </tr>
                     </thead>
                     <tbody>
-                        {allocationsSummary.items.map((item) => (
+                        {filteredItems.map((item) => (
                             <tr key={item.id}>
                                 <td>{item.type}</td>
-                                <td>{item.name}</td>
+                                <td>{monthLabelForItem(item)}</td>
                                 <td>{formatCurrency(item.amount)}</td>
                                 <td>{item.isMonthly ? 'Monthly' : 'One-time (annual impact)'}</td>
                                 {onRemove && (
@@ -95,7 +167,7 @@ const PlannedInvestmentAllocationsPanel = ({
                                             type="button"
                                             className="ius-alloc-remove-btn"
                                             onClick={() => onRemove(item.id)}
-                                            aria-label={`Remove ${item.name}`}
+                                            aria-label={`Remove ${item.type} for ${monthLabelForItem(item)}`}
                                         >
                                             <Trash2 size={14} />
                                             Remove
@@ -104,13 +176,50 @@ const PlannedInvestmentAllocationsPanel = ({
                                 )}
                             </tr>
                         ))}
+                        {filteredItems.length === 0 && (
+                            <tr>
+                                <td colSpan={onRemove ? 5 : 4} className="ius-alloc-empty">
+                                    No allocations for this month.
+                                </td>
+                            </tr>
+                        )}
                     </tbody>
                 </table>
             </div>
 
             <style>{`
                 .ius-alloc-card { padding: 1.25rem; }
-                .ius-alloc-sub { margin: -0.5rem 0 1rem; font-size: 0.88rem; color: var(--text-muted); }
+                .ius-alloc-header {
+                    display: flex;
+                    align-items: flex-start;
+                    justify-content: space-between;
+                    gap: 0.75rem;
+                    flex-wrap: wrap;
+                    margin-bottom: 0.35rem;
+                }
+                .ius-alloc-header .ius-section-title { margin-bottom: 0; }
+                .ius-alloc-month-chips {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 0.4rem;
+                    justify-content: flex-end;
+                }
+                .ius-alloc-month-chip {
+                    border: 1px solid var(--border);
+                    background: var(--bg-main);
+                    color: var(--text-muted);
+                    border-radius: 999px;
+                    padding: 0.3rem 0.7rem;
+                    font-size: 0.78rem;
+                    font-weight: 600;
+                    cursor: pointer;
+                }
+                .ius-alloc-month-chip-active {
+                    border-color: rgba(5, 150, 105, 0.45);
+                    background: rgba(16, 185, 129, 0.12);
+                    color: #047857;
+                }
+                .ius-alloc-sub { margin: 0 0 1rem; font-size: 0.88rem; color: var(--text-muted); }
                 .ius-section-title { margin: 0 0 1rem; font-size: 1.05rem; font-weight: 700; display: flex; align-items: center; gap: 0.45rem; }
                 .ius-alloc-clear-row {
                     display: flex;
@@ -144,6 +253,7 @@ const PlannedInvestmentAllocationsPanel = ({
                 .ius-alloc-table th, .ius-alloc-table td { padding: 0.65rem 0.75rem; border-bottom: 1px solid var(--border); text-align: left; }
                 .ius-alloc-table th { background: var(--bg-main); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
                 .ius-alloc-table tr:last-child td { border-bottom: none; }
+                .ius-alloc-empty { color: var(--text-muted); font-style: italic; }
                 .ius-alloc-actions-col { width: 7rem; }
                 .ius-alloc-remove-btn {
                     display: inline-flex;

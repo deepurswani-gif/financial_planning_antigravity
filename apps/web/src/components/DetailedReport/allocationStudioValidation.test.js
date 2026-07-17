@@ -6,7 +6,7 @@ import {
     computeDraftYearImpact,
     validateDraftPlan,
 } from './allocationStudioValidation';
-import { createEmptyDraftAllocations } from './instrumentAnalysisLogic';
+import { createEmptyDraftAllocations, getTotalDraftAllocated } from './instrumentAnalysisLogic';
 import { buildGrowthPreview } from './instrumentAnalysisLogic';
 
 const journeyProjections = [
@@ -52,6 +52,36 @@ describe('allocationStudioValidation', () => {
             monthIndex: 6,
         });
         expect(result.issues.some((i) => i.id === 'journey-deficit-exists')).toBe(true);
+    });
+
+    it('excludes lumpsum from monthly draft total', () => {
+        const total = getTotalDraftAllocated({
+            SIP: 3000,
+            Lumpsum: 3000,
+            'Direct Equity & ETFs': 2000,
+        });
+        expect(total).toBe(3000);
+    });
+
+    it('allows PPF reduction when editing existing studio plan', () => {
+        const result = validateDraftPlan({
+            draftAllocations: { PPF: 5000 },
+            deployableSurplus: 20000,
+            journeyProjections,
+            planStartMonth: 6,
+            calendarYear: 2026,
+            monthIndex: 6,
+            expenseCategories: {},
+            investmentAllocations: [{
+                id: 1,
+                type: 'PPF',
+                amount: 150000,
+                studioPlanKey: '2026-6',
+            }],
+            excludePlanKey: '2026-6',
+        });
+        expect(result.issues.some((i) => i.id === 'ppf-cap')).toBe(false);
+        expect(result.canApply).toBe(true);
     });
 
     it('blocks apply when year deficit projected', () => {

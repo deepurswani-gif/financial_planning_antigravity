@@ -23,7 +23,16 @@ const RECURRING_ALLOC_TYPES = [
 
 /** Studio apply stores recurring amounts as annual totals; convert to monthly. */
 export function getRecurringMonthlyAmount(alloc = {}) {
-    return parseAmount(alloc.amount) / 12;
+    const amount = parseAmount(alloc.amount);
+    const type = alloc.type;
+    const freq = String(alloc.frequency || 'Monthly').toLowerCase();
+    if (type === 'Life Insurance' || type === 'Life Insurance Saving Plans') {
+        if (freq === 'quarterly') return amount / 3;
+        if (freq === 'monthly') return amount;
+        if (alloc.studioPlanKey) return amount / 12;
+        return amount;
+    }
+    return amount / 12;
 }
 
 export function allocationHasStartedByMonth(alloc = {}, calendarYear, monthIndex) {
@@ -74,9 +83,181 @@ export function computeAllocationImpactForMonth(
     return Math.round(impact);
 }
 
+function getInstrumentDisplayLabel(type) {
+    for (let i = 0; i < INSTRUMENT_CATEGORIES.length; i += 1) {
+        const cat = INSTRUMENT_CATEGORIES[i];
+        if (cat.instrumentLabels?.[type]) return cat.instrumentLabels[type];
+    }
+    return type;
+}
+
+function getAllocationsAppliedInMonth(investmentAllocations = [], calendarYear, monthIndex) {
+    const planKey = getAllocationPlanKey(calendarYear, monthIndex);
+    return investmentAllocations
+        .filter((alloc) => alloc.studioPlanKey === planKey)
+        .map((alloc) => {
+            const type = alloc.type === 'RD' ? 'Recurring Deposit' : alloc.type;
+            const isRecurring = isRecurringAllocationType(type) || isRecurringAllocationType(alloc.type);
+            const amount = isRecurring
+                ? Math.round(getRecurringMonthlyAmount(alloc))
+                : Math.round(parseAmount(alloc.amount));
+            return {
+                type,
+                label: getInstrumentDisplayLabel(type),
+                amount,
+                isRecurring,
+            };
+        })
+        .filter((item) => item.amount > 0);
+}
+
+const formatInr = (value) => `₹${Math.round(value).toLocaleString('en-IN')}`;
+
 /**
- * Walk months from plan start through selected, carrying leftover unallocated surplus forward.
+ * Build deployable-surplus outlook cards for current month + next 2 months.
+ * @param {boolean} [options.excludeInvestmentAllocations] - journey-adjusted baseline only
  */
+export function buildThreeMonthSurplusOutlook({
+    unallocatedSurplusByMonth = [],
+    investmentAllocations = [],
+    journeyAdjustments = [],
+    calendarYear,
+    planStartMonth = 0,
+    currentMonth = new Date().getMonth(),
+    excludeInvestmentAllocations = false,
+}) {
+    const selectableMonths = getSelectableMonths(planStartMonth, currentMonth);
+    const allocs = excludeInvestmentAllocations ? [] : investmentAllocations;
+    const start = Math.max(0, Math.min(11, planStartMonth));
+    const monthSnapshots = [];
+
+    selectableMonths.forEach((sel) => {
+        const target = sel.monthIndex;
+        let carryIn = 0;
+        const steps = [];
+
+        for (let m = start; m <= target; m += 1) {
+            const ledger = parseAmount(unallocatedSurplusByMonth[m]);
+            const available = ledger + carryIn;
+            const allocImpact = computeAllocationImpactForMonth(allocs, calendarYear, m);
+            const journeyImpact = computeJourneyAdjustmentImpactForMonth(
+                journeyAdjustments,
+                calendarYear,
+                m,
+            );
+            const leftover = Math.max(0, available - allocImpact - journeyImpact);
+            steps.push({
+                monthIndex: m,
+                label: MONTH_LABELS_LONG[m],
+                ledger,
+                carryIn,
+                allocImpact,
+                journeyImpact,
+                leftover,
+            });
+            if (m < target) {
+                carryIn = leftover;
+            }
+        }
+
+        const last = steps[steps.length - 1];
+        const prior = steps.length > 1 ? steps[steps.length - 2] : null;
+        const allocationsInMonth = getAllocationsAppliedInMonth(allocs, calendarYear, target);
+
+        const recurringFromPriorMonths = [];
+        if (prior) {
+            const seen = new Set();
+            allocs.forEach((alloc) => {
+                const type = alloc.type === 'RD' ? 'Recurring Deposit' : alloc.type;
+                if (!isRecurringAllocationType(type) && !isRecurringAllocationType(alloc.type)) return;
+                if (!alloc.studioPlanKey) return;
+                const parts = String(alloc.studioPlanKey).split('-');
+                const planMonthIndex = parseInt(parts[1], 10);
+                if (!Number.isFinite(planMonthIndex) || planMonthIndex >= target) return;
+                if (!allocationHasStartedByMonth(alloc, calendarYear, target)) return;
+                const key = `${alloc.studioPlanKey}-${type}`;
+                if (seen.has(key)) return;
+                seen.add(key);
+                recurringFromPriorMonths.push({
+                    type,
+                    label: getInstrumentDisplayLabel(type),
+                    amount: Math.round(getRecurringMonthlyAmount(alloc)),
+                    fromMonthIndex: planMonthIndex,
+                    fromMonthLabel: MONTH_LABELS_LONG[planMonthIndex],
+                });
+            });
+        }
+
+        const calculationLines = [];
+        if (prior) {
+            let running = last.ledger;
+            calculationLines.push(`${last.label} surplus ${formatInr(running)}`);
+            recurringFromPriorMonths.forEach((item) => {
+                running -= item.amount;
+                calculationLines.push(`− ${item.fromMonthLabel} ${item.label} ${formatInr(item.amount)}`);
+            });
+            if (recurringFromPriorMonths.length > 0) {
+                calculationLines.push(`= ${formatInr(running)}`);
+            }
+            calculationLines.push(`+ ${prior.label} remaining ${formatInr(prior.leftover)}`);
+            calculationLines.push(`= ${formatInr(last.leftover)}`);
+        }
+
+        monthSnapshots.push({
+            monthIndex: target,
+            label: sel.label,
+            title: `Surplus ${sel.label} ${calendarYear}`,
+            ledgerUnallocated: Math.round(last.ledger),
+            deployableSurplus: Math.round(last.leftover),
+            carryFromPrior: Math.round(last.carryIn),
+            allocationsInMonth,
+            recurringFromPriorMonths,
+            calculationLines,
+        });
+    });
+
+    return monthSnapshots;
+}
+
+export function groupJourneyConstraintsByMonth(
+    items = [],
+    selectableMonths = [],
+    calendarYear = new Date().getFullYear(),
+) {
+    if (!items.length || !selectableMonths.length) {
+        return [];
+    }
+
+    const windowSet = new Set(selectableMonths.map((m) => m.monthIndex));
+    const byMonth = new Map();
+
+    items.forEach((item) => {
+        let monthIndex;
+        if (item.isLoan) {
+            const startMonth = parseInt(item.startMonth, 10) || 1;
+            monthIndex = startMonth - 1;
+            if (parseInt(item.startYear, 10) !== calendarYear) return;
+        } else {
+            monthIndex = (parseInt(item.startMonth, 10) || 1) - 1;
+            if (parseInt(item.startYear, 10) !== calendarYear) return;
+        }
+        if (!windowSet.has(monthIndex)) return;
+
+        if (!byMonth.has(monthIndex)) {
+            const monthMeta = selectableMonths.find((m) => m.monthIndex === monthIndex);
+            byMonth.set(monthIndex, {
+                monthIndex,
+                label: monthMeta?.label || MONTH_LABELS_LONG[monthIndex],
+                title: `${monthMeta?.label || MONTH_LABELS_LONG[monthIndex]} ${calendarYear}`,
+                items: [],
+            });
+        }
+        byMonth.get(monthIndex).items.push(item);
+    });
+
+    return Array.from(byMonth.values()).sort((a, b) => a.monthIndex - b.monthIndex);
+}
+
 export function computeDeployableSurplusWithCarry({
     unallocatedSurplusByMonth = [],
     investmentAllocations = [],
@@ -357,8 +538,11 @@ export function buildInstrumentCards(investmentAllocations = []) {
         });
         byType[type].count += 1;
         if (isMonthly) {
-            byType[type].monthlyTotal += amount;
-            byType[type].annualTotal += amount * 12;
+            const monthlyAmount = alloc.studioPlanKey
+                ? getRecurringMonthlyAmount({ ...alloc, type })
+                : amount;
+            byType[type].monthlyTotal += monthlyAmount;
+            byType[type].annualTotal += alloc.studioPlanKey ? amount : amount * 12;
         } else {
             byType[type].annualTotal += amount;
         }
@@ -879,6 +1063,25 @@ export function buildAllocationStudioContext({
 
     const selectableMonths = getSelectableMonths(planStartMonth, meta.currentMonth);
 
+    const threeMonthOutlook = buildThreeMonthSurplusOutlook({
+        unallocatedSurplusByMonth: ledger.unallocatedSurplus || [],
+        investmentAllocations,
+        journeyAdjustments,
+        calendarYear,
+        planStartMonth,
+        currentMonth: meta.currentMonth,
+    });
+
+    const journeyAdjustedOutlook = buildThreeMonthSurplusOutlook({
+        unallocatedSurplusByMonth: ledger.unallocatedSurplus || [],
+        investmentAllocations: [],
+        journeyAdjustments,
+        calendarYear,
+        planStartMonth,
+        currentMonth: meta.currentMonth,
+        excludeInvestmentAllocations: true,
+    });
+
     return {
         meta: {
             hasData: true,
@@ -897,6 +1100,8 @@ export function buildAllocationStudioContext({
             journeyMonthDeduction,
             journeyYearSurplus,
             ytdUnallocated: moneyFlowReport.totals?.ytdUnallocated || 0,
+            threeMonthOutlook,
+            journeyAdjustedOutlook,
         },
         briefing,
         journeyConstraints,

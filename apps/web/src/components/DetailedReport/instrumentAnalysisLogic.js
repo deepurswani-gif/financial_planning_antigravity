@@ -168,7 +168,7 @@ export function createEmptyDraftAllocations() {
 export function getDraftMonthlyImpact(instrumentType, amount) {
     const def = INSTRUMENT_REGISTRY[instrumentType];
     if (!def || amount <= 0) return 0;
-    return def.inputMode === 'monthly' ? amount : amount;
+    return def.inputMode === 'monthly' ? amount : 0;
 }
 
 export function getTotalDraftAllocated(draftAllocations = {}) {

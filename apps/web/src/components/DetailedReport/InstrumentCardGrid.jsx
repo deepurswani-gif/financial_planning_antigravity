@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-    TrendingUp, ChevronDown, Shield, Coins, Landmark, PiggyBank, BarChart2,
+    TrendingUp, ChevronDown, Shield, Coins, Landmark, PiggyBank, BarChart2, Calendar,
 } from 'lucide-react';
 import { formatCurrency } from '../CashFlowModule/CashFlowLogic';
 import ReportReveal from './ReportReveal';
@@ -129,13 +129,6 @@ const getInstrumentDisplayName = (category, instrument) => (
     category.instrumentLabels?.[instrument.type] || instrument.type
 );
 
-/** Natural list: "A", "A and B", or "A, B and C". */
-const formatAvenueNames = (names = []) => {
-    if (names.length === 0) return '';
-    if (names.length === 1) return names[0];
-    if (names.length === 2) return `${names[0]} and ${names[1]}`;
-    return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
-};
 
 const InstrumentCardGrid = ({
     instrumentCategories,
@@ -145,6 +138,11 @@ const InstrumentCardGrid = ({
     onDraftChange,
     onApplyManualAllocations,
     canApplyManual = false,
+    applyError = '',
+    selectableMonths = [],
+    selectedMonthIndex,
+    onMonthChange,
+    calendarYear,
 }) => {
     const [expandedId, setExpandedId] = useState(null);
 
@@ -154,17 +152,36 @@ const InstrumentCardGrid = ({
 
     return (
         <ReportReveal className="pymtw-zone-c">
-            <h3 className="pymtw-zone-title">Allocate your surplus</h3>
-            <p className="pymtw-zone-sub">
-                Open one category at a time to set amounts with the slider or by typing. Remaining:{' '}
-                <strong>{formatCurrency(Math.max(0, remainingSurplus))}</strong>
-            </p>
+            <div className="pymtw-allocate-header">
+                <div>
+                    <h3 className="pymtw-zone-title">Allocate your surplus</h3>
+                    <p className="pymtw-zone-sub">
+                        Open one category at a time to set amounts with the slider or by typing. Remaining:{' '}
+                        <strong className="pymtw-remaining-surplus">
+                            {formatCurrency(Math.max(0, remainingSurplus))}
+                        </strong>
+                    </p>
+                </div>
+                {selectableMonths.length > 0 && onMonthChange && (
+                    <div className="pymtw-month-picker">
+                        <Calendar size={16} />
+                        <select
+                            value={selectedMonthIndex}
+                            onChange={(e) => onMonthChange(parseInt(e.target.value, 10))}
+                            aria-label="Select month"
+                        >
+                            {selectableMonths.map((m) => (
+                                <option key={m.monthIndex} value={m.monthIndex}>
+                                    {m.label} {calendarYear}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+            </div>
 
             {instrumentCategories.map((category) => {
                 const isOpen = expandedId === category.id;
-                const avenueNames = formatAvenueNames(
-                    category.instruments.map((instrument) => getInstrumentDisplayName(category, instrument)),
-                );
                 const allocatedInCategory = category.instruments.reduce(
                     (sum, instrument) => sum + (draftAllocations[instrument.type] || 0),
                     0,
@@ -182,12 +199,21 @@ const InstrumentCardGrid = ({
                         >
                             <div className="pymtw-category-toggle-main">
                                 <h4 className="pymtw-category-label">{category.label}</h4>
-                                <span className="pymtw-category-meta">
-                                    {avenueNames}
-                                    {allocatedInCategory > 0 && (
-                                        <> · {formatCurrency(allocatedInCategory)} allocated</>
-                                    )}
-                                </span>
+                                <div className="pymtw-category-avenue-chips">
+                                    {category.instruments.map((instrument) => (
+                                        <span
+                                            key={instrument.type}
+                                            className="pymtw-avenue-chip"
+                                        >
+                                            {getInstrumentDisplayName(category, instrument)}
+                                        </span>
+                                    ))}
+                                </div>
+                                {allocatedInCategory > 0 && (
+                                    <span className="pymtw-category-meta">
+                                        {formatCurrency(allocatedInCategory)} allocated
+                                    </span>
+                                )}
                             </div>
                             <span className={`pymtw-category-action ${isOpen ? 'pymtw-category-action-open' : ''}`}>
                                 <span className="pymtw-category-action-label">
@@ -237,6 +263,11 @@ const InstrumentCardGrid = ({
                     >
                         Apply my allocations
                     </button>
+                    {applyError && (
+                        <div className="pymtw-apply-error" role="alert">
+                            {applyError}
+                        </div>
+                    )}
                 </div>
             )}
         </ReportReveal>

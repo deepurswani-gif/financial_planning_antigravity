@@ -7,6 +7,7 @@ import {
     buildDraftAllocationPlan,
     buildInstrumentCards,
     buildRecommendedBundles,
+    buildThreeMonthSurplusOutlook,
     compareSipGoalImpacts,
     computeAllocationImpactForMonth,
     computeDeployableSurplusWithCarry,
@@ -16,6 +17,7 @@ import {
     getSelectableMonths,
     getLoanStartMonths,
     clampLoanStartMonth,
+    groupJourneyConstraintsByMonth,
     summarizeJourneyConstraints,
     validateJourneyAdjustmentsAgainstSurplus,
 } from './putYourMoneyToWorkLogic';
@@ -371,6 +373,85 @@ describe('putYourMoneyToWorkLogic', () => {
         expect(total).toBe(30000);
         expect(bundles[0].id).toBe('life_journey');
         expect(bundles[0].engineResult?.diagnostics?.sequence?.[0]).toBe('protection_policy');
+    });
+
+    it('builds three-month surplus outlook with allocation breakdown', () => {
+        const ledger = [0, 0, 0, 0, 0, 0, 20000, 20000, 20000, 0, 0, 0];
+        const allocations = [
+            {
+                id: 1,
+                type: 'SIP',
+                name: 'Studio SIP (Jul 2026)',
+                amount: 60000,
+                startMonth: 7,
+                startYear: 2026,
+                studioPlanKey: '2026-6',
+            },
+            {
+                id: 2,
+                type: 'Liquid Mutual Fund',
+                name: 'Emergency Fund (Jul 2026)',
+                amount: 3000,
+                startMonth: 7,
+                startYear: 2026,
+                studioPlanKey: '2026-6',
+            },
+        ];
+
+        const outlook = buildThreeMonthSurplusOutlook({
+            unallocatedSurplusByMonth: ledger,
+            investmentAllocations: allocations,
+            journeyAdjustments: [],
+            calendarYear: 2026,
+            planStartMonth: 6,
+            currentMonth: 6,
+        });
+
+        expect(outlook).toHaveLength(3);
+        expect(outlook[0].deployableSurplus).toBe(12000);
+        expect(outlook[0].allocationsInMonth).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({ label: 'SIP', amount: 5000 }),
+                expect.objectContaining({ label: 'Emergency Fund', amount: 3000 }),
+            ]),
+        );
+        expect(outlook[1].deployableSurplus).toBe(27000);
+        expect(outlook[1].calculationLines.some((l) => l.includes('August surplus'))).toBe(true);
+        expect(outlook[1].calculationLines.some((l) => l.includes('₹27,000'))).toBe(true);
+    });
+
+    it('groups journey constraints by month within planning window', () => {
+        const months = getSelectableMonths(6, 6);
+        const grouped = groupJourneyConstraintsByMonth([
+            {
+                id: 1,
+                type: 'expense',
+                name: 'Trip',
+                isLoan: false,
+                startYear: 2026,
+                startMonth: 7,
+                monthLabel: 'July',
+                monthlyImpact: 5000,
+                annualImpact: 5000,
+                projectionNote: 'One-time',
+            },
+            {
+                id: 2,
+                type: 'loan',
+                name: 'Car loan',
+                isLoan: true,
+                startYear: 2026,
+                startMonth: 8,
+                monthLabel: 'August',
+                monthlyImpact: 8000,
+                annualImpact: 96000,
+                projectionNote: 'EMI',
+            },
+        ], months, 2026);
+
+        expect(grouped).toHaveLength(2);
+        expect(grouped[0].label).toBe('July');
+        expect(grouped[1].label).toBe('August');
     });
 
     it('builds draft allocation plan snapshot', () => {

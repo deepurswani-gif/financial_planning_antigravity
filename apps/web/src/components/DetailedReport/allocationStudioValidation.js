@@ -38,6 +38,7 @@ export function validateDraftPlan({
     monthIndex,
     expenseCategories = {},
     investmentAllocations = [],
+    excludePlanKey = null,
 }) {
     const issues = [];
     const totalDraft = getTotalDraftAllocated(draftAllocations);
@@ -96,7 +97,7 @@ export function validateDraftPlan({
         const existingPpfAnnual = parseAmount(expenseCategories?.savings?.ppf?.amount) * 12
             || parseAmount(expenseCategories?.savings?.ppf) * 12;
         const proposedPpfAnnual = investmentAllocations
-            .filter((a) => a.type === 'PPF')
+            .filter((a) => a.type === 'PPF' && a.studioPlanKey !== excludePlanKey)
             .reduce((sum, a) => sum + parseAmount(a.amount), 0);
         const monthsActive = Math.max(0, 13 - startMonth);
         const draftPpfYear = draftPpfMonthly * monthsActive;
