@@ -3,20 +3,32 @@ import { useNavigate, useParams, Navigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import YourMoneyFlowSection from './YourMoneyFlowSection';
 import PutYourMoneyToWorkSection from './PutYourMoneyToWorkSection';
+import TrackSurplusAllocationSection from './TrackSurplusAllocationSection';
 import {
     DEFAULT_DETAILED_REPORT_PATH,
     detailedReportSlugs,
     detailedReportSteps,
+    YOUR_MONEYS_MAGIC_PATH,
 } from './detailedReportSteps';
 
 const SECTION_BY_SLUG = {
     your_money_flow: YourMoneyFlowSection,
     put_your_money_to_work: PutYourMoneyToWorkSection,
+    your_moneys_magic: TrackSurplusAllocationSection,
+};
+
+/** Old slug → keep bookmarks working. */
+const LEGACY_SECTION_REDIRECTS = {
+    track_surplus_allocation: YOUR_MONEYS_MAGIC_PATH,
 };
 
 const DetailedReportView = () => {
     const navigate = useNavigate();
     const { section } = useParams();
+
+    if (section && LEGACY_SECTION_REDIRECTS[section]) {
+        return <Navigate to={LEGACY_SECTION_REDIRECTS[section]} replace />;
+    }
 
     if (!section || !detailedReportSlugs.has(section)) {
         return <Navigate to={DEFAULT_DETAILED_REPORT_PATH} replace />;
