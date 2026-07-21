@@ -18,6 +18,13 @@ import { getEffectiveMonthlySavings } from '../components/DetailedFlow/savingsDe
 import { initializeExpenseSnapshots, hasAnyEmiCommitment } from '../components/DetailedFlow/expenseDetailSync';
 import { initializeSavingsSnapshots } from '../components/DetailedFlow/savingsDetailSync';
 import { migrateInsuranceBlock } from '../components/DetailedFlow/insuranceDetailSync';
+import {
+  WORKSPACE_CAPABILITY_FULL,
+  WORKSPACE_CAPABILITY_SUMMARY,
+  loadWorkspaceCapability,
+  saveWorkspaceCapability,
+  resolveEffectiveCapability,
+} from '../components/FinancialWorkspace/workspaceCapabilityStorage';
 
 const FinancialPlanContext = createContext();
 
@@ -88,6 +95,7 @@ export const FinancialPlanProvider = ({ children }) => {
   const [summaryLifeCover, setSummaryLifeCover] = useState('');
   const [summaryHealthCover, setSummaryHealthCover] = useState('');
   const [summaryReportGeneratedAt, setSummaryReportGeneratedAt] = useState(null);
+  const [workspaceCapability, setWorkspaceCapability] = useState(null);
 
   const [inflationRates, setInflationRates] = useState({
     incomeIncrement: 10, householdInflation: 6, educationInflation: 8
@@ -668,6 +676,31 @@ export const FinancialPlanProvider = ({ children }) => {
     }
   }, [planId]);
 
+  // Keep workspace capability decoupled from onboarding flow state.
+  // - Summary capability is derived from persisted summaryReportGeneratedAt
+  // - Full capability is stored explicitly (can never be downgraded implicitly)
+  useEffect(() => {
+    if (!userId || loading) return;
+
+    const stored = loadWorkspaceCapability(userId);
+    const effective = resolveEffectiveCapability({
+      storedCapability: stored,
+      summaryReportGeneratedAt,
+    });
+
+    setWorkspaceCapability(effective);
+
+    if (effective && stored !== effective) {
+      saveWorkspaceCapability(userId, effective);
+    }
+  }, [userId, loading, summaryReportGeneratedAt]);
+
+  const markDetailedPlanningComplete = useCallback(() => {
+    if (!userId) return;
+    setWorkspaceCapability(WORKSPACE_CAPABILITY_FULL);
+    saveWorkspaceCapability(userId, WORKSPACE_CAPABILITY_FULL);
+  }, [userId]);
+
   const expandedGoals = useMemo(() => {
     let result = [];
     goals.forEach(g => {
@@ -739,6 +772,8 @@ export const FinancialPlanProvider = ({ children }) => {
       hasLifeInsurance, setHasLifeInsurance, hasHealthInsurance, setHasHealthInsurance,
       summaryLifeCover, setSummaryLifeCover, summaryHealthCover, setSummaryHealthCover,
       summaryReportGeneratedAt, setSummaryReportGeneratedAt, markReportGenerated,
+      workspaceCapability,
+      markDetailedPlanningComplete,
       journeyProjections, proposedSIPs, proposedLumpsums, proposedEquities,
       handleLogoutCleanup, savePlanData
     }}>

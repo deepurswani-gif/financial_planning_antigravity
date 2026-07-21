@@ -212,6 +212,16 @@ export function useWealthSnapshotQuestions() {
     const rawFD = assetCategories.investments?.fixedDeposit;
     const fdArray = Array.isArray(rawFD) ? rawFD : (rawFD ? [rawFD] : []);
 
+    const openFd = useCallback((index) => {
+        setActiveFdModal({ index });
+    }, []);
+
+    const addFd = useCallback(() => {
+        const nextIndex = fdArray.length;
+        handleAssetChange('investments', 'fixedDeposit', [...fdArray, '']);
+        setActiveFdModal({ index: nextIndex });
+    }, [fdArray, handleAssetChange]);
+
     const summaryAssetTotal = getSummaryAssetTotal(assetCategories);
     const summaryLiabilityTotal = getSummaryLiabilityTotal(liabilityCategories, hasEMI);
     const assetBreakdownTotal = getTotalAssetBreakdownTotal(assetCategories);
@@ -539,5 +549,9 @@ export function useWealthSnapshotQuestions() {
         setActiveFdModal,
         handleFdSave,
         activeFdInitialData,
+        // Smart Edit activation helpers
+        fdInstances: fdArray,
+        openFd,
+        addFd,
     };
 }

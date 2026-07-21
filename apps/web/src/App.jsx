@@ -14,6 +14,10 @@ import SummaryLiabilities from './components/SummaryFlow/SummaryLiabilities';
 import SummaryGoals from './components/SummaryFlow/SummaryGoals';
 import SummaryReportView from './components/SummaryReport/SummaryReportView';
 import DetailedReportView from './components/DetailedReport/DetailedReportView';
+import FinancialWorkspaceView from './components/FinancialWorkspace/FinancialWorkspaceView';
+import { FinancialWorkspaceProvider } from './components/FinancialWorkspace/FinancialWorkspaceContext';
+import WorkspaceEntryRedirect from './components/FinancialWorkspace/WorkspaceEntryRedirect';
+import { EditingProvider, FocusedEditShell } from './editing';
 
 // Detailed Flow Placeholder
 import DetailedFamilyInfo from './components/DetailedFlow/DetailedFamilyInfo';
@@ -24,6 +28,11 @@ import DetailedGrowthExpectations from './components/DetailedFlow/DetailedGrowth
 
 // Legacy Existing App Flow
 import DetailedFlowLayout from './DetailedFlowLayout';
+
+// DEV-only Question Registry Explorer (not an end-user product surface)
+const RegistryExplorer = import.meta.env.DEV
+  ? React.lazy(() => import('./questionRegistry/explorer/RegistryExplorer'))
+  : null;
 
 function App() {
   const { loading } = useFinancialPlan();
@@ -39,7 +48,14 @@ function App() {
   return (
     <RoleBasedRouting>
       <Routes>
-        <Route path="/" element={<Navigate to="/summary-flow/profile" replace />} />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <WorkspaceEntryRedirect />
+            </ProtectedRoute>
+          }
+        />
         
         {/* Summary Flow Routes (No Drawers) */}
         <Route path="/summary-flow" element={<ProtectedRoute><BlankLayout /></ProtectedRoute>}>
@@ -63,6 +79,21 @@ function App() {
           <Route path=":section" element={<DetailedReportView />} />
         </Route>
 
+        {/* Financial Workspace (shell v1.0 + Phase 2 navigation) */}
+        <Route
+          path="/financial-workspace"
+          element={
+            <ProtectedRoute>
+              <FinancialWorkspaceProvider>
+                <EditingProvider>
+                  <FinancialWorkspaceView />
+                  <FocusedEditShell />
+                </EditingProvider>
+              </FinancialWorkspaceProvider>
+            </ProtectedRoute>
+          }
+        />
+
         {/* Legacy Existing App */}
         <Route path="/detailed-flow/existing-app/*" element={<ProtectedRoute><DetailedFlowLayout /></ProtectedRoute>} />
 
@@ -76,6 +107,17 @@ function App() {
           <Route path="expenses_emis" element={<Navigate to="/detailed-flow/money_in_out" replace />} />
           <Route path="*" element={<Navigate to="/detailed-flow/familyinfo" replace />} />
         </Route>
+
+        {import.meta.env.DEV && RegistryExplorer && (
+          <Route
+            path="/dev/question-registry"
+            element={
+              <React.Suspense fallback={<div style={{ padding: '2rem' }}>Loading registry explorer…</div>}>
+                <RegistryExplorer />
+              </React.Suspense>
+            }
+          />
+        )}
       </Routes>
     </RoleBasedRouting>
   );

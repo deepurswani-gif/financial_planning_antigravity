@@ -1,5 +1,5 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigateToDetailReport } from './reportNavigation';
 import {
     Target,
     Sparkles,
@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 import { formatCurrency } from '../CashFlowModule/CashFlowLogic';
-import { PUT_YOUR_MONEY_TO_WORK_PATH } from './detailedReportSteps';
 import { buildTrackSurplusAllocationReport } from './trackSurplusAllocationLogic';
 import ReportReveal from './ReportReveal';
 
@@ -354,7 +353,7 @@ const StatusBadge = ({ status }) => {
 };
 
 const TrackSurplusAllocationSection = () => {
-    const navigate = useNavigate();
+    const navigateToDetailReport = useNavigateToDetailReport();
     const {
         goals = [],
         expenseCategories = {},
@@ -490,7 +489,7 @@ const TrackSurplusAllocationSection = () => {
                         <button
                             type="button"
                             className="btn btn-primary"
-                            onClick={() => navigate(PUT_YOUR_MONEY_TO_WORK_PATH)}
+                            onClick={() => navigateToDetailReport('put_your_money_to_work')}
                         >
                             Go to Put Your Money to Work
                             <ArrowRight size={16} style={{ marginLeft: 8 }} />

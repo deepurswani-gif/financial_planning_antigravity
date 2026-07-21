@@ -26,6 +26,9 @@ import { useSavingsInvestmentQuestions } from './useSavingsInvestmentQuestions';
 import LifePolicyDetailsModal from './LifePolicyDetailsModal';
 import InvestmentDetailsModal from '../CashFlowModule/InvestmentDetailsModal';
 import { EMI_LOAN_KEYS } from './expenseDetailSync';
+import { useSmartEditActivation } from '../FinancialWorkspace/smartEdit/activationChannel';
+import SmartEditInstancePicker from '../FinancialWorkspace/smartEdit/SmartEditInstancePicker';
+import { resolveInstanceActivation } from '../../experienceRegistry';
 
 const formatInr = (val) => {
     if (!val || isNaN(val)) return '₹0';
@@ -502,7 +505,45 @@ const DetailedMoneyInOut = () => {
         handleInvSave,
         activeInvInitialData,
         activeInvTitle,
+        rdInstances,
+        openRd,
+        addRd,
+        openInvestment,
     } = useSavingsInvestmentQuestions();
+
+    const [rdPickerOpen, setRdPickerOpen] = useState(false);
+
+    // Smart Edit activation — open the correct existing configure experience
+    // immediately after landing (no chevrons, no manual Configure click).
+    const onActivate = useCallback((request) => {
+        switch (request.channel) {
+            case 'loanModal':
+                if (request.key) setActiveLoanModal(request.key);
+                return true;
+            case 'lifePolicyModal':
+                setShowPolicyDetailsModal(true);
+                return true;
+            case 'investmentModal':
+                if (request.key) openInvestment(request.key);
+                return true;
+            case 'rdCollection': {
+                // A known entity carries the exact index — open it directly.
+                if (request.index != null) {
+                    openRd(request.index);
+                    return true;
+                }
+                const strategy = resolveInstanceActivation(rdInstances);
+                if (strategy === 'openAddFlow') addRd();
+                else if (strategy === 'openExistingInstance') openRd(0);
+                else setRdPickerOpen(true);
+                return true;
+            }
+            default:
+                return false;
+        }
+    }, [setActiveLoanModal, setShowPolicyDetailsModal, openInvestment, rdInstances, addRd, openRd]);
+
+    useSmartEditActivation(onActivate);
 
     const questions = useMemo(() => {
         const list = [{
@@ -619,6 +660,17 @@ const DetailedMoneyInOut = () => {
                     onSave={handleInvSave}
                 />
             )}
+            <SmartEditInstancePicker
+                open={rdPickerOpen}
+                title="Which Recurring Deposit?"
+                instances={rdInstances}
+                getLabel={(rd, i) => `RD #${i + 1}`}
+                getSublabel={(rd) => (rd && typeof rd === 'object' && rd.amount ? `₹${rd.amount}` : null)}
+                addLabel="Add a new RD"
+                onSelect={(index) => { setRdPickerOpen(false); openRd(index); }}
+                onAdd={() => { setRdPickerOpen(false); addRd(); }}
+                onClose={() => setRdPickerOpen(false)}
+            />
         </>
     );
 };

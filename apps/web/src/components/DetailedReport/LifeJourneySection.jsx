@@ -12,11 +12,11 @@ import {
 } from 'lucide-react';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 import { GROWTH_EXPECTATIONS_PATH } from '../DetailedFlow/detailedFlowSteps';
-import { DEFAULT_DETAILED_REPORT_PATH } from './detailedReportSteps';
 import {
     buildLifeJourneyReport,
     computeLifeJourneyInsights,
 } from './lifeJourneyTableLogic';
+import { getDetailReportPath } from './reportNavigation';
 import TransposedJourneyTable from './TransposedJourneyTable';
 import LifeJourneyVisuals from './LifeJourneyVisuals';
 
@@ -55,10 +55,24 @@ const LifeJourneySection = () => {
     const { meta, hero, projections, goalsByYear } = report;
     const hasGoals = Object.keys(goalsByYear).length > 0;
 
-    const growthEditPath = `${GROWTH_EXPECTATIONS_PATH}?returnTo=${encodeURIComponent(DEFAULT_DETAILED_REPORT_PATH)}`;
+    const formatRate = (value) => {
+        const n = Number(value);
+        return Number.isFinite(n) ? String(n) : '0';
+    };
+    const incomeGrowth = formatRate(inflationRates?.incomeIncrement);
+    const householdGrowth = formatRate(inflationRates?.householdInflation);
+    const educationGrowth = formatRate(inflationRates?.educationInflation);
+
+    const openGrowthAssumptions = () => {
+        // Resolve return path on click so an active host adapter (workspace) is applied.
+        const returnTo = getDetailReportPath('your_money_flow', { section: 'life-journey' });
+        navigate(
+            `${GROWTH_EXPECTATIONS_PATH}?returnTo=${encodeURIComponent(returnTo)}`
+        );
+    };
 
     return (
-        <div className="lj-section">
+        <div className="lj-section" id="life-journey">
             <div className="lj-hero card">
                 <div className="lj-hero-top">
                     <div>
@@ -70,12 +84,23 @@ const LifeJourneySection = () => {
                     <button
                         type="button"
                         className="lj-edit-rates-btn"
-                        onClick={() => navigate(growthEditPath)}
+                        onClick={openGrowthAssumptions}
                     >
                         <Settings2 size={16} />
                         Edit growth assumptions
                     </button>
                 </div>
+
+                <p className="lj-growth-assumptions">
+                    <span className="lj-growth-assumptions-label">Assumed Annual Growth in</span>
+                    <span className="lj-growth-assumptions-rates">
+                        Income - {incomeGrowth}%
+                        <span className="lj-growth-sep" aria-hidden="true">|</span>
+                        Household - {householdGrowth}%
+                        <span className="lj-growth-sep" aria-hidden="true">|</span>
+                        Education Cost - {educationGrowth}%
+                    </span>
+                </p>
 
                 {hero && (
                     <div className="lj-kpi-grid">
@@ -130,7 +155,14 @@ const LifeJourneySection = () => {
             <style>{`
                 .lj-section { display: flex; flex-direction: column; gap: 1.5rem; padding: 0 1rem; margin-top: 2.5rem; }
                 .lj-hero { padding: 1.5rem; background: linear-gradient(135deg, rgba(124,58,237,0.06), rgba(37,99,235,0.04)); }
-                .lj-hero-top { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.25rem; align-items: flex-start; }
+                .lj-hero-top { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.85rem; align-items: flex-start; }
+                .lj-growth-assumptions {
+                    margin: 0 0 1.25rem; font-size: 0.88rem; line-height: 1.55; color: var(--text-main);
+                    display: flex; flex-wrap: wrap; gap: 0.35rem 0.65rem; align-items: baseline;
+                }
+                .lj-growth-assumptions-label { color: var(--text-muted); font-weight: 600; }
+                .lj-growth-assumptions-rates { font-weight: 600; }
+                .lj-growth-sep { margin: 0 0.45rem; color: var(--text-muted); font-weight: 500; }
                 .lj-edit-rates-btn {
                     display: inline-flex; align-items: center; gap: 0.4rem;
                     padding: 0.5rem 0.85rem; border-radius: 8px;

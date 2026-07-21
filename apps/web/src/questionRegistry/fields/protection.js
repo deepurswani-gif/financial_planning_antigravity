@@ -1,0 +1,323 @@
+import { SECTION_IDS } from '../../components/FinancialWorkspace/sectionIds';
+import { normalizeField } from '../schema';
+
+/** @type {import('../schema').QuestionField[]} */
+export const PROTECTION_FIELDS = [
+  normalizeField({
+    id: 'protection.life.hasCoverage',
+    kind: 'field',
+    label: 'Do you have life insurance coverage?',
+    shortLabel: 'Has life cover?',
+    aliases: ['life insurance', 'term insurance', 'life cover yes no'],
+    domain: 'protection',
+    uiCategory: 'insurance',
+    valueType: 'boolean',
+    importance: 'high',
+    quickEditPriority: 'medium',
+    searchBoost: 8,
+    businessMeaning:
+      'Gate for life cover amount and detailed life-policy premium capture. Influences safety-net and protection recommendations.',
+    editExperience: {
+      type: 'question',
+      hostsFieldIds: ['protection.life.hasCoverage', 'protection.life.totalCover'],
+    },
+    state: { path: 'hasLifeInsurance' },
+    editSurfaces: [
+      {
+        flow: 'summary',
+        sectionId: SECTION_IDS.SAVINGS,
+        questionId: 'life-insurance-cover',
+        capability: 'summary',
+        role: 'primary',
+      },
+    ],
+    relatedFieldIds: ['protection.life.totalCover'],
+    impacts: ['report.summary.safety_net', 'engine.protection'],
+    tags: ['insurance', 'gate'],
+  }),
+
+  normalizeField({
+    id: 'protection.life.totalCover',
+    kind: 'field',
+    label: 'Total Life Insurance Cover',
+    shortLabel: 'Life Cover',
+    aliases: ['sum assured', 'life cover', 'term cover', 'life sum assured'],
+    domain: 'protection',
+    uiCategory: 'insurance',
+    valueType: 'currency',
+    importance: 'high',
+    quickEditPriority: 'medium',
+    searchBoost: 10,
+    businessMeaning:
+      'Aggregate life sum assured used in protection adequacy and safety-net analysis.',
+    editExperience: {
+      type: 'question',
+      hostsFieldIds: ['protection.life.hasCoverage', 'protection.life.totalCover'],
+    },
+    visibility: {
+      allOf: [{ field: 'protection.life.hasCoverage', eq: true }],
+    },
+    state: { path: 'summaryLifeCover' },
+    editSurfaces: [
+      {
+        flow: 'summary',
+        sectionId: SECTION_IDS.SAVINGS,
+        questionId: 'life-insurance-cover',
+        capability: 'summary',
+        role: 'primary',
+      },
+    ],
+    relatedFieldIds: ['protection.life.hasCoverage'],
+    impacts: ['report.summary.safety_net', 'engine.protection'],
+    tags: ['insurance'],
+  }),
+
+  normalizeField({
+    id: 'protection.health.hasCoverage',
+    kind: 'field',
+    label: 'Do you have health insurance coverage?',
+    shortLabel: 'Has health cover?',
+    aliases: ['health insurance', 'mediclaim', 'health cover yes no'],
+    domain: 'protection',
+    uiCategory: 'insurance',
+    valueType: 'boolean',
+    importance: 'high',
+    quickEditPriority: 'medium',
+    searchBoost: 8,
+    businessMeaning:
+      'Gate for health cover amount and detailed health premium questions. Influences protection adequacy views.',
+    editExperience: {
+      type: 'question',
+      hostsFieldIds: ['protection.health.hasCoverage', 'protection.health.totalCover'],
+    },
+    state: { path: 'hasHealthInsurance' },
+    editSurfaces: [
+      {
+        flow: 'summary',
+        sectionId: SECTION_IDS.SAVINGS,
+        questionId: 'health-insurance-cover',
+        capability: 'summary',
+        role: 'primary',
+      },
+    ],
+    relatedFieldIds: ['protection.health.totalCover'],
+    impacts: ['report.summary.safety_net', 'engine.protection'],
+    tags: ['insurance', 'gate'],
+  }),
+
+  normalizeField({
+    id: 'protection.health.totalCover',
+    kind: 'field',
+    label: 'Total Health Insurance Cover',
+    shortLabel: 'Health Cover',
+    aliases: ['health cover', 'mediclaim cover', 'health sum insured'],
+    domain: 'protection',
+    uiCategory: 'insurance',
+    valueType: 'currency',
+    importance: 'high',
+    quickEditPriority: 'medium',
+    searchBoost: 10,
+    businessMeaning:
+      'Aggregate health sum insured used in protection and contingency recommendations.',
+    editExperience: {
+      type: 'question',
+      hostsFieldIds: ['protection.health.hasCoverage', 'protection.health.totalCover'],
+    },
+    visibility: {
+      allOf: [{ field: 'protection.health.hasCoverage', eq: true }],
+    },
+    state: { path: 'summaryHealthCover' },
+    editSurfaces: [
+      {
+        flow: 'summary',
+        sectionId: SECTION_IDS.SAVINGS,
+        questionId: 'health-insurance-cover',
+        capability: 'summary',
+        role: 'primary',
+      },
+    ],
+    relatedFieldIds: ['protection.health.hasCoverage'],
+    impacts: ['report.summary.safety_net', 'engine.protection'],
+    tags: ['insurance'],
+  }),
+
+  // --- Phase 2: Detailed premiums & policies ---
+
+  normalizeField({
+    id: 'protection.health.premium',
+    kind: 'field',
+    label: 'Health insurance premium',
+    shortLabel: 'Health premium',
+    aliases: ['health premium', 'mediclaim premium'],
+    domain: 'protection',
+    uiCategory: 'insurance',
+    valueType: 'currency',
+    importance: 'high',
+    quickEditPriority: 'medium',
+    businessMeaning:
+      'Detailed health premium (with frequency) refining summary insurance spend and protection adequacy.',
+    editExperience: { type: 'question' },
+    visibility: { allOf: [{ field: 'protection.health.hasCoverage', eq: true }] },
+    state: {
+      path: 'expenseCategories.insurance.health',
+      refinements: { syncModule: 'insuranceDetailSync' },
+    },
+    editSurfaces: [
+      {
+        flow: 'detailed',
+        sectionId: SECTION_IDS.MONEY_IN_MONEY_OUT,
+        questionId: 'health-insurance',
+        capability: 'full',
+        role: 'primary',
+      },
+    ],
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    relatedFieldIds: ['expenses.insurance.monthlyPremiumTotal', 'protection.health.totalCover'],
+    impacts: [
+      'report.summary.safety_net',
+      'report.detail.your_money_flow',
+      'engine.protection',
+      'engine.cashFlow',
+    ],
+    tags: ['insurance'],
+  }),
+
+  normalizeField({
+    id: 'protection.life.policies',
+    kind: 'collection',
+    label: 'Life insurance policies',
+    shortLabel: 'Life policies',
+    aliases: ['life policy', 'term policy', 'ulip policy', 'sum assured policy'],
+    domain: 'protection',
+    uiCategory: 'insurance',
+    importance: 'high',
+    quickEditPriority: 'medium',
+    searchBoost: 8,
+    businessMeaning:
+      'Per-member life policy slots with premiums and optional detailed policy modal (sum assured, terms).',
+    editExperience: {
+      type: 'modal',
+      modalId: 'lifePolicyDetails',
+      collectionId: 'protection.life.policies',
+    },
+    state: {
+      path: 'policies',
+      refinements: { syncModule: 'insuranceDetailSync' },
+    },
+    itemFieldIds: ['protection.life.policy.premium', 'protection.life.policy.sumAssured'],
+    editSurfaces: [
+      {
+        flow: 'detailed',
+        sectionId: SECTION_IDS.MONEY_IN_MONEY_OUT,
+        questionId: 'life-insurance',
+        capability: 'full',
+        role: 'primary',
+      },
+    ],
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    relatedFieldIds: ['protection.life.totalCover', 'protection.life.hasCoverage'],
+    impacts: [
+      'report.summary.safety_net',
+      'report.detail.your_money_flow',
+      'engine.protection',
+    ],
+    tags: ['insurance', 'modal'],
+  }),
+
+  normalizeField({
+    id: 'protection.life.policy.premium',
+    kind: 'collectionItemField',
+    collectionId: 'protection.life.policies',
+    label: 'Life policy premium',
+    shortLabel: 'Life premium',
+    aliases: ['policy premium'],
+    domain: 'protection',
+    uiCategory: 'insurance',
+    valueType: 'currency',
+    importance: 'high',
+    quickEditPriority: 'medium',
+    businessMeaning: 'Premium for an individual life policy (with frequency).',
+    editExperience: {
+      type: 'modal',
+      modalId: 'lifePolicyDetails',
+      collectionId: 'protection.life.policies',
+    },
+    state: { path: 'premium' },
+    editSurfaces: [
+      {
+        flow: 'detailed',
+        sectionId: SECTION_IDS.MONEY_IN_MONEY_OUT,
+        questionId: 'life-insurance',
+        capability: 'full',
+        role: 'primary',
+      },
+    ],
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    impacts: ['engine.protection', 'engine.cashFlow'],
+  }),
+
+  normalizeField({
+    id: 'protection.life.policy.sumAssured',
+    kind: 'collectionItemField',
+    collectionId: 'protection.life.policies',
+    label: 'Life policy sum assured',
+    shortLabel: 'Sum assured',
+    aliases: ['policy cover', 'policy sum assured'],
+    domain: 'protection',
+    uiCategory: 'insurance',
+    valueType: 'currency',
+    importance: 'high',
+    quickEditPriority: 'low',
+    businessMeaning: 'Sum assured on an individual life policy contributing to total life cover.',
+    editExperience: {
+      type: 'modal',
+      modalId: 'lifePolicyDetails',
+      collectionId: 'protection.life.policies',
+    },
+    state: { path: 'sumAssured' },
+    editSurfaces: [
+      {
+        flow: 'detailed',
+        sectionId: SECTION_IDS.MONEY_IN_MONEY_OUT,
+        questionId: 'life-insurance',
+        capability: 'full',
+        role: 'primary',
+      },
+    ],
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    impacts: ['engine.protection'],
+  }),
+
+  normalizeField({
+    id: 'protection.vehicle.premiums',
+    kind: 'field',
+    label: 'Vehicle & other insurance premiums',
+    shortLabel: 'Vehicle/Other insurance',
+    aliases: ['car insurance', 'bike insurance', 'motor insurance', 'other insurance'],
+    domain: 'protection',
+    uiCategory: 'insurance',
+    valueType: 'currency',
+    importance: 'medium',
+    quickEditPriority: 'medium',
+    businessMeaning:
+      'Car, bike, and other insurance premiums contributing to total protection spend.',
+    editExperience: { type: 'question' },
+    state: {
+      path: 'expenseCategories.insurance',
+      refinements: { syncModule: 'insuranceDetailSync' },
+    },
+    editSurfaces: [
+      {
+        flow: 'detailed',
+        sectionId: SECTION_IDS.MONEY_IN_MONEY_OUT,
+        questionId: 'vehicle-other-insurance',
+        capability: 'full',
+        role: 'primary',
+      },
+    ],
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    relatedFieldIds: ['expenses.insurance.monthlyPremiumTotal'],
+    impacts: ['report.detail.your_money_flow', 'engine.cashFlow', 'engine.protection'],
+    tags: ['insurance'],
+  }),
+];

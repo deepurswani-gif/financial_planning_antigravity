@@ -2,8 +2,7 @@ import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, TrendingUp, GraduationCap } from 'lucide-react';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
-import { DEFAULT_DETAILED_REPORT_PATH } from '../DetailedReport/detailedReportSteps';
-import { GROWTH_EXPECTATIONS_PATH } from './detailedFlowSteps';
+import { financialWorkspacePath } from '../FinancialWorkspace/workspaceNavConfig';
 
 const RATE_FIELDS = [
     {
@@ -29,7 +28,7 @@ const RATE_FIELDS = [
 const DetailedGrowthExpectations = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    const returnTo = searchParams.get('returnTo') || DEFAULT_DETAILED_REPORT_PATH;
+    const returnTo = searchParams.get('returnTo') || financialWorkspacePath('full', { report: 'your_money_flow' });
     const { inflationRates, setInflationRates, savePlanData } = useFinancialPlan();
 
     const handleRateChange = (name, value) => {

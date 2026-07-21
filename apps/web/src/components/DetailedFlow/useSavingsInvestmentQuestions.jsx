@@ -115,6 +115,16 @@ export function useSavingsInvestmentQuestions() {
     const rawRD = savings.rd;
     const rdArray = Array.isArray(rawRD) ? rawRD : (rawRD ? [rawRD] : []);
 
+    const openRd = useCallback((index) => {
+        setActiveInvModal({ key: 'rd', index });
+    }, []);
+
+    const addRd = useCallback(() => {
+        const nextIndex = rdArray.length;
+        handleSavingsChange('rd', [...rdArray, '']);
+        setActiveInvModal({ key: 'rd', index: nextIndex });
+    }, [rdArray, handleSavingsChange]);
+
     const renderConfiguredField = (invKey, label) => {
         const rawValue = savings[invKey] || '';
         const isConfigured = rawValue !== null && typeof rawValue === 'object' && rawValue.amount > 0;
@@ -363,5 +373,10 @@ export function useSavingsInvestmentQuestions() {
         handleInvSave,
         activeInvInitialData,
         activeInvTitle,
+        // Smart Edit activation helpers
+        rdInstances: rdArray,
+        openRd,
+        addRd,
+        openInvestment: setActiveInvModal,
     };
 }

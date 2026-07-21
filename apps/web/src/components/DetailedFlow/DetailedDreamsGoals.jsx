@@ -2,10 +2,15 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import DetailedProgressiveLayout from './DetailedProgressiveLayout';
 import { useDreamsGoalsQuestions } from './useDreamsGoalsQuestions';
-import { GROWTH_EXPECTATIONS_PATH } from './detailedFlowSteps';
+import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
+import {
+    DEFAULT_DETAIL_TAB_ID,
+    financialWorkspacePath,
+} from '../FinancialWorkspace/workspaceNavConfig';
 
 const DetailedDreamsGoals = () => {
     const navigate = useNavigate();
+    const { markDetailedPlanningComplete } = useFinancialPlan();
     const {
         dreamsGoalsQuestions,
         navigateToQuestionId,
@@ -18,7 +23,14 @@ const DetailedDreamsGoals = () => {
             questions={dreamsGoalsQuestions}
             narrative="Perfect. I now have a clear picture of what you're working toward — and what it will take to get there."
             lastSectionLabel="View Detailed Report"
-            onComplete={() => navigate(GROWTH_EXPECTATIONS_PATH)}
+            onComplete={() =>
+                (async () => {
+                    markDetailedPlanningComplete?.();
+                    navigate(
+                        financialWorkspacePath('full', { report: DEFAULT_DETAIL_TAB_ID })
+                    );
+                })()
+            }
             navigateToQuestionId={navigateToQuestionId}
             onNavigateToQuestionHandled={clearNavigateToQuestion}
             contentWidth="wide"

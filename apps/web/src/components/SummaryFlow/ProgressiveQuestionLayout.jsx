@@ -7,6 +7,13 @@ import { useAuth } from '../../contexts/AuthContext';
 import { loadSummaryUiDraft, patchSummaryUiDraft } from '../../lib/summaryFlowStorage';
 import QuestionProgressBar from './QuestionProgressBar';
 import { useProgressiveShellWidth } from './useProgressiveShellWidth';
+import {
+    DEFAULT_DETAIL_TAB_ID,
+    DEFAULT_SUMMARY_REPORT_ID,
+    financialWorkspacePath,
+} from '../FinancialWorkspace/workspaceNavConfig';
+import { resolveSectionId } from '../FinancialWorkspace/sectionIds';
+import { useLandingQuestion, focusLandingControl } from '../FinancialWorkspace/smartEdit/useLandingQuestion';
 
 const steps = [
     { id: 'profile', label: 'Profile', path: '/summary-flow/profile' },
@@ -86,6 +93,8 @@ const ProgressiveQuestionLayout = ({
     const { savePlanData } = useFinancialPlan();
     const userId = user?.id ?? null;
     const shellClassName = useProgressiveShellWidth(contentWidth);
+  const query = new URLSearchParams(location.search);
+  const inWorkspaceEdit = location.pathname.startsWith('/financial-workspace') && Boolean(query.get('edit'));
     const [currentIndex, setCurrentIndex] = useState(() => {
         const savedIndex = loadSummaryUiDraft(userId)?.questionIndexByStep?.[currentStepId];
         if (typeof savedIndex === 'number' && savedIndex >= 0 && savedIndex < questions.length) {
@@ -95,6 +104,7 @@ const ProgressiveQuestionLayout = ({
     });
     const [direction, setDirection] = useState(1);
     const [showNarrative, setShowNarrative] = useState(false);
+    const { landingQuestionId, control: landingControl, clearLanding } = useLandingQuestion(questions);
 
     const currentGlobalIndex = steps.findIndex(s => s.id === currentStepId);
 
@@ -117,6 +127,18 @@ const ProgressiveQuestionLayout = ({
             lastSummaryPath: location.pathname,
         });
     }, [currentIndex, currentStepId, location.pathname, userId]);
+
+    // Smart Edit landing: jump directly to the requested question (no chevrons),
+    // focus/scroll the first control, then clear the one-shot landing params.
+    useEffect(() => {
+        if (!landingQuestionId) return;
+        const idx = questions.findIndex((q) => q && q.id === landingQuestionId);
+        if (idx < 0) return;
+        setDirection(1);
+        setCurrentIndex(idx);
+        focusLandingControl(landingControl);
+        clearLanding();
+    }, [landingQuestionId, landingControl, clearLanding, questions]);
 
     // Handle intra-step navigation (chevron arrows)
     const handleNextQuestion = useCallback(() => {
@@ -151,9 +173,25 @@ const ProgressiveQuestionLayout = ({
         } else {
             const nextStep = steps[currentGlobalIndex + 1];
             if (nextStep) {
-                navigate(nextStep.path);
+                if (inWorkspaceEdit) {
+                    const nextSectionId = resolveSectionId(nextStep.id);
+                    const nextQuery = new URLSearchParams(location.search);
+                    nextQuery.set('edit', nextSectionId);
+                    navigate(`${location.pathname}?${nextQuery.toString()}`);
+                } else {
+                    navigate(nextStep.path);
+                }
             } else {
-                navigate('/summary-report/money_story');
+                if (inWorkspaceEdit) {
+                    const mode = query.get('mode') === 'summary' ? 'summary' : 'full';
+                    const reportFromQuery = query.get('report');
+                    const report =
+                        reportFromQuery ??
+                        (mode === 'full' ? DEFAULT_DETAIL_TAB_ID : DEFAULT_SUMMARY_REPORT_ID);
+                    navigate(financialWorkspacePath(mode, { report }));
+                } else {
+                    navigate(financialWorkspacePath('summary', { report: DEFAULT_SUMMARY_REPORT_ID }));
+                }
             }
         }
     };
@@ -164,7 +202,14 @@ const ProgressiveQuestionLayout = ({
         }
         const prevStep = steps[currentGlobalIndex - 1];
         if (prevStep) {
-            navigate(prevStep.path);
+            if (inWorkspaceEdit) {
+                const prevSectionId = resolveSectionId(prevStep.id);
+                const prevQuery = new URLSearchParams(location.search);
+                prevQuery.set('edit', prevSectionId);
+                navigate(`${location.pathname}?${prevQuery.toString()}`);
+            } else {
+                navigate(prevStep.path);
+            }
         }
     };
 

@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, ArrowRight, ArrowLeft, Sparkles } from 'lucide-react';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 import { detailedFlowSteps } from './detailedFlowSteps';
 import { useProgressiveShellWidth } from '../SummaryFlow/useProgressiveShellWidth';
+import { financialWorkspacePath, DEFAULT_DETAIL_TAB_ID, DEFAULT_SUMMARY_REPORT_ID } from '../FinancialWorkspace/workspaceNavConfig';
+import { resolveSectionId } from '../FinancialWorkspace/sectionIds';
+import { useLandingQuestion, focusLandingControl } from '../FinancialWorkspace/smartEdit/useLandingQuestion';
 
 const useTypewriter = (text, speed = 30) => {
     const [displayed, setDisplayed] = useState('');
@@ -72,11 +75,16 @@ const DetailedProgressiveLayout = ({
     contentWidth = 'default',
 }) => {
     const navigate = useNavigate();
+  const location = useLocation();
     const { savePlanData } = useFinancialPlan();
     const shellClassName = useProgressiveShellWidth(contentWidth);
+
+  const query = new URLSearchParams(location.search);
+  const inWorkspaceEdit = location.pathname.startsWith('/financial-workspace') && Boolean(query.get('edit'));
     const [currentQuestionId, setCurrentQuestionId] = useState(() => questions[0]?.id ?? '');
     const [direction, setDirection] = useState(1);
     const [showNarrative, setShowNarrative] = useState(false);
+    const { landingQuestionId, control: landingControl, clearLanding } = useLandingQuestion(questions);
 
     const currentGlobalIndex = detailedFlowSteps.findIndex(s => s.id === currentStepId);
 
@@ -112,9 +120,22 @@ const DetailedProgressiveLayout = ({
         }
         const nextStep = detailedFlowSteps[currentGlobalIndex + 1];
         if (nextStep) {
-            navigate(nextStep.path);
+            if (inWorkspaceEdit) {
+                const nextSectionId = resolveSectionId(nextStep.id);
+                const nextQuery = new URLSearchParams(location.search);
+                nextQuery.set('edit', nextSectionId);
+                navigate(`${location.pathname}?${nextQuery.toString()}`);
+            } else {
+                navigate(nextStep.path);
+            }
         } else {
-            navigate('/summary-report/money_story');
+            if (inWorkspaceEdit) {
+                const mode = query.get('mode') === 'summary' ? 'summary' : 'full';
+                const report = query.get('report') ?? DEFAULT_DETAIL_TAB_ID;
+                navigate(financialWorkspacePath(mode, { report }));
+            } else {
+                navigate(financialWorkspacePath('full', { report: DEFAULT_DETAIL_TAB_ID }));
+            }
         }
     };
 
@@ -131,12 +152,25 @@ const DetailedProgressiveLayout = ({
             try { await savePlanData(); } catch (e) { console.error('Save failed on nav', e); }
         }
         if (currentGlobalIndex <= 0) {
-            navigate('/summary-report/money_story');
+            if (inWorkspaceEdit) {
+                const mode = query.get('mode') === 'summary' ? 'summary' : 'full';
+                const report = query.get('report') ?? DEFAULT_SUMMARY_REPORT_ID;
+                navigate(financialWorkspacePath(mode, { report }));
+            } else {
+                navigate(financialWorkspacePath('summary', { report: DEFAULT_SUMMARY_REPORT_ID }));
+            }
             return;
         }
         const prevStep = detailedFlowSteps[currentGlobalIndex - 1];
         if (prevStep) {
-            navigate(prevStep.path);
+            if (inWorkspaceEdit) {
+                const prevSectionId = resolveSectionId(prevStep.id);
+                const prevQuery = new URLSearchParams(location.search);
+                prevQuery.set('edit', prevSectionId);
+                navigate(`${location.pathname}?${prevQuery.toString()}`);
+            } else {
+                navigate(prevStep.path);
+            }
         }
     };
 
@@ -157,6 +191,16 @@ const DetailedProgressiveLayout = ({
         setCurrentQuestionId(navigateToQuestionId);
         onNavigateToQuestionHandled?.();
     }, [navigateToQuestionId, questions, onNavigateToQuestionHandled]);
+
+    // Smart Edit landing: jump directly to the requested question (no chevrons),
+    // focus/scroll the first control, then clear the one-shot landing params.
+    useEffect(() => {
+        if (!landingQuestionId) return;
+        setDirection(1);
+        setCurrentQuestionId(landingQuestionId);
+        focusLandingControl(landingControl);
+        clearLanding();
+    }, [landingQuestionId, landingControl, clearLanding]);
 
     useEffect(() => {
         if (questions.length === 0) return;

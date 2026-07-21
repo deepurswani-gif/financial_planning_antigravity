@@ -5,10 +5,13 @@ import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { signOut } from '../../services/authService';
 import finbrellaLogo from '../../assets/finbrella_logo.png';
-import { detailedFlowSteps, GROWTH_EXPECTATIONS_PATH } from '../DetailedFlow/detailedFlowSteps';
+import { detailedFlowSteps } from '../DetailedFlow/detailedFlowSteps';
 import { RECONCILIATION_STACK_ID } from '../DetailedFlow/reconciliationStackId';
-import { DEFAULT_SUMMARY_REPORT_PATH } from '../SummaryReport/summaryReportSteps';
-import { DEFAULT_DETAILED_REPORT_PATH } from '../DetailedReport/detailedReportSteps';
+import {
+    DEFAULT_DETAIL_TAB_ID,
+    DEFAULT_SUMMARY_REPORT_ID,
+    financialWorkspacePath,
+} from '../FinancialWorkspace/workspaceNavConfig';
 import { useBreakpoints } from '../../hooks';
 
 const steps = [
@@ -79,14 +82,14 @@ const BlankLayout = () => {
         if (savePlanData) {
             try { await savePlanData(); } catch (e) { console.error('Save failed on nav', e); }
         }
-        navigate(DEFAULT_SUMMARY_REPORT_PATH);
+        navigate(financialWorkspacePath('summary', { report: DEFAULT_SUMMARY_REPORT_ID }));
     };
 
     const handleViewDetailedReport = async () => {
         if (savePlanData) {
             try { await savePlanData(); } catch (e) { console.error('Save failed on nav', e); }
         }
-        navigate(isGrowthExpectations ? DEFAULT_DETAILED_REPORT_PATH : GROWTH_EXPECTATIONS_PATH);
+        navigate(financialWorkspacePath('full', { report: DEFAULT_DETAIL_TAB_ID }));
     };
 
     const useFixedFlowChrome = isSummaryFlow || isDetailedFlow;

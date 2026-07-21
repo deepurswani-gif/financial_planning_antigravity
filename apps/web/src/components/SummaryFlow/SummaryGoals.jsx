@@ -12,6 +12,10 @@ import { loadSummaryUiDraft, patchSummaryUiDraft } from '../../lib/summaryFlowSt
 import { calculateFutureCost } from '../GoalModule/GoalLogic';
 import QuestionProgressBar from './QuestionProgressBar';
 import { useProgressiveShellWidth } from './useProgressiveShellWidth';
+import {
+    DEFAULT_SUMMARY_REPORT_ID,
+    financialWorkspacePath,
+} from '../FinancialWorkspace/workspaceNavConfig';
 
 /* ─── Screen constants ─── */
 const INTRO   = 0;
@@ -263,7 +267,7 @@ const SummaryGoals = () => {
             await markReportGenerated();
         }
         setShowNarrative(false);
-        navigate('/summary-report/money_story');
+        navigate(financialWorkspacePath('summary', { report: DEFAULT_SUMMARY_REPORT_ID }));
     };
 
     const handleNarrativeDone = () => handleOpenReport(true);

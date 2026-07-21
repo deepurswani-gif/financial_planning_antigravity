@@ -1,5 +1,4 @@
 import React, { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
     ArrowRight,
     Lightbulb,
@@ -13,7 +12,7 @@ import {
     buildInvestSurplusReport,
     computeInvestSurplusInsights,
 } from './investSurplusLogic';
-import { PUT_YOUR_MONEY_TO_WORK_PATH } from './detailedReportSteps';
+import { useNavigateToDetailReport } from './reportNavigation';
 
 const InsightIcon = ({ tone }) => {
     if (tone === 'warning') return <AlertTriangle size={16} className="ius-insight-icon ius-insight-warning" />;
@@ -23,7 +22,7 @@ const InsightIcon = ({ tone }) => {
 };
 
 const InvestSurplusReportContent = () => {
-    const navigate = useNavigate();
+    const navigateToDetailReport = useNavigateToDetailReport();
     const {
         currentYearLedger,
         planStartMonth,
@@ -110,7 +109,7 @@ const InvestSurplusReportContent = () => {
                 <button
                     type="button"
                     className="btn btn-primary ius-full-planner-btn"
-                    onClick={() => navigate(PUT_YOUR_MONEY_TO_WORK_PATH)}
+                    onClick={() => navigateToDetailReport('put_your_money_to_work')}
                 >
                     Full allocation planner
                     <ArrowRight size={18} />
