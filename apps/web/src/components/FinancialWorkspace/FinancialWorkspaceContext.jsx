@@ -1,4 +1,12 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useReducer } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+} from 'react';
 import {
   DETAIL_REPORT_TAB_ITEMS,
   DEFAULT_DETAIL_TAB_ID,
@@ -176,6 +184,9 @@ function workspaceReducer(state, action) {
 
 export function FinancialWorkspaceProvider({ children }) {
   const [state, dispatch] = useReducer(workspaceReducer, null, loadWorkspaceState);
+  // Registered by FinancialWorkspaceView so recommendation cards can express
+  // "update information" intent without knowing Smart Edit / Experience IDs.
+  const recommendationActionLauncherRef = useRef(null);
 
   useEffect(() => {
     saveWorkspaceState(state);
@@ -215,6 +226,30 @@ export function FinancialWorkspaceProvider({ children }) {
 
   const setDrawerOpen = useCallback((open) => {
     dispatch({ type: 'SET_DRAWER_OPEN', open });
+  }, []);
+
+  const registerRecommendationActionLauncher = useCallback((launcher) => {
+    recommendationActionLauncherRef.current = launcher;
+    return () => {
+      if (recommendationActionLauncherRef.current === launcher) {
+        recommendationActionLauncherRef.current = null;
+      }
+    };
+  }, []);
+
+  /**
+   * Workspace-level intent API for recommendation primary actions.
+   * Presentation only passes the recommendation instance — no Smart Edit,
+   * Experience, or Question IDs leak into cards.
+   */
+  const launchRecommendationAction = useCallback((recommendation) => {
+    const launcher = recommendationActionLauncherRef.current;
+    if (typeof launcher === 'function') {
+      return launcher(recommendation);
+    }
+    // Fallback when the workspace view has not registered a launcher yet.
+    dispatch({ type: 'SET_DRAWER_OPEN', open: true });
+    return true;
   }, []);
 
   const toggleDrawerGroup = useCallback((groupId) => {
@@ -258,6 +293,8 @@ export function FinancialWorkspaceProvider({ children }) {
       workflowPrevious,
       workflowNext,
       setDrawerOpen,
+      registerRecommendationActionLauncher,
+      launchRecommendationAction,
       toggleDrawerGroup,
       patchDetailUi,
       patchSummaryUi,
@@ -279,6 +316,8 @@ export function FinancialWorkspaceProvider({ children }) {
       workflowPrevious,
       workflowNext,
       setDrawerOpen,
+      registerRecommendationActionLauncher,
+      launchRecommendationAction,
       toggleDrawerGroup,
       patchDetailUi,
       patchSummaryUi,
@@ -303,4 +342,22 @@ export function useFinancialWorkspace() {
     throw new Error('useFinancialWorkspace must be used within FinancialWorkspaceProvider');
   }
   return ctx;
+}
+
+/**
+ * Intent API for Recommendation Presentation. Safe outside the workspace
+ * provider (legacy report routes) — returns a no-op launcher so cards still
+ * render without crashing.
+ */
+export function useLaunchRecommendationAction() {
+  const ctx = useContext(FinancialWorkspaceContext);
+  return useCallback(
+    (recommendation) => {
+      if (ctx?.launchRecommendationAction) {
+        return ctx.launchRecommendationAction(recommendation);
+      }
+      return false;
+    },
+    [ctx],
+  );
 }

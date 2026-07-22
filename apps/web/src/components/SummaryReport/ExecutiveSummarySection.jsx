@@ -2,8 +2,13 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from 'recharts';
 import { Wallet, Shield, Heart, TrendingUp, Target, Download, CalendarClock, BadgeInfo } from 'lucide-react';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { buildExecutiveSummaryReport, buildWhatIfScenario } from './ExecutiveSummaryLogic';
 import { getReadinessSnapshotsByPlan, upsertMonthlyReadinessSnapshot } from '../../services/financialPlanService';
+import { buildExecutiveSummarySignals, PILLAR_TO_RECOMMENDATION_ID } from '../../recommendationRegistry/adapters/executiveSummaryAdapter';
+import { useRecommendationStore } from '../../recommendationOrchestration';
+import { RecommendationList } from '../../recommendationPresentation';
+import { useLaunchRecommendationAction } from '../FinancialWorkspace/FinancialWorkspaceContext';
 
 const ICON_MAP = {
     wallet: Wallet,
@@ -15,6 +20,7 @@ const ICON_MAP = {
 
 const SCORE_COLORS = ['#ef4444', '#f59e0b', '#00a9f2', '#6366f1', '#10b981'];
 const FALLBACK_LOGO = '/finbrella_logo.png';
+const USEFUL_INSIGHTS_REPORTS = ['useful_insights'];
 const DISCLAIMER_TEXT = [
     'This financial plan has been prepared by Finbrella based on the information provided by you. The projections, assumptions, and recommendations are based on current data, historical trends, and standard financial models.',
     'All future projections (including returns, inflation, and goal outcomes) are estimates only and may vary due to market movements, economic changes, policy changes, or other unforeseen factors.',
@@ -26,6 +32,8 @@ const DISCLAIMER_TEXT = [
 ];
 
 const ExecutiveSummarySection = () => {
+    const { user } = useAuth();
+    const launchRecommendationAction = useLaunchRecommendationAction();
     const {
         planId,
         income,
@@ -56,6 +64,24 @@ const ExecutiveSummarySection = () => {
             }),
         [income, expenseCategories, assetCategories, summaryLifeCover, summaryHealthCover, contingencyFund, goals, inflationRates, familyMembers, hasSpouseIncome]
     );
+
+    // Priority Next Steps: report selects/orders by weakest pillars; presentation
+    // owns card layout, actions, and visual hierarchy.
+    const recommendationSignals = useMemo(
+        () => buildExecutiveSummarySignals(report),
+        [report],
+    );
+    const recommendationStore = useRecommendationStore(recommendationSignals, {
+        reports: USEFUL_INSIGHTS_REPORTS,
+    });
+    const priorityRecommendations = useMemo(() => {
+        const byId = new Map(
+            recommendationStore.getByReport('useful_insights').map((rec) => [rec.recommendationId, rec]),
+        );
+        return (recommendationSignals.weakestPillars ?? [])
+            .map((pillarId) => byId.get(PILLAR_TO_RECOMMENDATION_ID[pillarId]))
+            .filter(Boolean);
+    }, [recommendationStore, recommendationSignals]);
 
     const [scenario, setScenario] = useState(report.baseMetrics);
     const [trendRows, setTrendRows] = useState([]);
@@ -324,14 +350,18 @@ const ExecutiveSummarySection = () => {
 
             <section className="es-actions">
                 <h3>Your Priority Next Steps</h3>
-                <div className="es-actions-grid">
-                    {report.actionPriorities.map((action, index) => (
-                        <div key={action} className="es-action-card">
-                            <span className="es-action-step">Step {index + 1}</span>
-                            <p>{action}</p>
-                        </div>
-                    ))}
-                </div>
+                <RecommendationList
+                    recommendations={priorityRecommendations}
+                    onPrimaryAction={launchRecommendationAction}
+                    ctaContext={{
+                        familyMembers,
+                        user,
+                        moduleName: 'Useful Insights — Priority Next Steps',
+                    }}
+                    density="summary"
+                    emptySurface="useful_insights"
+                    className="es-rec-list"
+                />
             </section>
 
             <section className="es-roadmap">
@@ -467,6 +497,7 @@ const ExecutiveSummarySection = () => {
                 .es-chart-panel h3, .es-actions h3, .es-roadmap h3, .es-benchmark h3, .es-export h3, .es-trend h3, .es-uplift h3, .es-simulator h3, .es-confidence h3 { margin: 0 0 1rem; font-size: 1.05rem; color: var(--text-main); }
                 .es-chart-wrap { border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; padding: 0.8rem; }
                 .es-actions-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
+                .es-rec-list { max-width: 1080px; }
                 .es-action-card { border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem; background: linear-gradient(135deg, #f8fafc, #fff); }
                 .es-action-step { display: inline-block; margin-bottom: 0.5rem; font-size: 0.75rem; font-weight: 700; color: #0369a1; text-transform: uppercase; letter-spacing: 0.05em; }
                 .es-action-card p { margin: 0; line-height: 1.65; color: var(--text-main); font-size: 0.9rem; }

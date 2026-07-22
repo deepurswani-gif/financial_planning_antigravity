@@ -41,6 +41,7 @@ import { loadWorkspaceCapability } from './workspaceCapabilityStorage';
 import { useEditing } from '../../editing/EditingProvider';
 import { getExperienceById, resolveLaunch, buildActivationRequest } from '../../experienceRegistry';
 import { SmartEditActivationContext } from './smartEdit/activationChannel';
+import { resolveExperienceIdForRecommendation } from './recommendationActionLaunch';
 
 /**
  * Scroll to a section id inside the workspace scroll container.
@@ -84,6 +85,7 @@ export default function FinancialWorkspaceView() {
     workflowPrevious,
     workflowNext,
     setDrawerOpen,
+    registerRecommendationActionLauncher,
     getDrawerAction,
     canWorkflowPrevious,
     canWorkflowNext,
@@ -332,7 +334,7 @@ export default function FinancialWorkspaceView() {
    * existing platform capabilities only (Edit Session, calculator modal,
    * section editor). No new routing is introduced.
    */
-  const handleLaunchExperience = (arg) => {
+  const handleLaunchExperience = useCallback((arg) => {
     // `arg` is either an experience id (footer utilities) or a full result
     // descriptor from the drawer. Dynamic-entity descriptors additionally carry
     // instance identity + an activation override so we open that exact object.
@@ -426,7 +428,32 @@ export default function FinancialWorkspaceView() {
         break;
     }
     return true;
-  };
+  }, [
+    activeDetailReportId,
+    activeSummaryReportId,
+    calculatorsLocked,
+    navigate,
+    openCalculator,
+    openUnlockDialog,
+    requestActivation,
+    setDrawerOpen,
+    startEditSession,
+    summaryMode,
+  ]);
+
+  // Register the workspace intent API used by Recommendation Presentation.
+  // Cards call launchRecommendationAction(recommendation) only — they never see
+  // Experience IDs, Question IDs, or Smart Edit internals.
+  useEffect(() => {
+    return registerRecommendationActionLauncher((recommendation) => {
+      const experienceId = resolveExperienceIdForRecommendation(recommendation);
+      if (experienceId) {
+        return handleLaunchExperience({ experienceId });
+      }
+      setDrawerOpen(true);
+      return true;
+    });
+  }, [handleLaunchExperience, registerRecommendationActionLauncher, setDrawerOpen]);
 
   const handleSummaryReportSelect = (reportId) => {
     selectSummaryReport(reportId);

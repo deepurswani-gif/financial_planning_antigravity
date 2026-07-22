@@ -1,24 +1,25 @@
 import React, { useMemo, useEffect, useState, useRef } from 'react';
-import { Shield, ShieldAlert, ShieldCheck, AlertTriangle, AlertOctagon, Umbrella, Wallet, Clock, TrendingDown, CheckCircle2, ArrowRight, Info, Zap, Target, Send, Check, Heart } from 'lucide-react';
+import { Shield, ShieldAlert, ShieldCheck, AlertTriangle, AlertOctagon, Umbrella, Wallet, Clock, TrendingDown, CheckCircle2, ArrowRight, Info, Target, Heart } from 'lucide-react';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency } from '../CashFlowModule/CashFlowLogic';
-import {
-    submitSupportRequestViaWeb3forms,
-    buildSupportEmailContextFromUser,
-    getSupportWeb3StorageKey,
-    isSupportWeb3CooldownActive,
-    markSupportWeb3Sent,
-} from '../../services/supportRequestEmailService';
 import {
     calculateProtectionData,
     calculateContingencyData,
     calculateHealthInsuranceData,
     buildCrisisTimeline,
-    buildRecoverySteps,
     formatCompactSN
 } from './SafetyNetLogic';
 import { getEmergencyFundAmount } from '../DetailedFlow/wealthDetailSync';
+import { buildSafetyNetSignals } from '../../recommendationRegistry/adapters/safetyNetAdapter';
+import { useRecommendationStore } from '../../recommendationOrchestration';
+import { RecommendationList } from '../../recommendationPresentation';
+import { useLaunchRecommendationAction } from '../FinancialWorkspace/FinancialWorkspaceContext';
+
+// Scope the orchestration store to this report so incomplete (safety-net-only)
+// signals never surface unrelated recommendations. Module-level constant keeps a
+// stable reference across renders.
+const SAFETY_NET_REPORTS = ['safety_net'];
 
 /* ─────────────── Animated Counter ─────────────── */
 const AnimatedCounter = ({ value, prefix = '', suffix = '', duration = 1500, decimals = 0 }) => {
@@ -181,113 +182,6 @@ const CircularGauge = ({ percent, size = 220, strokeWidth = 18 }) => {
     );
 };
 
-const SUPPORT_CTA_ERROR_COOLDOWN_SEC = 60;
-
-/* ─────────────── Recovery Step CTA ─────────────── */
-const RecoverySupportCta = ({ familyMembers, user, moduleName, color }) => {
-    const [sendState, setSendState] = useState('idle');
-    const [retrySeconds, setRetrySeconds] = useState(null);
-
-    const supportEmailContext = useMemo(
-        () => buildSupportEmailContextFromUser(familyMembers, user, moduleName),
-        [familyMembers, user, moduleName]
-    );
-
-    const storageKey = useMemo(() => {
-        const email = supportEmailContext?.userEmail;
-        if (!email || !moduleName) return null;
-        return getSupportWeb3StorageKey(email, moduleName);
-    }, [supportEmailContext?.userEmail, moduleName]);
-
-    useEffect(() => {
-        if (!storageKey) return;
-        if (isSupportWeb3CooldownActive(storageKey)) {
-            setSendState('success');
-        } else {
-            setSendState('idle');
-        }
-        setRetrySeconds(null);
-    }, [storageKey]);
-
-    useEffect(() => {
-        if (retrySeconds === null || retrySeconds <= 0) return undefined;
-        const t = setTimeout(() => {
-            setRetrySeconds((prev) => {
-                if (prev === null || prev <= 1) {
-                    setSendState('idle');
-                    return null;
-                }
-                return prev - 1;
-            });
-        }, 1000);
-        return () => clearTimeout(t);
-    }, [retrySeconds]);
-
-    const handleClick = async () => {
-        if (!storageKey || sendState === 'loading' || sendState === 'success') return;
-        if (isSupportWeb3CooldownActive(storageKey)) {
-            setSendState('success');
-            return;
-        }
-
-        setSendState('loading');
-        try {
-            const { ok } = await submitSupportRequestViaWeb3forms(supportEmailContext);
-            if (ok) {
-                markSupportWeb3Sent(storageKey);
-                setSendState('success');
-                setRetrySeconds(null);
-            } else {
-                setSendState('error');
-                setRetrySeconds(SUPPORT_CTA_ERROR_COOLDOWN_SEC);
-            }
-        } catch {
-            setSendState('error');
-            setRetrySeconds(SUPPORT_CTA_ERROR_COOLDOWN_SEC);
-        }
-    };
-
-    const disabled =
-        sendState === 'loading' ||
-        sendState === 'success' ||
-        (sendState === 'error' && retrySeconds !== null && retrySeconds > 0);
-
-    return (
-        <button
-            type="button"
-            className="sn-recovery-cta"
-            onClick={handleClick}
-            disabled={disabled}
-            style={{
-                '--cta-color': color,
-                background: sendState === 'success' ? '#16a34a' : sendState === 'error' ? '#dc2626' : color,
-            }}
-        >
-            {sendState === 'loading' && (
-                <>
-                    <Send size={16} />
-                    Sending…
-                </>
-            )}
-            {sendState === 'success' && (
-                <>
-                    <Check size={16} strokeWidth={2.5} />
-                    Request sent
-                </>
-            )}
-            {sendState === 'error' && (
-                <span>Try again in <strong>{retrySeconds ?? 0}s</strong></span>
-            )}
-            {sendState === 'idle' && (
-                <>
-                    <Send size={16} />
-                    Contact Finbrella for help
-                </>
-            )}
-        </button>
-    );
-};
-
 /* ─────────────── Timeline Stage Icon ─────────────── */
 const StageIcon = ({ icon, color }) => {
     const iconMap = {
@@ -339,10 +233,18 @@ const SafetyNetSection = () => {
         [contingencyData, protectionData]
     );
 
-    const recoverySteps = useMemo(
-        () => buildRecoverySteps(protectionData, healthData, contingencyData),
-        [protectionData, healthData, contingencyData]
+    // The Orchestration Engine owns trigger evaluation, deduplication, ordering,
+    // lifecycle and CTA resolution. This report only requests active instances
+    // and renders them through the Recommendation Presentation System.
+    const recommendationSignals = useMemo(
+        () => buildSafetyNetSignals({ protectionData, contingencyData, healthData }),
+        [protectionData, contingencyData, healthData]
     );
+    const recommendationStore = useRecommendationStore(recommendationSignals, {
+        reports: SAFETY_NET_REPORTS,
+    });
+    const recoveryRecommendations = recommendationStore.getByReport('safety_net');
+    const launchRecommendationAction = useLaunchRecommendationAction();
 
     const selfMember = familyMembers.find(m => m.relation?.toLowerCase() === 'self');
     const userName = selfMember?.name?.split(' ')[0] || 'there';
@@ -769,43 +671,26 @@ const SafetyNetSection = () => {
             {/* ══════════════════════════════════════════════
                 SECTION 5 — RECOVERY PLAN
                ══════════════════════════════════════════════ */}
-            {recoverySteps.length > 0 && (
-                <>
-                    <div className="sn-section-divider" style={{ marginTop: '4rem' }}>
-                        <div className="sn-divider-line" />
-                        <span className="sn-divider-label">RECOVERY PLAN — Next Steps</span>
-                        <div className="sn-divider-line" />
-                    </div>
+            <div className="sn-section-divider" style={{ marginTop: '4rem' }}>
+                <div className="sn-divider-line" />
+                <span className="sn-divider-label">RECOVERY PLAN — Next Steps</span>
+                <div className="sn-divider-line" />
+            </div>
 
-                    <RevealSection className="sn-recovery-section" delay={100}>
-                        {recoverySteps.map((step) => (
-                            <div key={step.id} className="sn-recovery-card">
-                                <div className="sn-recovery-step-badge" style={{ background: step.color }}>
-                                    Step {step.step}
-                                </div>
-                                <div className="sn-recovery-icon" style={{ background: `${step.color}15`, color: step.color }}>
-                                    {step.icon === 'shield' ? <Shield size={28} /> : step.icon === 'heart' ? <Heart size={28} /> : <Wallet size={28} />}
-                                </div>
-                                <div className="sn-recovery-urgency">
-                                    <Zap size={14} />
-                                    <span>{step.urgency}</span>
-                                </div>
-                                <h4 className="sn-recovery-title">{step.title}</h4>
-                                <p className="sn-recovery-desc">{step.description}</p>
-                                <div className="sn-recovery-amount">
-                                    {formatCurrency(step.amount)}
-                                </div>
-                                <RecoverySupportCta
-                                    familyMembers={familyMembers}
-                                    user={user}
-                                    moduleName={`Your Safety Net — ${step.title}`}
-                                    color={step.color}
-                                />
-                            </div>
-                        ))}
-                    </RevealSection>
-                </>
-            )}
+            <RevealSection className="sn-recovery-section" delay={100}>
+                <RecommendationList
+                    recommendations={recoveryRecommendations}
+                    onPrimaryAction={launchRecommendationAction}
+                    ctaContext={{
+                        familyMembers,
+                        user,
+                        moduleName: 'Your Safety Net',
+                    }}
+                    density="summary"
+                    emptySurface="safety_net"
+                    className="sn-rec-list"
+                />
+            </RevealSection>
 
             {/* ─── SCOPED STYLES ─── */}
             <style>{`
@@ -1334,110 +1219,18 @@ const SafetyNetSection = () => {
 
                 /* ── Recovery Plan ── */
                 .sn-recovery-section {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-                    gap: 1.5rem;
-                    max-width: 750px;
+                    max-width: 900px;
                     margin: 0 auto 2rem;
                     padding: 0 2rem;
                 }
-                .sn-recovery-card {
-                    position: relative;
-                    padding: 2rem 1.5rem;
-                    border: 1px solid #f1f5f9;
-                    border-radius: 16px;
-                    text-align: center;
-                    transition: all 0.3s ease;
-                    background: #ffffff;
-                }
-                .sn-recovery-card:hover {
-                    box-shadow: 0 8px 30px rgba(0,0,0,0.06);
-                    transform: translateY(-4px);
-                }
-                .sn-recovery-step-badge {
-                    position: absolute;
-                    top: -10px;
-                    left: 50%;
-                    transform: translateX(-50%);
-                    padding: 0.25rem 1rem;
-                    border-radius: 20px;
-                    color: white;
-                    font-size: 0.72rem;
-                    font-weight: 700;
-                    text-transform: uppercase;
-                    letter-spacing: 0.08em;
-                }
-                .sn-recovery-icon {
-                    width: 60px;
-                    height: 60px;
-                    border-radius: 16px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    margin: 0.5rem auto 1rem;
-                }
-                .sn-recovery-urgency {
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 0.35rem;
-                    padding: 0.3rem 0.75rem;
-                    border-radius: 20px;
-                    background: rgba(239, 68, 68, 0.08);
-                    color: #EF4444;
-                    font-size: 0.72rem;
-                    font-weight: 700;
-                    text-transform: uppercase;
-                    letter-spacing: 0.05em;
-                    margin-bottom: 0.75rem;
-                }
-                .sn-recovery-title {
-                    font-size: 1.1rem;
-                    font-weight: 700;
-                    color: var(--text-main);
-                    margin: 0 0 0.5rem 0;
-                }
-                .sn-recovery-desc {
-                    font-size: 0.88rem;
-                    color: var(--text-muted);
-                    line-height: 1.6;
-                    margin-bottom: 1rem;
-                }
-                .sn-recovery-amount {
-                    font-size: 1.5rem;
-                    font-weight: 800;
-                    color: var(--color-1);
-                    margin-bottom: 1.25rem;
-                }
-                .sn-recovery-cta {
-                    display: inline-flex;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 0.5rem;
-                    width: 100%;
-                    padding: 0.75rem 1.25rem;
-                    border: none;
-                    border-radius: 10px;
-                    color: #fff;
-                    font-size: 0.88rem;
-                    font-weight: 600;
-                    cursor: pointer;
-                    transition: opacity 0.2s, transform 0.2s;
-                }
-                .sn-recovery-cta:hover:not(:disabled) {
-                    opacity: 0.9;
-                    transform: translateY(-1px);
-                }
-                .sn-recovery-cta:disabled {
-                    cursor: not-allowed;
-                    opacity: 0.85;
+                .sn-rec-list {
+                    max-width: 900px;
+                    margin: 0 auto;
                 }
 
                 /* ── Responsive ── */
                 @media (max-width: 768px) {
                     .sn-stat-strip-3 {
-                        grid-template-columns: 1fr;
-                    }
-                    .sn-recovery-section {
                         grid-template-columns: 1fr;
                     }
                     .sn-timeline-stage {
