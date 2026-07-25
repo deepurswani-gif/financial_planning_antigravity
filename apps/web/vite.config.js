@@ -41,6 +41,8 @@ export default defineConfig({
       // (We will revisit once CI/CD build is wired up.)
       workbox: {
         mode: 'development',
+        // Main bundle exceeds Workbox's default 2 MiB precache limit.
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
       },
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icons.svg'],
       manifest: {

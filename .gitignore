@@ -37,3 +37,5 @@ build_plain.txt
 *.ppsx
 *.pptx
 *.pps
+.vercel
+.env*
