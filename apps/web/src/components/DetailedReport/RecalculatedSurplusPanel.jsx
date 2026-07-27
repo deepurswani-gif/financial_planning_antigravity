@@ -9,7 +9,7 @@ const RecalculatedSurplusPanel = ({
         <div className="pymtw-recalculated-body">
             <span className="pymtw-recalculated-label">Recalculated unallocated surplus</span>
             <p className="pymtw-recalculated-sub">
-                After future financial adjustments — investible surplus for the next three months.
+                Investible surplus remaining after future financial adjustments and any existing allocations.
             </p>
             <ThreeMonthSurplusGrid
                 outlook={outlook}

@@ -369,17 +369,20 @@ export function getSelectableMonths(planStartMonth = 0, currentMonth = new Date(
     return months;
 }
 
+/** PYMTW loan start months: same window as surplus planning (current + 2 months). */
 export function getLoanStartMonths(
     selectedYear,
     calendarYear,
     currentMonthIndex = new Date().getMonth(),
 ) {
-    const year = parseInt(selectedYear, 10) || calendarYear;
-    const minMonthIndex = year <= calendarYear
-        ? Math.max(0, Math.min(11, currentMonthIndex))
-        : 0;
+    // selectedYear is accepted for call-site compatibility; PYMTW loans stay in the
+    // current planning window (current month + 2), matching surplus allocation months.
+    void selectedYear;
+    void calendarYear;
+    const anchorMonth = Math.max(0, Math.min(11, currentMonthIndex));
+    const end = Math.min(11, anchorMonth + 2);
     const months = [];
-    for (let m = minMonthIndex; m < 12; m += 1) {
+    for (let m = anchorMonth; m <= end; m += 1) {
         months.push({
             monthIndex: m,
             value: m + 1,
@@ -395,10 +398,10 @@ export function clampLoanStartMonth(
     calendarYear,
     currentMonthIndex = new Date().getMonth(),
 ) {
-    const year = parseInt(startYear, 10) || calendarYear;
     const month = parseInt(startMonth, 10) || (currentMonthIndex + 1);
-    const minMonth = year <= calendarYear ? currentMonthIndex + 1 : 1;
-    return Math.max(month, minMonth);
+    const minMonth = currentMonthIndex + 1;
+    const maxMonth = Math.min(12, currentMonthIndex + 3);
+    return Math.min(Math.max(month, minMonth), maxMonth);
 }
 
 export function computeJourneyAdjustmentImpactForMonth(
@@ -432,37 +435,70 @@ export function computeJourneyAdjustmentImpactForMonth(
 }
 
 /**
- * Ensures journey expense amounts + loan EMIs do not exceed each month's unallocated surplus.
+ * Ensures journey expense amounts + loan EMIs fit within residual surplus after
+ * existing investment allocations (same residual model as deployable surplus).
+ * When selectableMonths is provided (PYMTW window), only those months are enforced —
+ * loan EMI beyond the planning window must not block save against empty later-month ledger cells.
  * @returns {{ ok: true } | { ok: false, message: string, monthLabel: string, monthIndex: number, surplus: number, impact: number }}
  */
 export function validateJourneyAdjustmentsAgainstSurplus(
     adjustments = [],
     unallocatedSurplusByMonth = [],
     calendarYear = new Date().getFullYear(),
+    {
+        investmentAllocations = [],
+        planStartMonth = 0,
+        selectableMonths = null,
+    } = {},
 ) {
     if (!adjustments.length) {
         return { ok: true };
     }
 
+    const start = Math.max(0, Math.min(11, planStartMonth));
+    const windowMonths = Array.isArray(selectableMonths) && selectableMonths.length > 0
+        ? new Set(selectableMonths.map((m) => m.monthIndex))
+        : null;
+    const hasAllocations = (investmentAllocations || []).some((a) => parseAmount(a?.amount) > 0);
+    let carryIn = 0;
+
     for (let monthIndex = 0; monthIndex < 12; monthIndex += 1) {
-        const impact = computeJourneyAdjustmentImpactForMonth(
+        const ledger = parseAmount(unallocatedSurplusByMonth[monthIndex]);
+        const available = monthIndex >= start ? ledger + carryIn : ledger;
+        const allocImpact = computeAllocationImpactForMonth(
+            investmentAllocations,
+            calendarYear,
+            monthIndex,
+        );
+        const journeyImpact = computeJourneyAdjustmentImpactForMonth(
             adjustments,
             calendarYear,
             monthIndex,
         );
-        if (impact <= 0) continue;
+        const residualAfterAlloc = available - allocImpact;
+        const leftover = residualAfterAlloc - journeyImpact;
+        const inPlanningWindow = !windowMonths || windowMonths.has(monthIndex);
 
-        const surplus = Math.round(parseAmount(unallocatedSurplusByMonth[monthIndex]));
-        if (impact > surplus) {
+        if (inPlanningWindow && journeyImpact > 0 && leftover < 0) {
+            const surplus = Math.max(0, Math.round(residualAfterAlloc));
+            const impact = Math.round(journeyImpact);
             const monthLabel = MONTH_LABELS_LONG[monthIndex] || 'Month';
+            const afterAllocNote = hasAllocations ? ' after existing allocations' : '';
             return {
                 ok: false,
                 monthIndex,
                 monthLabel,
                 surplus,
                 impact,
-                message: `${monthLabel} surplus is ₹${surplus.toLocaleString('en-IN')}; planned impact is ₹${impact.toLocaleString('en-IN')}. Reduce expenses or loan EMI so they fit within the available surplus.`,
+                message: surplus <= 0
+                    ? `${monthLabel} has no surplus available for future financial adjustments${afterAllocNote}. Planned impact is ₹${impact.toLocaleString('en-IN')}. Use a later month with remaining surplus, or reduce allocations first.`
+                    : `${monthLabel} surplus available for future financial adjustments is ₹${surplus.toLocaleString('en-IN')}${afterAllocNote}; planned impact is ₹${impact.toLocaleString('en-IN')}. Reduce expenses or loan EMI so they fit within the available surplus.`,
             };
+        }
+
+        if (monthIndex >= start) {
+            // Outside the PYMTW window, do not let negative loan EMI residuals poison carry.
+            carryIn = inPlanningWindow ? Math.max(0, leftover) : Math.max(0, residualAfterAlloc);
         }
     }
 
@@ -1074,12 +1110,11 @@ export function buildAllocationStudioContext({
 
     const journeyAdjustedOutlook = buildThreeMonthSurplusOutlook({
         unallocatedSurplusByMonth: ledger.unallocatedSurplus || [],
-        investmentAllocations: [],
+        investmentAllocations,
         journeyAdjustments,
         calendarYear,
         planStartMonth,
         currentMonth: meta.currentMonth,
-        excludeInvestmentAllocations: true,
     });
 
     return {

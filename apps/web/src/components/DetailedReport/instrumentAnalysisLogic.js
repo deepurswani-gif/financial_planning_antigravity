@@ -173,7 +173,7 @@ export function getDraftMonthlyImpact(instrumentType, amount) {
 
 export function getTotalDraftAllocated(draftAllocations = {}) {
     return STUDIO_INSTRUMENT_TYPES.reduce(
-        (sum, type) => sum + getDraftMonthlyImpact(type, draftAllocations[type] || 0),
+        (sum, type) => sum + Math.max(0, parseAmount(draftAllocations[type])),
         0,
     );
 }

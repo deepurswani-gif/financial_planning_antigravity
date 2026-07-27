@@ -22,6 +22,67 @@ import {
 } from '../DetailedFlow/insuranceDetailSync';
 import { getEffectiveMonthlySavings, buildSavingsBreakdownAnnual } from '../DetailedFlow/savingsDetailSync';
 
+/** Months between installments for a premium frequency. */
+const getInsuranceFrequencyInterval = (freq = 'Monthly') => {
+    if (freq === 'Quarterly') return 3;
+    if (freq === 'Half-Yearly' || freq === 'Half Yearly') return 6;
+    if (freq === 'Annual' || freq === 'Annually') return 12;
+    return 1; // Monthly
+};
+
+/**
+ * Full-year premium for allocation / studio protection rows.
+ *
+ * Term & Health (Allocation Studio / applyAllocationPlan) store amount as annual (monthly × 12).
+ * Legacy Life Insurance rows store the installment premium; studio-keyed Life rows store annual.
+ */
+export const getProtectionAllocationAnnual = (alloc = {}) => {
+    const amount = parseFloat(alloc.amount) || 0;
+    const type = alloc.type;
+
+    if (type === 'Term Insurance' || type === 'Health Insurance') {
+        return amount;
+    }
+
+    if ((type === 'Life Insurance' || type === 'Life Insurance Saving Plans') && alloc.studioPlanKey) {
+        return amount;
+    }
+
+    const interval = getInsuranceFrequencyInterval(alloc.frequency || 'Monthly');
+    return amount * (12 / interval);
+};
+
+/** Premium impact of a protection allocation in a given calendar year (start-year prorated). */
+export const getProtectionAllocationImpactForYear = (alloc = {}, year) => {
+    const allocStartYear = parseInt(alloc.startYear, 10);
+    const allocStartMonth = Math.min(12, Math.max(1, parseInt(alloc.startMonth, 10) || 1));
+    const allocDuration = parseInt(alloc.duration, 10) || 1;
+
+    if (!Number.isFinite(allocStartYear)) return 0;
+    if (!(year >= allocStartYear && year < (allocStartYear + allocDuration))) return 0;
+
+    const yearlyAmount = getProtectionAllocationAnnual(alloc);
+    if (year !== allocStartYear) return yearlyAmount;
+
+    const isLegacyInstallmentLife = (
+        (alloc.type === 'Life Insurance' || alloc.type === 'Life Insurance Saving Plans')
+        && !alloc.studioPlanKey
+    );
+
+    if (isLegacyInstallmentLife) {
+        const interval = getInsuranceFrequencyInterval(alloc.frequency || 'Monthly');
+        const installmentAmount = parseFloat(alloc.amount) || 0;
+        let installmentsThisYear = 0;
+        for (let m = allocStartMonth; m <= 12; m += interval) {
+            installmentsThisYear += 1;
+        }
+        return installmentAmount * installmentsThisYear;
+    }
+
+    // Annual-storage types: count remaining months in the start year
+    return (yearlyAmount / 12) * (13 - allocStartMonth);
+};
+
 const resolveAnnualInflowBases = ({
     income,
     selfDetail,
@@ -286,35 +347,11 @@ export const generateProjections = ({
 
         // Add Future Life Insurance from Allocation / Studio — skip when a linked
         // policy already carries the premium (Detailed Flow write-back exclusivity).
+        // Term/Health (and studio-keyed Life) store annual amounts; legacy Life uses installments.
         let futureLifeAllocationsThisYear = 0;
         investmentAllocations.forEach(alloc => {
             if (!shouldIncludeStudioInsuranceInProjections(alloc, policies)) return;
-
-            const allocStartYear = parseInt(alloc.startYear);
-            const allocStartMonth = parseInt(alloc.startMonth) || 1;
-            const allocDuration = parseInt(alloc.duration) || 1;
-            const installmentAmount = parseFloat(alloc.amount) || 0;
-            const freq = alloc.frequency || 'Monthly';
-            
-            const interval = freq === 'Monthly' ? 1 : 
-                           freq === 'Quarterly' ? 3 : 
-                           freq === 'Half-Yearly' ? 6 : 
-                           12; // Annual
-            const installmentsPerYear = 12 / interval;
-            const yearlyAmount = installmentAmount * installmentsPerYear;
-
-            if (year >= allocStartYear && year < (allocStartYear + allocDuration)) {
-                if (year === allocStartYear) {
-                    // Calculate how many installments fall in the remaining months of the start year
-                    let installmentsThisYear = 0;
-                    for (let m = allocStartMonth; m <= 12; m += interval) {
-                        installmentsThisYear++;
-                    }
-                    futureLifeAllocationsThisYear += installmentAmount * installmentsThisYear;
-                } else {
-                    futureLifeAllocationsThisYear += yearlyAmount;
-                }
-            }
+            futureLifeAllocationsThisYear += getProtectionAllocationImpactForYear(alloc, year);
         });
 
         const totalInsuranceOutflow = genInsuranceAnnual + detailedLifeThisYear + unallocatedLifeAnnual + futureLifeAllocationsThisYear;
@@ -539,13 +576,7 @@ export const generateProjections = ({
             let monthlyAmount = 0;
 
             if (isLifeInsurance) {
-                const freq = alloc.frequency || 'Monthly';
-                const interval = freq === 'Monthly' ? 1 : 
-                               freq === 'Quarterly' ? 3 : 
-                               freq === 'Half-Yearly' ? 6 : 
-                               12;
-                const installmentAmount = parseFloat(alloc.amount) || 0;
-                yearlyAmount = installmentAmount * (12 / interval);
+                yearlyAmount = getProtectionAllocationAnnual(alloc);
                 monthlyAmount = yearlyAmount / 12;
             } else {
                 // For recurring investments, alloc.amount is the ANNUAL amount (Monthly * 12)
@@ -562,16 +593,7 @@ export const generateProjections = ({
                     // If it's the starting year, only count from startMonth onwards
                     if (year === allocStartYear) {
                         if (isLifeInsurance) {
-                            const freq = alloc.frequency || 'Monthly';
-                            const interval = freq === 'Monthly' ? 1 : 
-                                           freq === 'Quarterly' ? 3 : 
-                                           freq === 'Half-Yearly' ? 6 : 
-                                           12;
-                            let installmentsThisYear = 0;
-                            for (let m = allocStartMonth; m <= 12; m += interval) {
-                                installmentsThisYear++;
-                            }
-                            impactThisYear = (parseFloat(alloc.amount) || 0) * installmentsThisYear;
+                            impactThisYear = getProtectionAllocationImpactForYear(alloc, year);
                         } else {
                             impactThisYear = monthlyAmount * (13 - allocStartMonth);
                         }

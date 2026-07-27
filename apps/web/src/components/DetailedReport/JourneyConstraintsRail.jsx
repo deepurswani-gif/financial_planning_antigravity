@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     Banknote, Home, AlertCircle, Info, Plus, Trash2, CheckCircle2, ChevronDown,
 } from 'lucide-react';
 import { formatCurrency } from '../CashFlowModule/CashFlowLogic';
 import {
     clampLoanStartMonth,
-    getLoanStartMonths,
     groupJourneyConstraintsByMonth,
     validateJourneyAdjustmentsAgainstSurplus,
 } from './putYourMoneyToWorkLogic';
@@ -16,6 +15,20 @@ const ADJUSTMENT_CATEGORIES = [
     { id: 'future_loans', label: 'Future Loans' },
 ];
 
+const parseAmount = (value) => parseFloat(value) || 0;
+
+const isExpenseDraft = (adj) => (adj.type || 'expense') !== 'loan';
+
+const isDraftConfigured = (adj) => {
+    if (!isExpenseDraft(adj)) {
+        return Boolean(adj.loanCategory)
+            && parseAmount(adj.principal) > 0
+            && parseAmount(adj.rate) > 0
+            && (parseInt(adj.tenure, 10) || 0) > 0;
+    }
+    return parseAmount(adj.amount) > 0;
+};
+
 const JourneyConstraintsRail = ({
     journeyConstraints,
     journeyAdjustments = [],
@@ -24,28 +37,49 @@ const JourneyConstraintsRail = ({
     defaultCalendarYear = new Date().getFullYear(),
     selectableMonths = [],
     unallocatedSurplusByMonth = [],
+    investmentAllocations = [],
+    planStartMonth = 0,
     onSaveAdjustments,
+    onSkipAdjustments,
     adjustmentsSaved = false,
     saveMessage = '',
 }) => {
     const [draftAdjustments, setDraftAdjustments] = useState([]);
     const [saveError, setSaveError] = useState('');
+    const [saveErrorCategory, setSaveErrorCategory] = useState(null);
     const [expandedId, setExpandedId] = useState(null);
+    const [savingCategory, setSavingCategory] = useState(null);
+    const savingRef = useRef(false);
+    const categoryFooterRefs = useRef({});
 
-    const defaultStartMonth = Math.min(12, Math.max(1, defaultStartMonthIndex + 1));
+    useEffect(() => {
+        if (draftAdjustments.length === 0) {
+            savingRef.current = false;
+            setSavingCategory(null);
+        }
+    }, [draftAdjustments]);
+
+    const planningMonthIndex = selectableMonths.length > 0
+        ? selectableMonths[0].monthIndex
+        : defaultStartMonthIndex;
+    const defaultStartMonth = Math.min(12, Math.max(1, planningMonthIndex + 1));
     const monthLabel = (month) => new Date(2000, Math.max(0, (month || 1) - 1), 1)
         .toLocaleString('default', { month: 'short' });
     const standardExpenseMonths = selectableMonths.length > 0
         ? selectableMonths
-        : [{ monthIndex: defaultStartMonthIndex, label: monthLabel(defaultStartMonth) }];
+        : [{ monthIndex: planningMonthIndex, label: monthLabel(defaultStartMonth) }];
+    // Same PYMTW window as standard expenses (current + 2) — not the Allocate month picker.
+    const loanStartMonths = standardExpenseMonths.map((m) => ({
+        monthIndex: m.monthIndex,
+        value: m.monthIndex + 1,
+        label: m.label,
+    }));
 
-    const visibleDrafts = draftAdjustments.filter((adj) => {
-        const startMonth = parseInt(adj.startMonth, 10) || defaultStartMonth;
-        const startYear = parseInt(adj.startYear, 10) || defaultCalendarYear;
-        return startMonth === defaultStartMonth && startYear === defaultCalendarYear;
-    });
-    const standardExpenses = visibleDrafts.filter((adj) => (adj.type || 'expense') !== 'loan');
-    const futureLoans = visibleDrafts.filter((adj) => (adj.type || 'expense') === 'loan');
+    // Keep all in-progress drafts visible across the PYMTW month window (current + 2).
+    const standardExpenses = draftAdjustments.filter(isExpenseDraft);
+    const futureLoans = draftAdjustments.filter((adj) => !isExpenseDraft(adj));
+    const configuredExpenses = standardExpenses.filter(isDraftConfigured);
+    const configuredLoans = futureLoans.filter(isDraftConfigured);
 
     const monthGroupedSummary = groupJourneyConstraintsByMonth(
         journeyConstraints?.items || [],
@@ -53,8 +87,60 @@ const JourneyConstraintsRail = ({
         defaultCalendarYear,
     );
 
+    const createExpenseDraft = () => ({
+        id: Date.now(),
+        type: 'expense',
+        name: '',
+        startMonth: defaultStartMonth,
+        startYear: defaultCalendarYear,
+        duration: 1,
+        amount: '',
+        principal: '',
+        rate: '',
+        tenure: '',
+        loanCategory: '',
+        emi: 0,
+    });
+
+    const createLoanDraft = () => ({
+        id: Date.now() + 1,
+        type: 'loan',
+        name: '',
+        startMonth: defaultStartMonth,
+        startYear: defaultCalendarYear,
+        duration: 1,
+        amount: '',
+        principal: '',
+        rate: '',
+        tenure: '',
+        loanCategory: '',
+        emi: 0,
+    });
+
+    const clearSaveError = () => {
+        setSaveError('');
+        setSaveErrorCategory(null);
+    };
+
+    const ensureFirstDraft = (categoryId) => {
+        setDraftAdjustments((prev) => {
+            if (categoryId === 'standard_expenses') {
+                if (prev.some(isExpenseDraft)) return prev;
+                return [...prev, createExpenseDraft()];
+            }
+            if (prev.some((adj) => !isExpenseDraft(adj))) return prev;
+            return [...prev, createLoanDraft()];
+        });
+    };
+
     const toggleCategory = (id) => {
-        setExpandedId((prev) => (prev === id ? null : id));
+        const isClosing = expandedId === id;
+        if (isClosing) {
+            setExpandedId(null);
+            return;
+        }
+        setExpandedId(id);
+        ensureFirstDraft(id);
     };
 
     const calculateEmi = (principal, rate, tenure) => {
@@ -68,84 +154,45 @@ const JourneyConstraintsRail = ({
         return 0;
     };
 
-    const updateDraft = (id, field, value) => {
-        setDraftAdjustments((prev) => prev.map((adj) => (
-            adj.id === id ? { ...adj, [field]: value } : adj
-        )));
-        setSaveError('');
-    };
-
-    const updateLoanStartYear = (id, startYear) => {
-        setDraftAdjustments((prev) => prev.map((adj) => {
-            if (adj.id !== id) return adj;
-            const nextYear = parseInt(startYear, 10) || defaultCalendarYear;
-            const startMonth = clampLoanStartMonth(
-                adj.startMonth || defaultStartMonth,
-                nextYear,
-                defaultCalendarYear,
-                defaultStartMonthIndex,
-            );
-            return { ...adj, startYear: nextYear, startMonth };
-        }));
-        setSaveError('');
-    };
-
     const updateStandardExpense = (id, field, value) => {
         setDraftAdjustments((prev) => prev.map((adj) => (
             adj.id === id
                 ? { ...adj, [field]: value, startYear: defaultCalendarYear }
                 : adj
         )));
-        setSaveError('');
+        clearSaveError();
+    };
+
+    const updateLoanStartMonth = (id, startMonth) => {
+        const nextMonth = clampLoanStartMonth(
+            startMonth,
+            defaultCalendarYear,
+            defaultCalendarYear,
+            planningMonthIndex,
+        );
+        setDraftAdjustments((prev) => prev.map((adj) => (
+            adj.id === id
+                ? { ...adj, startMonth: nextMonth, startYear: defaultCalendarYear }
+                : adj
+        )));
+        clearSaveError();
     };
 
     const addStandardExpense = () => {
         setExpandedId('standard_expenses');
-        setDraftAdjustments((prev) => [
-            ...prev,
-            {
-                id: Date.now(),
-                type: 'expense',
-                name: '',
-                startMonth: defaultStartMonth,
-                startYear: defaultCalendarYear,
-                duration: 1,
-                amount: '',
-                principal: '',
-                rate: '',
-                tenure: '',
-                loanCategory: '',
-                emi: 0,
-            },
-        ]);
-        setSaveError('');
+        setDraftAdjustments((prev) => [...prev, createExpenseDraft()]);
+        clearSaveError();
     };
 
     const addFutureLoan = () => {
         setExpandedId('future_loans');
-        setDraftAdjustments((prev) => [
-            ...prev,
-            {
-                id: Date.now() + 1,
-                type: 'loan',
-                name: '',
-                startMonth: defaultStartMonth,
-                startYear: defaultCalendarYear,
-                duration: 1,
-                amount: '',
-                principal: '',
-                rate: '',
-                tenure: '',
-                loanCategory: '',
-                emi: 0,
-            },
-        ]);
-        setSaveError('');
+        setDraftAdjustments((prev) => [...prev, createLoanDraft()]);
+        clearSaveError();
     };
 
     const removeDraft = (id) => {
         setDraftAdjustments((prev) => prev.filter((adj) => adj.id !== id));
-        setSaveError('');
+        clearSaveError();
     };
 
     const removeCommitted = (id) => {
@@ -153,24 +200,51 @@ const JourneyConstraintsRail = ({
         setJourneyAdjustments((prev) => prev.filter((adj) => adj.id !== id));
     };
 
-    const handleSave = () => {
-        const combined = [...journeyAdjustments, ...draftAdjustments];
+    const handleSaveCategory = (categoryId) => {
+        const toCommit = categoryId === 'standard_expenses' ? configuredExpenses : configuredLoans;
+        if (!toCommit.length || savingRef.current) return;
+
+        savingRef.current = true;
+        setSavingCategory(categoryId);
+
+        const combined = [...journeyAdjustments, ...toCommit];
         const validation = validateJourneyAdjustmentsAgainstSurplus(
             combined,
             unallocatedSurplusByMonth,
             defaultCalendarYear,
+            {
+                investmentAllocations,
+                planStartMonth,
+                selectableMonths: standardExpenseMonths,
+            },
         );
         if (!validation.ok) {
+            savingRef.current = false;
+            setSavingCategory(null);
             setSaveError(validation.message);
+            setSaveErrorCategory(categoryId);
+            categoryFooterRefs.current[categoryId]?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
             return;
         }
 
-        if (draftAdjustments.length > 0 && setJourneyAdjustments) {
-            setJourneyAdjustments((prev) => [...prev, ...draftAdjustments]);
+        if (setJourneyAdjustments) {
+            setJourneyAdjustments((prev) => [...prev, ...toCommit]);
         }
-        setDraftAdjustments([]);
-        setSaveError('');
+        setDraftAdjustments((prev) => (
+            categoryId === 'standard_expenses'
+                ? prev.filter((adj) => !isExpenseDraft(adj))
+                : prev.filter(isExpenseDraft)
+        ));
+        clearSaveError();
+        savingRef.current = false;
+        setSavingCategory(null);
         onSaveAdjustments?.();
+    };
+
+    const handleNoFutureAdjustments = () => {
+        setDraftAdjustments([]);
+        clearSaveError();
+        onSkipAdjustments?.();
     };
 
     const summaryGridClass = monthGroupedSummary.length === 1
@@ -179,14 +253,43 @@ const JourneyConstraintsRail = ({
             ? 'pymtw-adjust-summary-grid-2'
             : 'pymtw-adjust-summary-grid-3';
 
+    const renderCategoryFooter = (categoryId, { onAdd, canSave }) => {
+        const isSaving = savingCategory === categoryId;
+        return (
+            <div
+                className="pymtw-adjust-category-footer"
+                ref={(el) => {
+                    categoryFooterRefs.current[categoryId] = el;
+                }}
+            >
+                <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => handleSaveCategory(categoryId)}
+                    disabled={!canSave || Boolean(savingCategory)}
+                >
+                    {isSaving ? 'Saving…' : 'Save'}
+                </button>
+                <button
+                    type="button"
+                    className="btn btn-secondary pymtw-adjust-add-btn"
+                    onClick={onAdd}
+                >
+                    <Plus size={16} />
+                    Add New
+                </button>
+                {saveError && saveErrorCategory === categoryId && (
+                    <div className="pymtw-adjust-save-error" role="alert">
+                        <AlertCircle size={16} />
+                        <span>{saveError}</span>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
     const renderStandardExpenses = () => (
         <>
-            <div className="pymtw-adjust-head">
-                <button type="button" className="btn btn-secondary pymtw-adjust-add-btn" onClick={addStandardExpense}>
-                    <Plus size={16} />
-                    Add standard expense
-                </button>
-            </div>
             <div className="pymtw-adjust-list">
                 {standardExpenses.map((adj) => (
                     <div key={adj.id} className="pymtw-adjust-card">
@@ -238,7 +341,7 @@ const JourneyConstraintsRail = ({
                                             }
                                             : item
                                     )));
-                                    setSaveError('');
+                                    clearSaveError();
                                 }}
                             />
                         </div>
@@ -259,17 +362,15 @@ const JourneyConstraintsRail = ({
                     </div>
                 )}
             </div>
+            {renderCategoryFooter('standard_expenses', {
+                onAdd: addStandardExpense,
+                canSave: configuredExpenses.length > 0,
+            })}
         </>
     );
 
     const renderFutureLoans = () => (
         <>
-            <div className="pymtw-adjust-head">
-                <button type="button" className="btn btn-secondary pymtw-adjust-add-btn" onClick={addFutureLoan}>
-                    <Plus size={16} />
-                    Add future loan
-                </button>
-            </div>
             <div className="pymtw-adjust-list">
                 {futureLoans.map((adj) => (
                     <div key={adj.id} className="pymtw-adjust-card">
@@ -284,7 +385,7 @@ const JourneyConstraintsRail = ({
                                     setDraftAdjustments((prev) => prev.map((item) => (
                                         item.id === adj.id ? { ...item, loanCategory, name: nextName } : item
                                     )));
-                                    setSaveError('');
+                                    clearSaveError();
                                 }}
                             >
                                 <option value="">Select loan type</option>
@@ -307,7 +408,7 @@ const JourneyConstraintsRail = ({
                                     setDraftAdjustments((prev) => prev.map((item) => (
                                         item.id === adj.id ? { ...item, principal, emi, amount: emi * 12 } : item
                                     )));
-                                    setSaveError('');
+                                    clearSaveError();
                                 }}
                             />
                         </div>
@@ -322,7 +423,7 @@ const JourneyConstraintsRail = ({
                                     setDraftAdjustments((prev) => prev.map((item) => (
                                         item.id === adj.id ? { ...item, rate, emi, amount: emi * 12 } : item
                                     )));
-                                    setSaveError('');
+                                    clearSaveError();
                                 }}
                             />
                         </div>
@@ -345,7 +446,7 @@ const JourneyConstraintsRail = ({
                                             }
                                             : item
                                     )));
-                                    setSaveError('');
+                                    clearSaveError();
                                 }}
                             />
                         </div>
@@ -354,17 +455,13 @@ const JourneyConstraintsRail = ({
                             <select
                                 value={clampLoanStartMonth(
                                     adj.startMonth || defaultStartMonth,
-                                    adj.startYear || defaultCalendarYear,
                                     defaultCalendarYear,
-                                    defaultStartMonthIndex,
+                                    defaultCalendarYear,
+                                    planningMonthIndex,
                                 )}
-                                onChange={(e) => updateDraft(adj.id, 'startMonth', parseInt(e.target.value, 10))}
+                                onChange={(e) => updateLoanStartMonth(adj.id, parseInt(e.target.value, 10))}
                             >
-                                {getLoanStartMonths(
-                                    adj.startYear || defaultCalendarYear,
-                                    defaultCalendarYear,
-                                    defaultStartMonthIndex,
-                                ).map((m) => (
+                                {loanStartMonths.map((m) => (
                                     <option key={m.value} value={m.value}>
                                         {m.label}
                                     </option>
@@ -375,9 +472,10 @@ const JourneyConstraintsRail = ({
                             <label>Start year</label>
                             <input
                                 type="number"
-                                value={adj.startYear || defaultCalendarYear}
-                                min={defaultCalendarYear}
-                                onChange={(e) => updateLoanStartYear(adj.id, e.target.value)}
+                                value={defaultCalendarYear}
+                                readOnly
+                                disabled
+                                aria-label="Start year"
                             />
                         </div>
                         <div className="pymtw-adjust-emi">
@@ -401,6 +499,10 @@ const JourneyConstraintsRail = ({
                     </div>
                 )}
             </div>
+            {renderCategoryFooter('future_loans', {
+                onAdd: addFutureLoan,
+                canSave: configuredLoans.length > 0,
+            })}
         </>
     );
 
@@ -455,15 +557,13 @@ const JourneyConstraintsRail = ({
                     })}
 
                     <div className="pymtw-adjust-save">
-                        <button type="button" className="btn btn-primary" onClick={handleSave}>
-                            Save
+                        <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={handleNoFutureAdjustments}
+                        >
+                            No Future Adjustments
                         </button>
-                        {saveError && (
-                            <div className="pymtw-adjust-save-error" role="alert">
-                                <AlertCircle size={16} />
-                                <span>{saveError}</span>
-                            </div>
-                        )}
                         {adjustmentsSaved && !saveError && (
                             <div className="pymtw-adjust-saved-msg" role="status">
                                 <CheckCircle2 size={16} />

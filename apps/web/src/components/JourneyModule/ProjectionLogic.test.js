@@ -104,11 +104,12 @@ describe('ProjectionLogic', () => {
                 {
                     id: 101,
                     type: 'Term Insurance',
-                    amount: 5000,
+                    amount: 60000, // Studio stores annual (₹5,000/mo × 12)
                     startMonth: 1,
                     startYear: 2026,
                     duration: 10,
                     frequency: 'Monthly',
+                    studioPlanKey: '2026-0',
                 },
             ],
             policies: [
@@ -177,11 +178,12 @@ describe('ProjectionLogic', () => {
                 {
                     id: 101,
                     type: 'Term Insurance',
-                    amount: 5000,
+                    amount: 60000, // annual storage
                     startMonth: 1,
                     startYear: 2026,
                     duration: 10,
                     frequency: 'Monthly',
+                    studioPlanKey: '2026-0',
                 },
             ],
             policies: [
@@ -208,11 +210,12 @@ describe('ProjectionLogic', () => {
                 {
                     id: 101,
                     type: 'Term Insurance',
-                    amount: 5000,
+                    amount: 60000,
                     startMonth: 1,
                     startYear: 2026,
                     duration: 15,
                     frequency: 'Monthly',
+                    studioPlanKey: '2026-0',
                 },
             ],
             policies: [
@@ -235,6 +238,78 @@ describe('ProjectionLogic', () => {
         expect(year2035.insurancePremium).toBe(60000);
         expect(year2040.insurancePremium).toBe(60000);
         expect(year2041.insurancePremium).toBe(0);
+    });
+
+    it('treats studio Term/Health amounts as annual and prorates from July (no double-count)', () => {
+        // Reproduces: CF life ₹174k + non-life ₹6k + Self policy ₹32k offset
+        // + Studio Term ₹1,500/mo and Health ₹1,000/mo from July (stored annual).
+        const params = {
+            familyMembers: [
+                { relation: 'Self', name: 'Self', age: 35, retirementAge: 60, dob: '1991-01-01' },
+                { relation: 'Spouse', name: 'Spouse', age: 33 },
+                { relation: 'Child', name: 'Child', age: 8 },
+            ],
+            income: { self: 100000 },
+            expenseCategories: {
+                household: { rent: 60000 },
+                insurance: {
+                    health: { value: 500, frequency: 'Monthly' },
+                    life: {
+                        Self: { value: 32000, frequency: 'Annual' },
+                        Spouse: { value: 100000, frequency: 'Annual' },
+                        Child: { value: 42000, frequency: 'Annual' },
+                    },
+                },
+                emi: {},
+                savings: { sip: 12000 },
+            },
+            goals: [],
+            inflationRates: { incomeIncrement: 0, householdInflation: 0, educationInflation: 0 },
+            startYear: 2026,
+            policies: [
+                {
+                    id: 'p-self',
+                    insuredName: 'Self',
+                    premium: '32000',
+                    frequency: 'Annually',
+                    paymentTerm: '12',
+                    startDate: '2022-03-12',
+                    isProposed: false,
+                },
+            ],
+            investmentAllocations: [
+                {
+                    id: 1,
+                    type: 'Term Insurance',
+                    amount: 18000, // ₹1,500/mo × 12 (studio annual storage)
+                    startMonth: 7,
+                    startYear: 2026,
+                    duration: 10,
+                    frequency: 'Monthly',
+                    studioPlanKey: '2026-6',
+                },
+                {
+                    id: 2,
+                    type: 'Health Insurance',
+                    amount: 12000, // ₹1,000/mo × 12
+                    startMonth: 7,
+                    startYear: 2026,
+                    duration: 10,
+                    frequency: 'Monthly',
+                    studioPlanKey: '2026-6',
+                },
+            ],
+        };
+        const results = generateProjections(params);
+        // Non-life 6k + Self policy 32k + unallocated CF life (174k-32k)=142k
+        // + Term Jul–Dec 9k + Health Jul–Dec 6k = 195k
+        expect(results[0].insurancePremium).toBe(195000);
+        expect(results[0].savingsBreakdown.sip).toBe(144000);
+        expect(results[0].savingsAndInvestments).toBe(339000);
+        // Without studio, insurance would be 180k → investments 324k
+        const withoutStudio = generateProjections({ ...params, investmentAllocations: [] });
+        expect(withoutStudio[0].insurancePremium).toBe(180000);
+        expect(withoutStudio[0].savingsAndInvestments).toBe(324000);
     });
 
     it('uses Step 8 tax logic with selfDetail and standard deduction', () => {

@@ -795,6 +795,14 @@ const PutYourMoneyToWorkSection = () => {
         setAdjustmentSaveMessage('Future financial adjustments saved. You can now proceed.');
     }, [setAllocationPlans]);
 
+    const handleSkipAdjustments = useCallback(() => {
+        setAllocationPlans((prev) => withPymtwGate(prev, {
+            adjustmentsSaved: true,
+            showInvestmentAvenues: Boolean(prev?.[PYMTW_GATE_KEY]?.showInvestmentAvenues),
+        }));
+        setAdjustmentSaveMessage('No future adjustments. You can now proceed.');
+    }, [setAllocationPlans]);
+
     const handleProceedToInvestmentAvenues = useCallback(() => {
         setAllocationPlans((prev) => withPymtwGate(prev, {
             adjustmentsSaved: true,
@@ -834,11 +842,16 @@ const PutYourMoneyToWorkSection = () => {
                 journeyConstraints={studio.journeyConstraints}
                 journeyAdjustments={journeyAdjustments}
                 setJourneyAdjustments={handleJourneyAdjustmentsChange}
-                defaultStartMonthIndex={effectiveMonth}
+                defaultStartMonthIndex={studio.selectableMonths?.[0]?.monthIndex
+                    ?? studio.meta.currentMonth
+                    ?? 0}
                 defaultCalendarYear={studio.meta.calendarYear}
                 selectableMonths={studio.selectableMonths}
                 unallocatedSurplusByMonth={moneyFlowReport?.ledger?.unallocatedSurplus || []}
+                investmentAllocations={investmentAllocations}
+                planStartMonth={studio.meta.planStartMonth ?? 0}
                 onSaveAdjustments={handleSaveAdjustments}
+                onSkipAdjustments={handleSkipAdjustments}
                 adjustmentsSaved={adjustmentsSaved}
                 saveMessage={adjustmentSaveMessage}
             />
@@ -852,7 +865,7 @@ const PutYourMoneyToWorkSection = () => {
 
             {!adjustmentsSaved && (
                 <div className="pymtw-proceed-hint">
-                    Save future financial adjustments to unlock investment avenues.
+                    Save adjustments or choose No Future Adjustments to unlock investment avenues.
                 </div>
             )}
 
@@ -958,7 +971,7 @@ const PutYourMoneyToWorkSection = () => {
                     border-top: 1px solid var(--border);
                 }
                 .pymtw-adjust-accordion-panel {
-                    padding: 0 0 0.75rem;
+                    padding: 0.15rem 0 0.85rem;
                 }
                 .pymtw-adjust-summary-grid {
                     display: grid;
@@ -1529,14 +1542,12 @@ const PutYourMoneyToWorkSection = () => {
                     color: #059669;
                 }
                 .pymtw-zone-b { padding: 1.25rem; }
-                .pymtw-adjust-head {
+                .pymtw-adjust-category-footer {
+                    margin-top: 0.9rem;
                     display: flex;
                     align-items: center;
-                    justify-content: space-between;
                     gap: 0.75rem;
-                    margin-top: 1.25rem;
-                    padding-top: 1rem;
-                    border-top: 1px solid var(--border);
+                    flex-wrap: wrap;
                 }
                 .pymtw-adjust-add-btn {
                     display: inline-flex;
@@ -1544,7 +1555,7 @@ const PutYourMoneyToWorkSection = () => {
                     gap: 0.35rem;
                 }
                 .pymtw-adjust-list {
-                    margin-top: 0.9rem;
+                    margin-top: 0.75rem;
                     display: grid;
                     gap: 0.9rem;
                 }
