@@ -31,18 +31,16 @@ const getInsuranceFrequencyInterval = (freq = 'Monthly') => {
 };
 
 /**
- * Full-year premium for allocation / studio protection rows.
+ * Full-year premium for Life Insurance allocation rows that still flow through
+ * the Investments / insurance column (legacy installment vs studio annual).
  *
- * Term & Health (Allocation Studio / applyAllocationPlan) store amount as annual (monthly × 12).
- * Legacy Life Insurance rows store the installment premium; studio-keyed Life rows store annual.
+ * Term & Health are NOT included here — they reduce unallocated surplus like SIP
+ * (studio stores annual monthly×12) so PYMTW deployable surplus is not double-hit
+ * via both netInvestibleSurplus and allocation impact.
  */
 export const getProtectionAllocationAnnual = (alloc = {}) => {
     const amount = parseFloat(alloc.amount) || 0;
     const type = alloc.type;
-
-    if (type === 'Term Insurance' || type === 'Health Insurance') {
-        return amount;
-    }
 
     if ((type === 'Life Insurance' || type === 'Life Insurance Saving Plans') && alloc.studioPlanKey) {
         return amount;
@@ -52,7 +50,7 @@ export const getProtectionAllocationAnnual = (alloc = {}) => {
     return amount * (12 / interval);
 };
 
-/** Premium impact of a protection allocation in a given calendar year (start-year prorated). */
+/** Premium impact of a Life Insurance allocation in a given calendar year (start-year prorated). */
 export const getProtectionAllocationImpactForYear = (alloc = {}, year) => {
     const allocStartYear = parseInt(alloc.startYear, 10);
     const allocStartMonth = Math.min(12, Math.max(1, parseInt(alloc.startMonth, 10) || 1));
@@ -79,9 +77,17 @@ export const getProtectionAllocationImpactForYear = (alloc = {}, year) => {
         return installmentAmount * installmentsThisYear;
     }
 
-    // Annual-storage types: count remaining months in the start year
+    // Studio-keyed Life: annual storage — remaining months in the start year
     return (yearlyAmount / 12) * (13 - allocStartMonth);
 };
+
+/** True when this row belongs in the Investments insurance bucket (not unallocated surplus). */
+const isInsuranceColumnAllocation = (alloc = {}) => alloc.type === 'Life Insurance';
+
+/** Studio Term/Health (annual storage) — deplete unallocated surplus like SIP/PPF. */
+const isSurplusAllocationProtection = (alloc = {}) => (
+    alloc.type === 'Term Insurance' || alloc.type === 'Health Insurance'
+);
 
 const resolveAnnualInflowBases = ({
     income,
@@ -345,11 +351,12 @@ export const generateProjections = ({
             }
         });
 
-        // Add Future Life Insurance from Allocation / Studio — skip when a linked
-        // policy already carries the premium (Detailed Flow write-back exclusivity).
-        // Term/Health (and studio-keyed Life) store annual amounts; legacy Life uses installments.
+        // Life Insurance from Allocation / Studio only — Term/Health reduce unallocated
+        // surplus like SIP (avoids double-counting against PYMTW deployable surplus).
+        // Skip when a linked policy already carries the premium.
         let futureLifeAllocationsThisYear = 0;
         investmentAllocations.forEach(alloc => {
+            if (!isInsuranceColumnAllocation(alloc)) return;
             if (!shouldIncludeStudioInsuranceInProjections(alloc, policies)) return;
             futureLifeAllocationsThisYear += getProtectionAllocationImpactForYear(alloc, year);
         });
@@ -512,9 +519,14 @@ export const generateProjections = ({
             // 2. Calculate Monthly Allocation Deductions
             investmentAllocations.forEach(alloc => {
                 const isRecurring = ['SIP', 'PPF', 'NPS', 'Life Insurance', 'Term Insurance', 'Health Insurance', 'Life Insurance Saving Plans', 'Recurring Deposit'].includes(alloc.type);
-                const isLifeInsurance = ['Life Insurance', 'Term Insurance', 'Health Insurance'].includes(alloc.type);
 
-                if (isLifeInsurance) return; // Handled in savingsAndInvestments already as totalInsuranceOutflow
+                // Life Insurance is in savingsAndInvestments / insurance column already
+                if (isInsuranceColumnAllocation(alloc)) return;
+                // Term/Health linked to a policy premium — counted under detailedLifeThisYear
+                if (isSurplusAllocationProtection(alloc)
+                    && !shouldIncludeStudioInsuranceInProjections(alloc, policies)) {
+                    return;
+                }
 
                 const allocStartYear = parseInt(alloc.startYear);
                 const allocStartMonth = parseInt(alloc.startMonth) || 1;
@@ -566,50 +578,51 @@ export const generateProjections = ({
             const allocDuration = parseInt(alloc.duration) || 1;
             const type = alloc.type;
             const isRecurring = ['SIP', 'PPF', 'NPS', 'Life Insurance', 'Term Insurance', 'Health Insurance', 'Life Insurance Saving Plans', 'Recurring Deposit'].includes(type);
-            
-            // If it's Life Insurance, it's already accounted for in totalInsuranceOutflow
-            // We want it to show up in the Allocation Table, so we will add it to activeAllocations
-            // but we MUST NOT subtract it from unallocatedSurplus (i.e., don't add to yearAllocationsTotal)
-            const isLifeInsurance = ['Life Insurance', 'Term Insurance', 'Health Insurance'].includes(type);
+
+            // Life Insurance stays on the Investments/insurance column — show in activeAllocations
+            // but do not subtract again from unallocatedSurplus.
+            // Term/Health deplete unallocated surplus (annual studio amounts), unless a linked
+            // policy already carries the premium.
+            const inInsuranceColumn = isInsuranceColumnAllocation(alloc);
+            const skipSurplusProtection = isSurplusAllocationProtection(alloc)
+                && !shouldIncludeStudioInsuranceInProjections(alloc, policies);
 
             let yearlyAmount = 0;
             let monthlyAmount = 0;
 
-            if (isLifeInsurance) {
+            if (inInsuranceColumn) {
                 yearlyAmount = getProtectionAllocationAnnual(alloc);
                 monthlyAmount = yearlyAmount / 12;
             } else {
-                // For recurring investments, alloc.amount is the ANNUAL amount (Monthly * 12)
-                // For one-time investments, alloc.amount is the TOTAL amount
+                // Recurring (incl. Term/Health): alloc.amount is ANNUAL (Monthly × 12)
+                // One-time: alloc.amount is the TOTAL amount
                 yearlyAmount = parseFloat(alloc.amount) || 0;
                 monthlyAmount = isRecurring ? (yearlyAmount / 12) : 0;
             }
 
             if (isRecurring) {
-                // If the year is between start and end (within duration)
                 if (year >= allocStartYear && year < (allocStartYear + allocDuration)) {
                     let impactThisYear = yearlyAmount;
-                    
-                    // If it's the starting year, only count from startMonth onwards
+
                     if (year === allocStartYear) {
-                        if (isLifeInsurance) {
+                        if (inInsuranceColumn) {
                             impactThisYear = getProtectionAllocationImpactForYear(alloc, year);
                         } else {
                             impactThisYear = monthlyAmount * (13 - allocStartMonth);
                         }
                     }
-                    
-                    if (!isLifeInsurance) {
+
+                    if (!inInsuranceColumn && !skipSurplusProtection) {
                         yearAllocationsTotal += impactThisYear;
                     }
-                    activeAllocations.push({ ...alloc, impactThisYear });
+                    if (!skipSurplusProtection || inInsuranceColumn) {
+                        activeAllocations.push({ ...alloc, impactThisYear });
+                    }
                 }
             } else {
                 // One-time investments only impact the starting year
                 if (year === allocStartYear) {
-                    if (!isLifeInsurance) {
-                        yearAllocationsTotal += yearlyAmount;
-                    }
+                    yearAllocationsTotal += yearlyAmount;
                     activeAllocations.push({ ...alloc, impactThisYear: yearlyAmount });
                 }
             }

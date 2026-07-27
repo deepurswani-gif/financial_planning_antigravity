@@ -126,8 +126,9 @@ describe('ProjectionLogic', () => {
             ],
         };
         const results = generateProjections(params);
-        // Policy only: 5000 * 12 = 60k (studio row skipped via exclusivity)
+        // Policy only in insurance: 5000 * 12 = 60k; studio Term skipped from yearAllocationsTotal
         expect(results[0].insurancePremium).toBe(60000);
+        expect(results[0].yearAllocationsTotal).toBe(0);
         expect(results[0].unallocatedSurplus).toBe(
             generateProjections({
                 ...params,
@@ -170,7 +171,7 @@ describe('ProjectionLogic', () => {
         expect(results[0].insurancePremium).toBe(36000);
     });
 
-    it('keeps studio term in surplus when linked policy has no premium details yet', () => {
+    it('keeps studio term on unallocated surplus when linked policy has no premium details yet', () => {
         const params = {
             ...mockParams,
             expenseCategories: { ...mockParams.expenseCategories, insurance: { life: {} } },
@@ -198,7 +199,9 @@ describe('ProjectionLogic', () => {
             ],
         };
         const results = generateProjections(params);
-        expect(results[0].insurancePremium).toBe(60000);
+        // Term/Health no longer inflate Investments — they reduce unallocated surplus
+        expect(results[0].insurancePremium).toBe(0);
+        expect(results[0].yearAllocationsTotal).toBe(60000);
     });
 
     it('uses written-back payment term on policy for later projection years', () => {
@@ -240,9 +243,9 @@ describe('ProjectionLogic', () => {
         expect(year2041.insurancePremium).toBe(0);
     });
 
-    it('treats studio Term/Health amounts as annual and prorates from July (no double-count)', () => {
-        // Reproduces: CF life ₹174k + non-life ₹6k + Self policy ₹32k offset
-        // + Studio Term ₹1,500/mo and Health ₹1,000/mo from July (stored annual).
+    it('keeps studio Term/Health out of Investments and on unallocated surplus (annual amounts)', () => {
+        // CF life ₹174k + non-life ₹6k + Self policy ₹32k offset → Investments insurance ₹180k
+        // Studio Term ₹1,500/mo + Health ₹1,000/mo from July → yearAllocationsTotal only
         const params = {
             familyMembers: [
                 { relation: 'Self', name: 'Self', age: 35, retirementAge: 60, dob: '1991-01-01' },
@@ -301,15 +304,19 @@ describe('ProjectionLogic', () => {
             ],
         };
         const results = generateProjections(params);
-        // Non-life 6k + Self policy 32k + unallocated CF life (174k-32k)=142k
-        // + Term Jul–Dec 9k + Health Jul–Dec 6k = 195k
-        expect(results[0].insurancePremium).toBe(195000);
+        expect(results[0].insurancePremium).toBe(180000);
         expect(results[0].savingsBreakdown.sip).toBe(144000);
-        expect(results[0].savingsAndInvestments).toBe(339000);
-        // Without studio, insurance would be 180k → investments 324k
+        expect(results[0].savingsAndInvestments).toBe(324000);
+        // Term Jul–Dec 9k + Health Jul–Dec 6k
+        expect(results[0].yearAllocationsTotal).toBe(15000);
+        expect(results[0].unallocatedSurplus).toBe(results[0].netInvestibleSurplus - 15000);
+
         const withoutStudio = generateProjections({ ...params, investmentAllocations: [] });
         expect(withoutStudio[0].insurancePremium).toBe(180000);
         expect(withoutStudio[0].savingsAndInvestments).toBe(324000);
+        expect(withoutStudio[0].yearAllocationsTotal).toBe(0);
+        // netInvestibleSurplus unchanged by Term/Health (Investments column stable)
+        expect(results[0].netInvestibleSurplus).toBe(withoutStudio[0].netInvestibleSurplus);
     });
 
     it('uses Step 8 tax logic with selfDetail and standard deduction', () => {

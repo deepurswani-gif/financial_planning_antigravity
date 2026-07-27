@@ -38,16 +38,20 @@ export const LANDING_TARGETS = Object.freeze([
   { id: 'expenses.household', control: 'scalar', fieldId: 'expenses.household.monthlyTotal' },
 
   // —— Insurance ——
+  // Land on Life Insurance Premium question (not the policy-details modal).
   {
     id: 'insurance.life',
-    control: 'collection',
+    control: 'question',
     fieldId: 'protection.life.policies',
     collectionFieldId: 'protection.life.policies',
   },
   { id: 'insurance.health', control: 'configure', fieldId: 'protection.health.totalCover' },
-  { id: 'insurance.vehicle', control: 'configure', fieldId: 'protection.vehicle.premiums' },
+  // Land on the vehicle/other insurance question (not Focused Edit).
+  { id: 'insurance.vehicle', control: 'question', fieldId: 'protection.vehicle.premiums' },
 
   // —— Loans (configure the EMI/loan object) ——
+  // Gate question — always present in Money in & out (Yes/No for ongoing EMIs).
+  { id: 'loan.emiGate', control: 'question', fieldId: 'debt.hasEmi' },
   { id: 'loan.home', control: 'configure', fieldId: 'debt.emi.loans' },
   { id: 'loan.personal', control: 'configure', fieldId: 'debt.emi.loans' },
   { id: 'loan.car', control: 'configure', fieldId: 'debt.emi.loans' },
@@ -55,8 +59,10 @@ export const LANDING_TARGETS = Object.freeze([
 
   // —— Investments / recurring savings ——
   { id: 'investment.sip', control: 'scalar', fieldId: 'savings.sip' },
-  { id: 'investment.ppf', control: 'scalar', fieldId: 'savings.ppf' },
-  { id: 'investment.nps', control: 'scalar', fieldId: 'savings.nps' },
+  // PPF/NPS are modal-configured on the savings breakup — land on the question,
+  // never Focused Edit (which cannot host modal editExperience types).
+  { id: 'investment.ppf', control: 'configure', fieldId: 'savings.ppf' },
+  { id: 'investment.nps', control: 'configure', fieldId: 'savings.nps' },
   {
     id: 'investment.rd',
     control: 'collection',
