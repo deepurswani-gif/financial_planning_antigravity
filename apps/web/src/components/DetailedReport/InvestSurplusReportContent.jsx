@@ -111,7 +111,7 @@ const InvestSurplusReportContent = () => {
                 <button
                     type="button"
                     className="btn btn-primary ius-full-planner-btn"
-                    onClick={() => navigateToDetailReport('put_your_money_to_work')}
+                    onClick={() => navigateToDetailReport('fix_your_financial_gaps')}
                 >
                     Full allocation planner
                     <ArrowRight size={18} />

@@ -11,23 +11,27 @@ const RECURRING_ALLOC_TYPES = [
 ];
 
 export function summarizeInvestmentAllocations(allocations = []) {
-    const items = allocations.map((a) => {
-        const rawAmount = parseAmount(a.amount);
-        const isMonthly = RECURRING_ALLOC_TYPES.includes(a.type);
-        // Studio / calculator rows store recurring amounts as annual totals.
-        const monthlyAmount = isMonthly ? rawAmount / 12 : 0;
-        return {
-            id: a.id,
-            type: a.type,
-            name: a.name || a.type,
-            amount: isMonthly ? monthlyAmount : rawAmount,
-            isMonthly,
-            annualImpact: isMonthly ? rawAmount : rawAmount,
-            studioPlanKey: a.studioPlanKey || null,
-            startMonth: a.startMonth || null,
-            startYear: a.startYear || null,
-        };
-    });
+    const items = allocations
+        .map((a) => {
+            const rawAmount = parseAmount(a.amount);
+            const isMonthly = RECURRING_ALLOC_TYPES.includes(a.type);
+            // Studio / calculator rows store recurring amounts as annual totals.
+            const monthlyAmount = isMonthly ? rawAmount / 12 : 0;
+            return {
+                id: a.id,
+                type: a.type,
+                name: a.name || a.type,
+                amount: isMonthly ? monthlyAmount : rawAmount,
+                isMonthly,
+                annualImpact: isMonthly ? rawAmount : rawAmount,
+                studioPlanKey: a.studioPlanKey || null,
+                startMonth: a.startMonth || null,
+                startYear: a.startYear || null,
+            };
+        })
+        // Planned table is for committed/pending amounts only — never show ₹0 placeholders
+        // (e.g. SIP avenue open-by-default must not appear until the user assigns a value).
+        .filter((item) => Math.round(item.amount || 0) > 0);
 
     const monthlyCommitted = items
         .filter((i) => i.isMonthly)

@@ -91,6 +91,7 @@ export const SUMMARY_REPORT_NAV_ITEMS = [
 
 export const DETAIL_REPORT_TAB_ITEMS = [
   { id: 'your_money_flow', label: 'Your Money Flow', stage: 'Understand' },
+  { id: 'fix_your_financial_gaps', label: 'Fix Your Financial Gaps', stage: 'Protection' },
   { id: 'put_your_money_to_work', label: 'Put Your Money To Work', stage: 'Decide' },
   { id: 'your_moneys_magic', label: "Your Money's Magic", stage: 'Grow' },
 ];
