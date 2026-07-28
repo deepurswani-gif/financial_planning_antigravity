@@ -10,6 +10,8 @@ import {
     createEmptyDraftAllocations,
     getAllocationPlanKey,
     getTotalDraftAllocated,
+    PROTECTION_ALLOCATION_TYPES,
+    getPymtwInstrumentCategories,
 } from './putYourMoneyToWorkLogic';
 import {
     analyzeInstrument,
@@ -32,18 +34,30 @@ import GrowthPreviewStrip from './GrowthPreviewStrip';
 import StudioInsightsRail from './StudioInsightsRail';
 import PlannedInvestmentAllocationsPanel from './PlannedInvestmentAllocationsPanel';
 import RecalculatedSurplusPanel from './RecalculatedSurplusPanel';
-import { summarizeInvestmentAllocations } from './investSurplusLogic';
+import SurplusMonthChips from './SurplusMonthChips';
+import AllocationStudioStickyBar from './AllocationStudioStickyBar';
+import { useNavigateToDetailReport } from './reportNavigation';
 import {
     validateDraftPlan,
     buildScenarioComparison,
     buildStudioInsights,
     buildEnhancedBriefingLines,
 } from './allocationStudioValidation';
+import {
+    areDraftsEqual,
+    draftInstrumentTypeFromSummaryItem,
+    getDisplayDraftAllocations,
+    summarizeWithDraftOverlay,
+} from './allocationStudioUiState';
 
 const PPF_ANNUAL_CAP = 150000;
 const PPF_MAX_MONTHLY = 12500;
 const PYMTW_GATE_KEY = '__pymtwGate';
 const parseAmount = (value) => parseFloat(value) || 0;
+
+const GAPS_REPLACE_TYPES = [...PROTECTION_ALLOCATION_TYPES];
+const PYMTW_REPLACE_TYPES = getPymtwInstrumentCategories()
+    .flatMap((c) => c.instruments);
 
 const getPymtwGate = (allocationPlans = {}) => ({
     adjustmentsSaved: Boolean(allocationPlans[PYMTW_GATE_KEY]?.adjustmentsSaved),
@@ -127,7 +141,11 @@ const draftFromStudioAllocations = (investmentAllocations = [], studioPlanKey) =
     return draft;
 };
 
-const PutYourMoneyToWorkSection = () => {
+const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
+    const isGaps = mode === 'gaps';
+    const reportScope = isGaps ? 'gaps' : 'pymtw';
+    const replaceTypes = isGaps ? GAPS_REPLACE_TYPES : PYMTW_REPLACE_TYPES;
+    const navigateToDetailReport = useNavigateToDetailReport();
     const {
         currentYearLedger,
         planStartMonth,
@@ -188,6 +206,13 @@ const PutYourMoneyToWorkSection = () => {
     const [isManualEditing, setIsManualEditing] = useState(false);
     const [applyError, setApplyError] = useState('');
     const [adjustmentSaveMessage, setAdjustmentSaveMessage] = useState('');
+    const [draftHydratedFromApplied, setDraftHydratedFromApplied] = useState(false);
+    const [lastAppliedBundleId, setLastAppliedBundleId] = useState(null);
+    const [saveSuccessMessage, setSaveSuccessMessage] = useState('');
+    const [showReplaceConfirm, setShowReplaceConfirm] = useState(false);
+    const [pendingMonthIndex, setPendingMonthIndex] = useState(null);
+    const [pendingLeaveToAi, setPendingLeaveToAi] = useState(false);
+    const [activeAvenueType, setActiveAvenueType] = useState('SIP');
     const persistedGate = getPymtwGate(allocationPlans);
     const inferredUnlocked = hasUnlockedInvestmentAvenues(allocationPlans, investmentAllocations);
     const adjustmentsSaved = persistedGate.adjustmentsSaved || inferredUnlocked;
@@ -209,6 +234,7 @@ const PutYourMoneyToWorkSection = () => {
             goalMappings,
             goals,
             selectedMonthIndex: effectiveMonth,
+            reportScope,
         }),
         [
             moneyFlowReport,
@@ -224,6 +250,7 @@ const PutYourMoneyToWorkSection = () => {
             goalMappings,
             goals,
             effectiveMonth,
+            reportScope,
         ],
     );
 
@@ -240,23 +267,93 @@ const PutYourMoneyToWorkSection = () => {
             setActiveBundleId(saved.selectedBundleId || null);
             setAppliedPlanKey(null);
             setAvenuesMode(hasItems && !saved.selectedBundleId ? 'manual_edit' : 'choose');
+            setDraftHydratedFromApplied(false);
         } else if (saved?.status === 'applied') {
             setDraftAllocations(createEmptyDraftAllocations());
             setActiveBundleId(saved.selectedBundleId || null);
+            setLastAppliedBundleId(saved.selectedBundleId || null);
             setAppliedPlanKey(planKey);
             setAvenuesMode(saved.selectedBundleId ? 'ai_applied' : 'manual_applied');
+            setDraftHydratedFromApplied(false);
         } else {
             setDraftAllocations(createEmptyDraftAllocations());
             setActiveBundleId(null);
             setAppliedPlanKey(null);
             setAvenuesMode('choose');
+            setDraftHydratedFromApplied(false);
         }
     }, [planKey, allocationPlans, isManualEditing]);
 
-    const handleMonthChange = useCallback((monthIndex) => {
+    const appliedBaseline = useMemo(() => {
+        if (!planKey) return createEmptyDraftAllocations();
+        return draftFromStudioAllocations(investmentAllocations, planKey);
+    }, [investmentAllocations, planKey]);
+
+    const replaceTypeSet = useMemo(() => new Set(replaceTypes), [replaceTypes]);
+
+    const scopedDraftTotal = useCallback((draft) => (
+        replaceTypes.reduce((sum, type) => sum + Math.max(0, parseAmount(draft?.[type])), 0)
+    ), [replaceTypes]);
+
+    const areScopedDraftsEqual = useCallback((a, b) => (
+        replaceTypes.every((type) => Math.round(parseAmount(a?.[type])) === Math.round(parseAmount(b?.[type])))
+    ), [replaceTypes]);
+
+    const hasScopedMonthPlan = useMemo(() => {
+        if (!planKey) return false;
+        return (investmentAllocations || []).some((a) => {
+            if (a.studioPlanKey !== planKey) return false;
+            const type = normalizeAllocType(a.type) || a.type;
+            return replaceTypeSet.has(type);
+        });
+    }, [investmentAllocations, planKey, replaceTypeSet]);
+
+    const hasAppliedMonthPlan = Boolean(
+        planKey
+        && (
+            hasScopedMonthPlan
+            || allocationPlans[planKey]?.status === 'applied'
+            || appliedPlanKey === planKey
+        ),
+    );
+
+    const isEditingMonth = avenuesMode === 'manual_edit';
+    const isDirty = isEditingMonth && !areScopedDraftsEqual(draftAllocations, appliedBaseline);
+    const headerAllocations = getDisplayDraftAllocations({
+        isEditing: isEditingMonth,
+        draftAllocations,
+        baselineAllocations: appliedBaseline,
+    });
+    const stickyTotalAllocation = scopedDraftTotal(headerAllocations);
+    const editingMonthLabel = studio.meta?.hasData
+        ? `Editing ${studio.meta.monthLabel} ${studio.meta.calendarYear}`
+        : '';
+    const saveLabel = hasAppliedMonthPlan && draftHydratedFromApplied ? 'Save Changes' : 'Save Plan';
+    const statusHint = isEditingMonth && !isDirty ? 'No changes to save.' : '';
+
+    const doMonthChange = useCallback((monthIndex) => {
         setIsManualEditing(false);
+        setDraftHydratedFromApplied(false);
+        setShowReplaceConfirm(false);
+        setPendingMonthIndex(null);
+        setPendingLeaveToAi(false);
+        setSaveSuccessMessage('');
+        setApplyError('');
+        setAvenuesMode('choose');
+        setAppliedPlanKey(null);
+        setActiveBundleId(null);
+        setDraftAllocations(createEmptyDraftAllocations());
         setSelectedMonthIndex(monthIndex);
     }, []);
+
+    const handleMonthChange = useCallback((monthIndex) => {
+        if (monthIndex === effectiveMonth) return;
+        if (isDirty) {
+            setPendingMonthIndex(monthIndex);
+            return;
+        }
+        doMonthChange(monthIndex);
+    }, [effectiveMonth, isDirty, doMonthChange]);
 
     const analysisBase = useMemo(() => {
         if (!studio.meta?.hasData) return null;
@@ -281,33 +378,73 @@ const PutYourMoneyToWorkSection = () => {
         familyMembers,
     ]);
 
-    const totalAllocated = getTotalDraftAllocated(draftAllocations);
+    const totalAllocated = scopedDraftTotal(
+        isEditingMonth ? draftAllocations : (hasAppliedMonthPlan ? appliedBaseline : draftAllocations),
+    );
     const editingStudioImpact = useMemo(() => {
         if (!studio.meta?.hasData || !planKey) return 0;
-        if (avenuesMode !== 'manual_edit') return 0;
+        if (avenuesMode !== 'manual_edit' && !hasAppliedMonthPlan && !isGaps) return 0;
+        const monthRows = (investmentAllocations || []).filter((a) => a.studioPlanKey === planKey);
+        const scopedRows = monthRows.filter((a) => {
+            const type = normalizeAllocType(a.type) || a.type;
+            return replaceTypes.includes(type);
+        });
         return computeAllocationImpactForMonth(
-            (investmentAllocations || []).filter((a) => a.studioPlanKey === planKey),
+            scopedRows,
             studio.meta.calendarYear,
             effectiveMonth,
         );
-    }, [avenuesMode, investmentAllocations, planKey, studio.meta, effectiveMonth]);
-    const availableSurplus = (studio.hero?.deployableSurplus || 0) + editingStudioImpact;
+    }, [
+        avenuesMode,
+        hasAppliedMonthPlan,
+        investmentAllocations,
+        planKey,
+        studio.meta,
+        effectiveMonth,
+        replaceTypes,
+        isGaps,
+    ]);
+    // Gaps: Protection claims surplus before FFA — add journey deduction back into the draft ceiling.
+    const availableSurplus = (studio.hero?.deployableSurplus || 0)
+        + editingStudioImpact
+        + (isGaps ? (studio.hero?.journeyMonthDeduction || 0) : 0);
     const remaining = availableSurplus - totalAllocated;
     const ppfMaxByCap = useMemo(
         () => getMonthlyPpfCap(
             expenseCategories,
             investmentAllocations,
-            { ...draftAllocations, PPF: 0 },
+            {
+                ...(isEditingMonth ? draftAllocations : (hasAppliedMonthPlan ? appliedBaseline : draftAllocations)),
+                PPF: 0,
+            },
             planKey,
         ),
-        [expenseCategories, investmentAllocations, draftAllocations, planKey],
+        [
+            expenseCategories,
+            investmentAllocations,
+            draftAllocations,
+            isEditingMonth,
+            hasAppliedMonthPlan,
+            appliedBaseline,
+            planKey,
+        ],
     );
     const maxForInstrument = useCallback((instrumentType) => {
-        const currentDraft = draftAllocations[instrumentType] || 0;
+        const display = isEditingMonth
+            ? draftAllocations
+            : (hasAppliedMonthPlan ? appliedBaseline : draftAllocations);
+        const currentDraft = display[instrumentType] || 0;
         const genericMax = currentDraft + Math.max(0, remaining);
         if (instrumentType !== 'PPF') return genericMax;
         return Math.min(genericMax, Math.max(currentDraft, ppfMaxByCap));
-    }, [draftAllocations, remaining, ppfMaxByCap]);
+    }, [
+        draftAllocations,
+        isEditingMonth,
+        hasAppliedMonthPlan,
+        appliedBaseline,
+        remaining,
+        ppfMaxByCap,
+    ]);
 
     const growthPreview = useMemo(() => {
         if (!analysisBase || !studio.meta?.hasData) return null;
@@ -488,18 +625,70 @@ const PutYourMoneyToWorkSection = () => {
 
     const handleDraftChange = useCallback((instrumentType, amount) => {
         const requested = Math.max(0, Math.round(amount));
-        const rounded = instrumentType === 'PPF'
-            ? Math.min(requested, maxForInstrument('PPF'))
-            : Math.min(requested, maxForInstrument(instrumentType));
-        const next = { ...draftAllocations, [instrumentType]: rounded };
+        const leavingAppliedView = avenuesMode !== 'manual_edit' && hasAppliedMonthPlan;
+        const base = leavingAppliedView ? appliedBaseline : draftAllocations;
+
+        let maxAllowed;
+        if (leavingAppliedView) {
+            const monthRows = (investmentAllocations || []).filter((a) => a.studioPlanKey === planKey);
+            const scopedRows = monthRows.filter((a) => {
+                const type = normalizeAllocType(a.type) || a.type;
+                return replaceTypes.includes(type);
+            });
+            const impact = computeAllocationImpactForMonth(
+                scopedRows,
+                studio.meta?.calendarYear,
+                effectiveMonth,
+            );
+            const avail = (studio.hero?.deployableSurplus || 0)
+                + impact
+                + (isGaps ? (studio.hero?.journeyMonthDeduction || 0) : 0);
+            const others = scopedDraftTotal(base) - (base[instrumentType] || 0);
+            maxAllowed = Math.max(base[instrumentType] || 0, avail - others);
+            if (instrumentType === 'PPF') {
+                maxAllowed = Math.min(
+                    maxAllowed,
+                    Math.max(
+                        base.PPF || 0,
+                        getMonthlyPpfCap(expenseCategories, investmentAllocations, { ...base, PPF: 0 }, planKey),
+                    ),
+                );
+            }
+        } else {
+            maxAllowed = maxForInstrument(instrumentType);
+        }
+
+        const rounded = Math.min(requested, Math.max(0, maxAllowed));
+        const next = { ...base, [instrumentType]: rounded };
         setDraftAllocations(next);
         setActiveBundleId(null);
         setAppliedPlanKey(null);
         setAvenuesMode('manual_edit');
         setIsManualEditing(true);
         setApplyError('');
+        setSaveSuccessMessage('');
+        if (leavingAppliedView) {
+            setDraftHydratedFromApplied(true);
+        } else if (avenuesMode !== 'manual_edit') {
+            setDraftHydratedFromApplied(false);
+        }
         persistDraft(next, null);
-    }, [draftAllocations, persistDraft, maxForInstrument]);
+    }, [
+        draftAllocations,
+        persistDraft,
+        avenuesMode,
+        hasAppliedMonthPlan,
+        appliedBaseline,
+        investmentAllocations,
+        planKey,
+        studio,
+        effectiveMonth,
+        expenseCategories,
+        maxForInstrument,
+        replaceTypes,
+        scopedDraftTotal,
+        isGaps,
+    ]);
 
     const commitAppliedPlan = useCallback((allocations, bundleId) => {
         if (!planKey || !studio.meta?.hasData) return false;
@@ -535,6 +724,8 @@ const PutYourMoneyToWorkSection = () => {
             draftAllocations: allocations,
             calendarYear: studio.meta.calendarYear,
             monthIndex: effectiveMonth,
+            // Full AI bundle replaces the whole month; manual/scoped saves merge by report.
+            replaceTypes: bundleId ? null : replaceTypes,
         });
         setInvestmentAllocations(updatedAllocations);
 
@@ -555,9 +746,15 @@ const PutYourMoneyToWorkSection = () => {
         setAllocationPlans({ ...allocationPlans, [planKey]: applied });
         setDraftAllocations(createEmptyDraftAllocations());
         setActiveBundleId(bundleId);
+        setLastAppliedBundleId(bundleId);
         setAppliedPlanKey(planKey);
         setAvenuesMode(bundleId ? 'ai_applied' : 'manual_applied');
         setIsManualEditing(false);
+        setDraftHydratedFromApplied(false);
+        setShowReplaceConfirm(false);
+        setSaveSuccessMessage(
+            `✓ ${studio.meta.monthLabel} allocation plan updated successfully.`,
+        );
         return true;
     }, [
         planKey,
@@ -572,6 +769,7 @@ const PutYourMoneyToWorkSection = () => {
         allocationPlans,
         setAllocationPlans,
         availableSurplus,
+        replaceTypes,
     ]);
 
     const handleApplyAiRecommendations = useCallback(() => {
@@ -591,21 +789,162 @@ const PutYourMoneyToWorkSection = () => {
     }, [recommendedBundles, ppfMaxByCap, commitAppliedPlan, persistDraft]);
 
     const handleStartManualAllocation = useCallback(() => {
+        if (isGaps) {
+            navigateToDetailReport('put_your_money_to_work');
+            return;
+        }
         setDraftAllocations(createEmptyDraftAllocations());
         setActiveBundleId(null);
         setAppliedPlanKey(null);
         setAvenuesMode('manual_edit');
         setIsManualEditing(true);
         setApplyError('');
-    }, []);
+        setDraftHydratedFromApplied(false);
+        setSaveSuccessMessage('');
+        setShowReplaceConfirm(false);
+    }, [isGaps, navigateToDetailReport]);
+
+    // Gaps: keep Protection studio in edit mode so sliders/save work without AI gate.
+    useEffect(() => {
+        if (!isGaps || !studio.meta?.hasData) return;
+        if (avenuesMode === 'choose') {
+            setAvenuesMode('manual_edit');
+            setIsManualEditing(true);
+        }
+    }, [isGaps, studio.meta?.hasData, avenuesMode]);
+
+    const performSavePlan = useCallback(() => {
+        const ok = commitAppliedPlan(draftAllocations, null);
+        if (ok && pendingMonthIndex != null) {
+            const nextMonth = pendingMonthIndex;
+            setPendingMonthIndex(null);
+            doMonthChange(nextMonth);
+        }
+        return ok;
+    }, [commitAppliedPlan, draftAllocations, pendingMonthIndex, doMonthChange]);
 
     const handleApplyManualAllocations = useCallback(() => {
-        commitAppliedPlan(draftAllocations, null);
-    }, [commitAppliedPlan, draftAllocations]);
+        if (!isDirty) return;
+        if (hasAppliedMonthPlan && !draftHydratedFromApplied) {
+            setShowReplaceConfirm(true);
+            return;
+        }
+        performSavePlan();
+    }, [
+        isDirty,
+        hasAppliedMonthPlan,
+        draftHydratedFromApplied,
+        performSavePlan,
+    ]);
+
+    const handleConfirmReplacePlan = useCallback(() => {
+        performSavePlan();
+    }, [performSavePlan]);
+
+    const handleDiscardChanges = useCallback(() => {
+        if (!planKey || !studio.meta?.hasData) return;
+
+        setApplyError('');
+        setSaveSuccessMessage('');
+        setShowReplaceConfirm(false);
+
+        const hasCommittedRows = (investmentAllocations || []).some(
+            (a) => a.studioPlanKey === planKey,
+        );
+
+        if (hasCommittedRows) {
+            const baseline = draftFromStudioAllocations(investmentAllocations, planKey);
+            const bundleId = lastAppliedBundleId;
+            const restored = {
+                ...buildDraftAllocationPlan({
+                    planKey,
+                    deployableSurplus: studio.hero?.deployableSurplus || 0,
+                    draftAllocations: baseline,
+                    selectedBundleId: bundleId,
+                    calendarYear: studio.meta.calendarYear,
+                    monthIndex: effectiveMonth,
+                    monthLabel: studio.meta.monthLabel,
+                    growthPreview: analysisBase
+                        ? buildGrowthPreview({
+                            ...analysisBase,
+                            draftAllocations: baseline,
+                            monthIndex: effectiveMonth,
+                        })
+                        : null,
+                }),
+                status: 'applied',
+            };
+            setAllocationPlans({ ...allocationPlans, [planKey]: restored });
+            setDraftAllocations(createEmptyDraftAllocations());
+            setActiveBundleId(bundleId);
+            setAppliedPlanKey(planKey);
+            setAvenuesMode(bundleId ? 'ai_applied' : 'manual_applied');
+            setIsManualEditing(false);
+            setDraftHydratedFromApplied(false);
+            return;
+        }
+
+        const nextPlans = { ...allocationPlans };
+        if (nextPlans[planKey]?.status === 'draft') {
+            delete nextPlans[planKey];
+            setAllocationPlans(nextPlans);
+        }
+        setDraftAllocations(createEmptyDraftAllocations());
+        setActiveBundleId(null);
+        setAppliedPlanKey(null);
+        setAvenuesMode('choose');
+        setIsManualEditing(false);
+        setDraftHydratedFromApplied(false);
+    }, [
+        planKey,
+        studio,
+        investmentAllocations,
+        lastAppliedBundleId,
+        effectiveMonth,
+        analysisBase,
+        allocationPlans,
+        setAllocationPlans,
+    ]);
+
+    const handleMonthSwitchStay = useCallback(() => {
+        setPendingMonthIndex(null);
+    }, []);
+
+    const handleMonthSwitchDiscard = useCallback(() => {
+        const nextMonth = pendingMonthIndex;
+        handleDiscardChanges();
+        if (nextMonth != null) doMonthChange(nextMonth);
+    }, [pendingMonthIndex, handleDiscardChanges, doMonthChange]);
+
+    const handleMonthSwitchSave = useCallback(() => {
+        if (hasAppliedMonthPlan && !draftHydratedFromApplied) {
+            setShowReplaceConfirm(true);
+            return;
+        }
+        performSavePlan();
+    }, [
+        hasAppliedMonthPlan,
+        draftHydratedFromApplied,
+        performSavePlan,
+    ]);
 
     const allocationsSummary = useMemo(
-        () => summarizeInvestmentAllocations(investmentAllocations),
-        [investmentAllocations],
+        () => summarizeWithDraftOverlay({
+            investmentAllocations,
+            draftAllocations,
+            planKey,
+            calendarYear: studio.meta?.calendarYear,
+            monthIndex: effectiveMonth,
+            showDraft: isEditingMonth,
+        }),
+        [
+            investmentAllocations,
+            draftAllocations,
+            planKey,
+            studio.meta?.calendarYear,
+            effectiveMonth,
+            isEditingMonth,
+        ],
     );
 
     const hasMonthPlan = Boolean(
@@ -624,11 +963,17 @@ const PutYourMoneyToWorkSection = () => {
         setAvenuesMode('choose');
         setIsManualEditing(false);
         setApplyError('');
+        setDraftHydratedFromApplied(false);
+        setShowReplaceConfirm(false);
+        setSaveSuccessMessage('');
+        setPendingMonthIndex(null);
+        setPendingLeaveToAi(false);
     }, []);
 
-    const handleClearMonthPlan = useCallback((planKeyOverride) => {
+    const handleClearMonthPlan = useCallback((planKeyOverride, { force = false } = {}) => {
         const targetKey = planKeyOverride || planKey;
         if (!targetKey || !studio.meta?.hasData) return;
+        if (!force && isDirty && targetKey === planKey) return;
 
         const [yearStr, monthStr] = String(targetKey).split('-');
         const calendarYear = parseInt(yearStr, 10);
@@ -639,11 +984,16 @@ const PutYourMoneyToWorkSection = () => {
             investmentAllocations,
             calendarYear,
             monthIndex,
+            clearTypes: replaceTypes,
         });
         setInvestmentAllocations(nextAllocations);
 
         const nextPlans = { ...allocationPlans };
-        delete nextPlans[targetKey];
+        // Keep plan meta if other scope still has rows for this month
+        const stillHasPlan = nextAllocations.some((a) => a.studioPlanKey === targetKey);
+        if (!stillHasPlan) {
+            delete nextPlans[targetKey];
+        }
         setAllocationPlans(pruneAllocationPlansForAllocations(nextPlans, nextAllocations));
 
         if (targetKey === planKey) {
@@ -657,6 +1007,8 @@ const PutYourMoneyToWorkSection = () => {
         allocationPlans,
         setAllocationPlans,
         resetLocalDraftState,
+        isDirty,
+        replaceTypes,
     ]);
 
     const handleEditMonthPlan = useCallback((planKeyOverride) => {
@@ -667,6 +1019,15 @@ const PutYourMoneyToWorkSection = () => {
         const calendarYear = parseInt(yearStr, 10);
         const monthIndex = parseInt(monthStr, 10);
         if (!Number.isFinite(calendarYear) || !Number.isFinite(monthIndex)) return;
+
+        if (isDirty && monthIndex !== effectiveMonth) {
+            setPendingMonthIndex(monthIndex);
+            return;
+        }
+
+        const priorBundleId = allocationPlans[targetKey]?.selectedBundleId
+            || (targetKey === planKey ? lastAppliedBundleId : null);
+        if (priorBundleId) setLastAppliedBundleId(priorBundleId);
 
         const nextDraft = draftFromStudioAllocations(investmentAllocations, targetKey);
 
@@ -708,7 +1069,10 @@ const PutYourMoneyToWorkSection = () => {
         setAppliedPlanKey(null);
         setAvenuesMode('manual_edit');
         setIsManualEditing(true);
+        setDraftHydratedFromApplied(true);
         setApplyError('');
+        setSaveSuccessMessage('');
+        setShowReplaceConfirm(false);
 
         requestAnimationFrame(() => {
             document.getElementById('pymtw-allocate-surplus')?.scrollIntoView({
@@ -723,9 +1087,16 @@ const PutYourMoneyToWorkSection = () => {
         investmentAllocations,
         setAllocationPlans,
         analysisBase,
+        isDirty,
+        effectiveMonth,
+        lastAppliedBundleId,
     ]);
 
     const handleBackToAiRecommendations = useCallback(() => {
+        if (isDirty) {
+            setPendingLeaveToAi(true);
+            return;
+        }
         // Prefer a soft return when nothing was applied yet (manual edit only).
         if (avenuesMode === 'manual_edit' && !hasMonthPlan) {
             if (planKey && allocationPlans[planKey]?.status === 'draft') {
@@ -738,6 +1109,7 @@ const PutYourMoneyToWorkSection = () => {
         }
         handleClearMonthPlan(planKey);
     }, [
+        isDirty,
         avenuesMode,
         hasMonthPlan,
         planKey,
@@ -747,34 +1119,60 @@ const PutYourMoneyToWorkSection = () => {
         handleClearMonthPlan,
     ]);
 
-    const handleRemoveAllocation = useCallback((id) => {
-        const removed = investmentAllocations.find((a) => a.id === id);
-        const nextAllocations = removeInvestmentAllocationById(investmentAllocations, id);
+    const handleLeaveStay = useCallback(() => {
+        setPendingLeaveToAi(false);
+        setPendingMonthIndex(null);
+    }, []);
+
+    const handleLeaveDiscardAndGo = useCallback(() => {
+        handleDiscardChanges();
+        setPendingLeaveToAi(false);
+        handleClearMonthPlan(planKey, { force: true });
+    }, [handleDiscardChanges, handleClearMonthPlan, planKey]);
+
+    const handleRemoveAllocation = useCallback((item) => {
+        if (!item) return;
+
+        const itemPlanKey = item.studioPlanKey || null;
+        const type = draftInstrumentTypeFromSummaryItem(item);
+
+        // Current month (pending draft or committed studio rows) → draft-only until Save.
+        if (item.pending || (itemPlanKey && itemPlanKey === planKey)) {
+            const base = isEditingMonth
+                ? draftAllocations
+                : draftFromStudioAllocations(investmentAllocations, planKey);
+            if (!isEditingMonth) {
+                setDraftHydratedFromApplied(true);
+                const priorBundle = allocationPlans[planKey]?.selectedBundleId || lastAppliedBundleId;
+                if (priorBundle) setLastAppliedBundleId(priorBundle);
+            }
+            const next = { ...base, [type]: 0 };
+            setDraftAllocations(next);
+            setActiveBundleId(null);
+            setAppliedPlanKey(null);
+            setAvenuesMode('manual_edit');
+            setIsManualEditing(true);
+            setApplyError('');
+            setSaveSuccessMessage('');
+            persistDraft(next, null);
+            return;
+        }
+
+        // Non-current-month committed rows: keep immediate remove (not in this edit session).
+        if (item.id == null || String(item.id).startsWith('draft-')) return;
+        const nextAllocations = removeInvestmentAllocationById(investmentAllocations, item.id);
         setInvestmentAllocations(nextAllocations);
         setAllocationPlans(pruneAllocationPlansForAllocations(allocationPlans, nextAllocations));
-
-        if (removed?.studioPlanKey) {
-            const removedType = normalizeAllocType(removed.type) || removed.type;
-            if (removed.studioPlanKey === planKey) {
-                setDraftAllocations((prev) => ({
-                    ...prev,
-                    [removedType]: 0,
-                }));
-                setIsManualEditing(true);
-                setAvenuesMode('manual_edit');
-            }
-            const stillHasMonth = nextAllocations.some((a) => a.studioPlanKey === removed.studioPlanKey);
-            if (!stillHasMonth && removed.studioPlanKey === planKey) {
-                resetLocalDraftState();
-            }
-        }
     }, [
-        investmentAllocations,
-        setInvestmentAllocations,
-        allocationPlans,
-        setAllocationPlans,
         planKey,
-        resetLocalDraftState,
+        isEditingMonth,
+        draftAllocations,
+        investmentAllocations,
+        allocationPlans,
+        lastAppliedBundleId,
+        persistDraft,
+        setInvestmentAllocations,
+        setAllocationPlans,
     ]);
 
     const handleJourneyAdjustmentsChange = useCallback((updater) => {
@@ -795,6 +1193,14 @@ const PutYourMoneyToWorkSection = () => {
         setAdjustmentSaveMessage('Future financial adjustments saved. You can now proceed.');
     }, [setAllocationPlans]);
 
+    const handleSkipAdjustments = useCallback(() => {
+        setAllocationPlans((prev) => withPymtwGate(prev, {
+            adjustmentsSaved: true,
+            showInvestmentAvenues: Boolean(prev?.[PYMTW_GATE_KEY]?.showInvestmentAvenues),
+        }));
+        setAdjustmentSaveMessage('No future adjustments. You can now proceed.');
+    }, [setAllocationPlans]);
+
     const handleProceedToInvestmentAvenues = useCallback(() => {
         setAllocationPlans((prev) => withPymtwGate(prev, {
             adjustmentsSaved: true,
@@ -811,91 +1217,326 @@ const PutYourMoneyToWorkSection = () => {
     if (!studio.meta?.hasData) {
         return (
             <div className="pymtw-section card pymtw-empty-state">
-                <h2>Put Your Money to Work</h2>
+                <h2>{isGaps ? 'Fix Your Financial Gaps' : 'Put Your Money to Work'}</h2>
                 <p className="text-muted">
-                    Complete Your Money Flow first to unlock the allocation studio.
+                    Complete Your Money Flow first to unlock this report.
                 </p>
             </div>
         );
     }
 
-    return (
-        <div className="pymtw-section">
-            <AllocationStudioHero hero={studio.hero} />
-
-            <div className="card pymtw-guidance-card">
-                <p>
-                    Planning any expense or loan in the next 3 months? Add it here first, and I&apos;ll
-                    recalculate your investible surplus for your goals.
-                </p>
+    const monthSwitchConfirm = (pendingMonthIndex != null || pendingLeaveToAi) ? (
+        <div className="pymtw-confirm-panel" role="alertdialog" aria-labelledby="pymtw-leave-title">
+            <p id="pymtw-leave-title" className="pymtw-confirm-title">
+                {pendingLeaveToAi
+                    ? 'You have unsaved changes.'
+                    : `You have unsaved changes for ${studio.meta.monthLabel}.`}
+            </p>
+            <p className="pymtw-confirm-body">
+                {pendingLeaveToAi
+                    ? 'Discard changes before returning to AI recommendations, or stay and keep editing.'
+                    : 'Save, discard, or stay on the current month. Your draft will not be lost silently.'}
+            </p>
+            <div className="pymtw-confirm-actions">
+                {!pendingLeaveToAi && (
+                    <button type="button" className="btn btn-primary" onClick={handleMonthSwitchSave}>
+                        Save Changes
+                    </button>
+                )}
+                <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={pendingLeaveToAi ? handleLeaveDiscardAndGo : handleMonthSwitchDiscard}
+                >
+                    Discard Changes
+                </button>
+                <button type="button" className="btn btn-secondary" onClick={handleLeaveStay}>
+                    Stay on Current Month
+                </button>
             </div>
+        </div>
+    ) : null;
 
-            <JourneyConstraintsRail
-                journeyConstraints={studio.journeyConstraints}
-                journeyAdjustments={journeyAdjustments}
-                setJourneyAdjustments={handleJourneyAdjustmentsChange}
-                defaultStartMonthIndex={effectiveMonth}
-                defaultCalendarYear={studio.meta.calendarYear}
-                selectableMonths={studio.selectableMonths}
-                unallocatedSurplusByMonth={moneyFlowReport?.ledger?.unallocatedSurplus || []}
-                onSaveAdjustments={handleSaveAdjustments}
-                adjustmentsSaved={adjustmentsSaved}
-                saveMessage={adjustmentSaveMessage}
-            />
+    const replaceConfirm = showReplaceConfirm ? (
+        <div className="pymtw-confirm-panel" role="alertdialog" aria-labelledby="pymtw-replace-title">
+            <p id="pymtw-replace-title" className="pymtw-confirm-title">
+                This month already has an allocation plan.
+            </p>
+            <p className="pymtw-confirm-body">
+                Saving now will replace the existing month&apos;s allocations.
+            </p>
+            <div className="pymtw-confirm-actions">
+                <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setShowReplaceConfirm(false)}
+                >
+                    Cancel
+                </button>
+                <button type="button" className="btn btn-primary" onClick={handleConfirmReplacePlan}>
+                    Replace Plan
+                </button>
+            </div>
+        </div>
+    ) : null;
 
-            {adjustmentsSaved && (
-                <RecalculatedSurplusPanel
-                    outlook={studio.hero.journeyAdjustedOutlook}
-                    onProceed={handleProceedToInvestmentAvenues}
-                />
-            )}
+    const pymtwAvenueInstruments = studio.instrumentCategories.flatMap((category) => (
+        category.instruments.map((instrument) => ({
+            ...instrument,
+            categoryId: category.id,
+            categoryLabel: category.label,
+            displayName: category.instrumentLabels?.[instrument.type] || instrument.type,
+            note: category.instrumentNotes?.[instrument.type],
+        }))
+    ));
+    const activeAvenue = pymtwAvenueInstruments.find((i) => i.type === activeAvenueType)
+        || pymtwAvenueInstruments[0];
 
-            {!adjustmentsSaved && (
-                <div className="pymtw-proceed-hint">
-                    Save future financial adjustments to unlock investment avenues.
-                </div>
-            )}
-
-            {showInvestmentAvenues && (
+    return (
+        <div className={`pymtw-section ${isGaps ? 'fyfg-section' : ''}`}>
+            {isGaps ? (
                 <>
-                    <RecommendedBundles
-                        bundles={recommendedBundles}
-                        deployableSurplus={studio.hero.deployableSurplus}
-                        engineResult={engineResult}
-                        avenuesMode={avenuesMode}
-                        onApplyAiRecommendations={handleApplyAiRecommendations}
-                        onStartManualAllocation={handleStartManualAllocation}
-                        onBackToAiRecommendations={handleBackToAiRecommendations}
-                        canApplyAi={Boolean(recommendedBundles[0]) && studio.hero.deployableSurplus > 0}
-                    />
-
-                    <div id="pymtw-allocate-surplus">
-                        <InstrumentCardGrid
-                            instrumentCategories={studio.instrumentCategories}
-                            draftAllocations={draftAllocations}
-                            remainingSurplus={remaining}
-                            getMaxAmountForInstrument={maxForInstrument}
-                            onDraftChange={handleDraftChange}
-                            onApplyManualAllocations={handleApplyManualAllocations}
-                            canApplyManual={validation.canApply}
-                            applyError={applyError}
-                            selectableMonths={studio.selectableMonths}
-                            selectedMonthIndex={effectiveMonth}
-                            onMonthChange={handleMonthChange}
-                            calendarYear={studio.meta.calendarYear}
-                        />
+                    <div className="card fyfg-hero">
+                        <h2 className="fyfg-hero-title">Secure your financial foundation before you invest.</h2>
+                        <p className="fyfg-hero-message">
+                            Fill gaps in your Life Insurance, Health Insurance, and Emergency Fund, and add any
+                            planned expenses or loans for the next 3 months. I&apos;ll automatically recalculate
+                            the surplus available for your long-term goals.
+                        </p>
                     </div>
 
-                    {(avenuesMode === 'ai_applied' || avenuesMode === 'manual_applied') && (
-                        <GrowthPreviewStrip growthPreview={appliedGrowthPreview || growthPreview} />
+                    <div className="card fyfg-month-select">
+                        <h3 className="pymtw-zone-title">Select Month</h3>
+                        <p className="pymtw-zone-sub">Unallocated surplus available this month (before Protection and adjustments).</p>
+                        <SurplusMonthChips
+                            months={studio.selectableMonths}
+                            outlook={studio.hero.threeMonthOutlook}
+                            selectedMonthIndex={effectiveMonth}
+                            onSelect={handleMonthChange}
+                            amountKey="ledger"
+                        />
+                        {monthSwitchConfirm}
+                        {replaceConfirm}
+                    </div>
+
+                    <InstrumentCardGrid
+                        instrumentCategories={studio.instrumentCategories}
+                        draftAllocations={
+                            isEditingMonth
+                                ? draftAllocations
+                                : (hasAppliedMonthPlan ? appliedBaseline : draftAllocations)
+                        }
+                        headerAllocations={headerAllocations}
+                        baselineAllocations={appliedBaseline}
+                        remainingSurplus={remaining}
+                        getMaxAmountForInstrument={maxForInstrument}
+                        onDraftChange={handleDraftChange}
+                        onApplyManualAllocations={handleApplyManualAllocations}
+                        canApplyManual={validation.canApply}
+                        applyError={applyError}
+                        selectableMonths={studio.selectableMonths}
+                        selectedMonthIndex={effectiveMonth}
+                        onMonthChange={handleMonthChange}
+                        calendarYear={studio.meta.calendarYear}
+                        isDirty={isDirty}
+                        showStickyBar
+                        showMonthPicker={false}
+                        editingMonthLabel={editingMonthLabel}
+                        totalMonthlyAllocation={stickyTotalAllocation}
+                        saveLabel={saveLabel}
+                        statusHint={statusHint}
+                        saveSuccessMessage={saveSuccessMessage}
+                        onDiscardChanges={handleDiscardChanges}
+                        showUnsavedBanner={isDirty}
+                        monthSwitchConfirm={null}
+                        replaceConfirm={null}
+                    />
+
+                    <JourneyConstraintsRail
+                        journeyConstraints={studio.journeyConstraints}
+                        journeyAdjustments={journeyAdjustments}
+                        setJourneyAdjustments={handleJourneyAdjustmentsChange}
+                        defaultStartMonthIndex={studio.selectableMonths?.[0]?.monthIndex
+                            ?? studio.meta.currentMonth
+                            ?? 0}
+                        defaultCalendarYear={studio.meta.calendarYear}
+                        selectableMonths={studio.selectableMonths}
+                        unallocatedSurplusByMonth={moneyFlowReport?.ledger?.unallocatedSurplus || []}
+                        investmentAllocations={investmentAllocations}
+                        planStartMonth={studio.meta.planStartMonth ?? 0}
+                        onSaveAdjustments={handleSaveAdjustments}
+                        onSkipAdjustments={handleSkipAdjustments}
+                        adjustmentsSaved={adjustmentsSaved}
+                        saveMessage={adjustmentSaveMessage}
+                    />
+
+                    {adjustmentsSaved && (
+                        <RecalculatedSurplusPanel
+                            outlook={studio.hero.journeyAdjustedOutlook}
+                            onProceed={handleProceedToInvestmentAvenues}
+                            proceedLabel="Show recommended surplus allocation"
+                        />
                     )}
+
+                    {!adjustmentsSaved && (
+                        <div className="pymtw-proceed-hint">
+                            Save adjustments or choose No Future Adjustments to unlock recommendations.
+                        </div>
+                    )}
+
+                    {showInvestmentAvenues && (
+                        <RecommendedBundles
+                            bundles={recommendedBundles}
+                            deployableSurplus={studio.hero.deployableSurplus}
+                            engineResult={engineResult}
+                            avenuesMode={avenuesMode === 'manual_edit' ? 'choose' : avenuesMode}
+                            onApplyAiRecommendations={handleApplyAiRecommendations}
+                            onStartManualAllocation={handleStartManualAllocation}
+                            onBackToAiRecommendations={handleBackToAiRecommendations}
+                            canApplyAi={Boolean(recommendedBundles[0]) && studio.hero.deployableSurplus > 0}
+                        />
+                    )}
+                </>
+            ) : (
+                <>
+                    <div className="card pymtw-available-surplus">
+                        <h3 className="pymtw-zone-title">Available Surplus for Investment</h3>
+                        <p className="pymtw-zone-sub">
+                            Remaining after Protection and future financial adjustments.
+                        </p>
+                        <SurplusMonthChips
+                            months={studio.selectableMonths}
+                            outlook={studio.hero.journeyAdjustedOutlook}
+                            selectedMonthIndex={effectiveMonth}
+                            onSelect={handleMonthChange}
+                            amountKey="deployable"
+                        />
+                        {monthSwitchConfirm}
+                        {replaceConfirm}
+                    </div>
+
+                    <div className="card pymtw-avenue-picker">
+                        <h3 className="pymtw-zone-title">Investment avenues</h3>
+                        <p className="pymtw-zone-sub">Select an avenue to set the amount. SIP opens by default.</p>
+                        {studio.instrumentCategories.map((category) => (
+                            <div key={category.id} className="pymtw-avenue-group">
+                                <h4 className="pymtw-avenue-group-label">{category.label}</h4>
+                                <div className="pymtw-avenue-chip-row">
+                                    {category.instruments.map((instrument) => {
+                                        const label = category.instrumentLabels?.[instrument.type] || instrument.type;
+                                        const selected = activeAvenueType === instrument.type;
+                                        return (
+                                            <button
+                                                key={instrument.type}
+                                                type="button"
+                                                className={`pymtw-avenue-chip ${selected ? 'pymtw-avenue-chip-selected' : ''}`}
+                                                onClick={() => {
+                                                    setActiveAvenueType(instrument.type);
+                                                    if (avenuesMode === 'choose') {
+                                                        setDraftAllocations({ ...appliedBaseline });
+                                                        setAvenuesMode('manual_edit');
+                                                        setIsManualEditing(true);
+                                                        setDraftHydratedFromApplied(hasAppliedMonthPlan);
+                                                    }
+                                                }}
+                                            >
+                                                {label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {isDirty && (
+                        <div className="pymtw-unsaved-banner" role="status">
+                            You have unsaved changes. Save Plan to update your monthly allocation.
+                        </div>
+                    )}
+
+                    <div className="pymtw-allocate-split card">
+                        <div className="pymtw-allocate-split-left">
+                            <AllocationStudioStickyBar
+                                editingMonthLabel={editingMonthLabel}
+                                remainingSurplus={remaining}
+                                totalMonthlyAllocation={stickyTotalAllocation}
+                                isDirty={isDirty}
+                                canSave={validation.canApply && isDirty}
+                                saveLabel={saveLabel}
+                                statusHint={statusHint}
+                                applyError={applyError}
+                                saveSuccessMessage={saveSuccessMessage}
+                                onDiscard={handleDiscardChanges}
+                                onSave={handleApplyManualAllocations}
+                            />
+                        </div>
+                        <div className="pymtw-allocate-split-right">
+                            {activeAvenue && (
+                                <InstrumentCardGrid
+                                    instrumentCategories={[{
+                                        ...studio.instrumentCategories.find((c) => c.id === activeAvenue.categoryId),
+                                        instruments: [activeAvenue],
+                                    }].filter((c) => c?.id)}
+                                    draftAllocations={
+                                        isEditingMonth
+                                            ? draftAllocations
+                                            : (hasAppliedMonthPlan ? appliedBaseline : draftAllocations)
+                                    }
+                                    headerAllocations={headerAllocations}
+                                    baselineAllocations={appliedBaseline}
+                                    remainingSurplus={remaining}
+                                    getMaxAmountForInstrument={maxForInstrument}
+                                    onDraftChange={(type, amount) => {
+                                        const current = Math.round(
+                                            (isEditingMonth
+                                                ? draftAllocations[type]
+                                                : (hasAppliedMonthPlan ? appliedBaseline[type] : draftAllocations[type])
+                                            ) || 0,
+                                        );
+                                        if (Math.round(amount || 0) === current) return;
+                                        if (avenuesMode !== 'manual_edit') {
+                                            setAvenuesMode('manual_edit');
+                                            setIsManualEditing(true);
+                                        }
+                                        handleDraftChange(type, amount);
+                                    }}
+                                    onApplyManualAllocations={handleApplyManualAllocations}
+                                    canApplyManual={validation.canApply}
+                                    applyError=""
+                                    selectableMonths={studio.selectableMonths}
+                                    selectedMonthIndex={effectiveMonth}
+                                    onMonthChange={handleMonthChange}
+                                    calendarYear={studio.meta.calendarYear}
+                                    isDirty={isDirty}
+                                    showStickyBar={false}
+                                    showMonthPicker={false}
+                                    editingMonthLabel={editingMonthLabel}
+                                    totalMonthlyAllocation={stickyTotalAllocation}
+                                    saveLabel={saveLabel}
+                                    statusHint={statusHint}
+                                    saveSuccessMessage=""
+                                    onDiscardChanges={handleDiscardChanges}
+                                    showUnsavedBanner={false}
+                                />
+                            )}
+                        </div>
+                    </div>
 
                     <PlannedInvestmentAllocationsPanel
                         allocationsSummary={allocationsSummary}
                         onRemove={handleRemoveAllocation}
                         onEditMonthPlan={handleEditMonthPlan}
                         onClearMonthPlan={handleClearMonthPlan}
+                        clearDisabled={isDirty}
+                        clearDisabledReason="Save or discard changes before clearing this month plan."
                     />
+
+                    <AllocationStudioHero hero={studio.hero} />
+
+                    {(avenuesMode === 'ai_applied' || avenuesMode === 'manual_applied' || hasAppliedMonthPlan) && (
+                        <GrowthPreviewStrip growthPreview={appliedGrowthPreview || growthPreview} />
+                    )}
 
                     <div className="card pymtw-analysis-summary">
                         <h3 className="pymtw-zone-title">{studio.briefing?.headline || 'Allocation Studio analysis'}</h3>
@@ -924,6 +1565,48 @@ const PutYourMoneyToWorkSection = () => {
             />
 
             <style>{`
+                .fyfg-hero { padding: 1.5rem 1.25rem; background: linear-gradient(135deg, rgba(15,118,110,0.08), rgba(15,118,110,0.02)); }
+                .fyfg-hero-title { margin: 0 0 0.75rem; font-size: 1.45rem; line-height: 1.3; color: var(--text-main); }
+                .fyfg-hero-message { margin: 0; line-height: 1.55; color: var(--text-muted, #64748b); }
+                .fyfg-month-select, .pymtw-available-surplus, .pymtw-avenue-picker { padding: 1.25rem; }
+                .pymtw-avenue-group { margin-top: 1rem; }
+                .pymtw-avenue-group-label { margin: 0 0 0.5rem; font-size: 0.95rem; }
+                .pymtw-avenue-chip-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+                .pymtw-avenue-chip {
+                    border: 1px solid var(--border-color, #e2e8f0);
+                    background: #fff;
+                    border-radius: 999px;
+                    padding: 0.45rem 0.85rem;
+                    cursor: pointer;
+                    font-size: 0.85rem;
+                }
+                .pymtw-avenue-chip-selected {
+                    border-color: var(--primary, #0f766e);
+                    background: rgba(15,118,110,0.1);
+                    font-weight: 600;
+                }
+                .pymtw-allocate-split {
+                    display: grid;
+                    grid-template-columns: 40% 60%;
+                    gap: 1rem;
+                    padding: 1rem;
+                    align-items: start;
+                }
+                @media (max-width: 900px) {
+                    .pymtw-allocate-split { grid-template-columns: 1fr; }
+                }
+                .pymtw-allocate-split-left .pymtw-sticky-action-bar {
+                    position: static;
+                    border: 1px solid var(--border-color, #e2e8f0);
+                    border-radius: 12px;
+                }
+                .pymtw-unsaved-banner {
+                    padding: 0.75rem 1rem;
+                    border-radius: 10px;
+                    background: rgba(245, 158, 11, 0.12);
+                    border: 1px solid rgba(245, 158, 11, 0.35);
+                    color: var(--text-main);
+                }
                 .pymtw-section {
                     display: flex;
                     flex-direction: column;
@@ -958,7 +1641,7 @@ const PutYourMoneyToWorkSection = () => {
                     border-top: 1px solid var(--border);
                 }
                 .pymtw-adjust-accordion-panel {
-                    padding: 0 0 0.75rem;
+                    padding: 0.15rem 0 0.85rem;
                 }
                 .pymtw-adjust-summary-grid {
                     display: grid;
@@ -1529,14 +2212,12 @@ const PutYourMoneyToWorkSection = () => {
                     color: #059669;
                 }
                 .pymtw-zone-b { padding: 1.25rem; }
-                .pymtw-adjust-head {
+                .pymtw-adjust-category-footer {
+                    margin-top: 0.9rem;
                     display: flex;
                     align-items: center;
-                    justify-content: space-between;
                     gap: 0.75rem;
-                    margin-top: 1.25rem;
-                    padding-top: 1rem;
-                    border-top: 1px solid var(--border);
+                    flex-wrap: wrap;
                 }
                 .pymtw-adjust-add-btn {
                     display: inline-flex;
@@ -1544,7 +2225,7 @@ const PutYourMoneyToWorkSection = () => {
                     gap: 0.35rem;
                 }
                 .pymtw-adjust-list {
-                    margin-top: 0.9rem;
+                    margin-top: 0.75rem;
                     display: grid;
                     gap: 0.9rem;
                 }
@@ -1679,10 +2360,122 @@ const PutYourMoneyToWorkSection = () => {
                     font-size: 0.78rem;
                     color: var(--text-muted);
                     line-height: 1.4;
-                    display: -webkit-box;
-                    -webkit-line-clamp: 2;
-                    -webkit-box-orient: vertical;
-                    overflow: hidden;
+                }
+                .pymtw-category-status-row {
+                    display: flex;
+                    flex-wrap: wrap;
+                    align-items: center;
+                    gap: 0.5rem 0.75rem;
+                    margin-top: 0.35rem;
+                }
+                .pymtw-category-save-chip {
+                    font-size: 0.72rem;
+                    font-weight: 700;
+                    letter-spacing: 0.02em;
+                }
+                .pymtw-category-save-chip-saved { color: #047857; }
+                .pymtw-category-save-chip-dirty { color: #b45309; }
+                .pymtw-unsaved-banner {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.15rem;
+                    margin: 0 0 1rem;
+                    padding: 0.75rem 1rem;
+                    border-radius: 10px;
+                    border: 1px solid rgba(245, 158, 11, 0.35);
+                    background: rgba(251, 191, 36, 0.12);
+                    color: #92400e;
+                    font-size: 0.88rem;
+                }
+                .pymtw-unsaved-banner strong { font-weight: 700; }
+                .pymtw-confirm-panel {
+                    margin: 0 0 1rem;
+                    padding: 1rem 1.1rem;
+                    border-radius: 10px;
+                    border: 1px solid rgba(5, 150, 105, 0.35);
+                    background: rgba(16, 185, 129, 0.08);
+                }
+                .pymtw-confirm-title {
+                    margin: 0 0 0.35rem;
+                    font-weight: 700;
+                    color: var(--text-main);
+                }
+                .pymtw-confirm-body {
+                    margin: 0 0 0.85rem;
+                    font-size: 0.88rem;
+                    color: var(--text-muted);
+                }
+                .pymtw-confirm-actions {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 0.5rem;
+                }
+                .pymtw-sticky-action-bar {
+                    position: sticky;
+                    bottom: 0;
+                    z-index: 20;
+                    margin-top: 1.25rem;
+                    padding: 0.9rem 1rem;
+                    border: 1px solid var(--border);
+                    border-radius: 12px 12px 0 0;
+                    background: var(--bg-card, #fff);
+                    box-shadow: 0 -6px 20px rgba(15, 23, 42, 0.08);
+                }
+                .pymtw-sticky-action-main {
+                    display: flex;
+                    flex-wrap: wrap;
+                    align-items: flex-end;
+                    justify-content: space-between;
+                    gap: 1rem;
+                }
+                .pymtw-sticky-meta {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.45rem;
+                    min-width: 0;
+                }
+                .pymtw-sticky-month {
+                    font-size: 1rem;
+                    color: var(--text-main);
+                }
+                .pymtw-sticky-kpis {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 0.85rem 1.25rem;
+                }
+                .pymtw-sticky-kpi {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.15rem;
+                }
+                .pymtw-sticky-kpi-label {
+                    font-size: 0.72rem;
+                    text-transform: uppercase;
+                    letter-spacing: 0.04em;
+                    color: var(--text-muted);
+                    font-weight: 600;
+                }
+                .pymtw-sticky-status {
+                    font-size: 0.85rem;
+                    font-weight: 700;
+                }
+                .pymtw-sticky-status-dirty { color: #b45309; }
+                .pymtw-sticky-status-saved { color: #047857; }
+                .pymtw-sticky-hint {
+                    margin: 0;
+                    font-size: 0.8rem;
+                    color: var(--text-muted);
+                }
+                .pymtw-sticky-actions {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 0.5rem;
+                }
+                .pymtw-save-success {
+                    margin-top: 0.65rem;
+                    font-size: 0.88rem;
+                    font-weight: 600;
+                    color: #047857;
                 }
                 .pymtw-category-action {
                     display: inline-flex;

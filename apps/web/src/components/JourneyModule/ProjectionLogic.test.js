@@ -104,11 +104,12 @@ describe('ProjectionLogic', () => {
                 {
                     id: 101,
                     type: 'Term Insurance',
-                    amount: 5000,
+                    amount: 60000, // Studio stores annual (₹5,000/mo × 12)
                     startMonth: 1,
                     startYear: 2026,
                     duration: 10,
                     frequency: 'Monthly',
+                    studioPlanKey: '2026-0',
                 },
             ],
             policies: [
@@ -125,8 +126,9 @@ describe('ProjectionLogic', () => {
             ],
         };
         const results = generateProjections(params);
-        // Policy only: 5000 * 12 = 60k (studio row skipped via exclusivity)
+        // Policy only in insurance: 5000 * 12 = 60k; studio Term skipped from yearAllocationsTotal
         expect(results[0].insurancePremium).toBe(60000);
+        expect(results[0].yearAllocationsTotal).toBe(0);
         expect(results[0].unallocatedSurplus).toBe(
             generateProjections({
                 ...params,
@@ -169,7 +171,7 @@ describe('ProjectionLogic', () => {
         expect(results[0].insurancePremium).toBe(36000);
     });
 
-    it('keeps studio term in surplus when linked policy has no premium details yet', () => {
+    it('keeps studio term on unallocated surplus when linked policy has no premium details yet', () => {
         const params = {
             ...mockParams,
             expenseCategories: { ...mockParams.expenseCategories, insurance: { life: {} } },
@@ -177,11 +179,12 @@ describe('ProjectionLogic', () => {
                 {
                     id: 101,
                     type: 'Term Insurance',
-                    amount: 5000,
+                    amount: 60000, // annual storage
                     startMonth: 1,
                     startYear: 2026,
                     duration: 10,
                     frequency: 'Monthly',
+                    studioPlanKey: '2026-0',
                 },
             ],
             policies: [
@@ -196,7 +199,9 @@ describe('ProjectionLogic', () => {
             ],
         };
         const results = generateProjections(params);
-        expect(results[0].insurancePremium).toBe(60000);
+        // Term/Health no longer inflate Investments — they reduce unallocated surplus
+        expect(results[0].insurancePremium).toBe(0);
+        expect(results[0].yearAllocationsTotal).toBe(60000);
     });
 
     it('uses written-back payment term on policy for later projection years', () => {
@@ -208,11 +213,12 @@ describe('ProjectionLogic', () => {
                 {
                     id: 101,
                     type: 'Term Insurance',
-                    amount: 5000,
+                    amount: 60000,
                     startMonth: 1,
                     startYear: 2026,
                     duration: 15,
                     frequency: 'Monthly',
+                    studioPlanKey: '2026-0',
                 },
             ],
             policies: [
@@ -235,6 +241,82 @@ describe('ProjectionLogic', () => {
         expect(year2035.insurancePremium).toBe(60000);
         expect(year2040.insurancePremium).toBe(60000);
         expect(year2041.insurancePremium).toBe(0);
+    });
+
+    it('keeps studio Term/Health out of Investments and on unallocated surplus (annual amounts)', () => {
+        // CF life ₹174k + non-life ₹6k + Self policy ₹32k offset → Investments insurance ₹180k
+        // Studio Term ₹1,500/mo + Health ₹1,000/mo from July → yearAllocationsTotal only
+        const params = {
+            familyMembers: [
+                { relation: 'Self', name: 'Self', age: 35, retirementAge: 60, dob: '1991-01-01' },
+                { relation: 'Spouse', name: 'Spouse', age: 33 },
+                { relation: 'Child', name: 'Child', age: 8 },
+            ],
+            income: { self: 100000 },
+            expenseCategories: {
+                household: { rent: 60000 },
+                insurance: {
+                    health: { value: 500, frequency: 'Monthly' },
+                    life: {
+                        Self: { value: 32000, frequency: 'Annual' },
+                        Spouse: { value: 100000, frequency: 'Annual' },
+                        Child: { value: 42000, frequency: 'Annual' },
+                    },
+                },
+                emi: {},
+                savings: { sip: 12000 },
+            },
+            goals: [],
+            inflationRates: { incomeIncrement: 0, householdInflation: 0, educationInflation: 0 },
+            startYear: 2026,
+            policies: [
+                {
+                    id: 'p-self',
+                    insuredName: 'Self',
+                    premium: '32000',
+                    frequency: 'Annually',
+                    paymentTerm: '12',
+                    startDate: '2022-03-12',
+                    isProposed: false,
+                },
+            ],
+            investmentAllocations: [
+                {
+                    id: 1,
+                    type: 'Term Insurance',
+                    amount: 18000, // ₹1,500/mo × 12 (studio annual storage)
+                    startMonth: 7,
+                    startYear: 2026,
+                    duration: 10,
+                    frequency: 'Monthly',
+                    studioPlanKey: '2026-6',
+                },
+                {
+                    id: 2,
+                    type: 'Health Insurance',
+                    amount: 12000, // ₹1,000/mo × 12
+                    startMonth: 7,
+                    startYear: 2026,
+                    duration: 10,
+                    frequency: 'Monthly',
+                    studioPlanKey: '2026-6',
+                },
+            ],
+        };
+        const results = generateProjections(params);
+        expect(results[0].insurancePremium).toBe(180000);
+        expect(results[0].savingsBreakdown.sip).toBe(144000);
+        expect(results[0].savingsAndInvestments).toBe(324000);
+        // Term Jul–Dec 9k + Health Jul–Dec 6k
+        expect(results[0].yearAllocationsTotal).toBe(15000);
+        expect(results[0].unallocatedSurplus).toBe(results[0].netInvestibleSurplus - 15000);
+
+        const withoutStudio = generateProjections({ ...params, investmentAllocations: [] });
+        expect(withoutStudio[0].insurancePremium).toBe(180000);
+        expect(withoutStudio[0].savingsAndInvestments).toBe(324000);
+        expect(withoutStudio[0].yearAllocationsTotal).toBe(0);
+        // netInvestibleSurplus unchanged by Term/Health (Investments column stable)
+        expect(results[0].netInvestibleSurplus).toBe(withoutStudio[0].netInvestibleSurplus);
     });
 
     it('uses Step 8 tax logic with selfDetail and standard deduction', () => {

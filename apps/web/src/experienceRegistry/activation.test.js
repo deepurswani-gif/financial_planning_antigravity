@@ -48,13 +48,33 @@ describe('resolveActivation — metadata driven', () => {
     expect(resolveActivation(exp, landingFor('planning.incomeTax'))).toBe('openConfigureModal');
   });
 
-  it('deterministic configure (home loan, life policy) opens a configure modal', () => {
+  it('deterministic configure (home loan, PPF) opens a configure modal', () => {
     expect(resolveActivation(getExperienceById('liabilities.homeLoan'), landingFor('liabilities.homeLoan'))).toBe(
       'openConfigureModal',
     );
-    expect(resolveActivation(getExperienceById('protection.lifeInsurance'), landingFor('protection.lifeInsurance'))).toBe(
+    expect(resolveActivation(getExperienceById('savings.ppf'), landingFor('savings.ppf'))).toBe(
       'openConfigureModal',
     );
+  });
+
+  it('Life Insurance lands on premiums without opening the policy modal', () => {
+    expect(resolveActivation(getExperienceById('protection.lifeInsurance'), landingFor('protection.lifeInsurance'))).toBe(
+      'noActivation',
+    );
+    expect(buildActivationRequest(getExperienceById('protection.lifeInsurance'), landingFor('protection.lifeInsurance'))).toBeNull();
+  });
+
+  it('Add experiences land without activation so users can add another instance', () => {
+    expect(resolveActivation(getExperienceById('savings.addRecurringDeposit'), landingFor('savings.addRecurringDeposit'))).toBe(
+      'noActivation',
+    );
+    expect(resolveActivation(getExperienceById('assets.addFixedDeposit'), landingFor('assets.addFixedDeposit'))).toBe(
+      'noActivation',
+    );
+    expect(resolveActivation(getExperienceById('savings.addPpf'), landingFor('savings.addPpf'))).toBe(
+      'noActivation',
+    );
+    expect(buildActivationRequest(getExperienceById('savings.addRecurringDeposit'), landingFor('savings.addRecurringDeposit'))).toBeNull();
   });
 
   it('collections refine by instance count', () => {

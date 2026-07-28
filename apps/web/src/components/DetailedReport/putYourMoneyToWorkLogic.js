@@ -21,17 +21,42 @@ const RECURRING_ALLOC_TYPES = [
     'Life Insurance Saving Plans', 'Recurring Deposit', 'RD',
 ];
 
+/** Studio Protection avenues — claim surplus before FFA. */
+export const PROTECTION_ALLOCATION_TYPES = [
+    'Term Insurance',
+    'Health Insurance',
+    'Liquid Mutual Fund',
+];
+
+export function isProtectionAllocationType(type) {
+    if (!type) return false;
+    const normalized = type === 'RD' ? 'Recurring Deposit' : type;
+    return PROTECTION_ALLOCATION_TYPES.includes(normalized)
+        || PROTECTION_ALLOCATION_TYPES.includes(type);
+}
+
+function allocationMatchesProtectionFilter(alloc, { protectionOnly = false, excludeProtection = false } = {}) {
+    const isProtection = isProtectionAllocationType(alloc?.type);
+    if (protectionOnly) return isProtection;
+    if (excludeProtection) return !isProtection;
+    return true;
+}
+
 /** Studio apply stores recurring amounts as annual totals; convert to monthly. */
 export function getRecurringMonthlyAmount(alloc = {}) {
     const amount = parseAmount(alloc.amount);
     const type = alloc.type;
     const freq = String(alloc.frequency || 'Monthly').toLowerCase();
-    if (type === 'Life Insurance' || type === 'Life Insurance Saving Plans') {
+
+    // Legacy Allocation-module Life Insurance: amount is the installment premium.
+    if (type === 'Life Insurance' && !alloc.studioPlanKey) {
         if (freq === 'quarterly') return amount / 3;
-        if (freq === 'monthly') return amount;
-        if (alloc.studioPlanKey) return amount / 12;
-        return amount;
+        if (freq === 'half-yearly' || freq === 'half yearly') return amount / 6;
+        if (freq === 'annual' || freq === 'annually') return amount / 12;
+        return amount; // Monthly installment
     }
+
+    // Studio rows (SIP, Term/Health, Life Insurance Saving Plans, studio Life, etc.): annual ÷ 12
     return amount / 12;
 }
 
@@ -55,16 +80,19 @@ export function isRecurringAllocationType(type) {
  * Surplus consumed by investment allocations in a single calendar month.
  * Recurring: monthly amount every month on/after start.
  * One-time: full amount only in the start month (skipped if no start — matches prior global-commit behavior).
+ * @param {{ protectionOnly?: boolean, excludeProtection?: boolean }} [filter]
  */
 export function computeAllocationImpactForMonth(
     investmentAllocations = [],
     calendarYear,
     monthIndex,
+    filter = {},
 ) {
     const month = monthIndex + 1;
     let impact = 0;
 
     investmentAllocations.forEach((alloc) => {
+        if (!allocationMatchesProtectionFilter(alloc, filter)) return;
         const type = alloc.type === 'RD' ? 'Recurring Deposit' : alloc.type;
         if (isRecurringAllocationType(type) || isRecurringAllocationType(alloc.type)) {
             if (!allocationHasStartedByMonth(alloc, calendarYear, monthIndex)) return;
@@ -81,6 +109,66 @@ export function computeAllocationImpactForMonth(
     });
 
     return Math.round(impact);
+}
+
+export function computeProtectionImpactForMonth(investmentAllocations, calendarYear, monthIndex) {
+    return computeAllocationImpactForMonth(
+        investmentAllocations,
+        calendarYear,
+        monthIndex,
+        { protectionOnly: true },
+    );
+}
+
+export function computeNonProtectionAllocationImpactForMonth(
+    investmentAllocations,
+    calendarYear,
+    monthIndex,
+) {
+    return computeAllocationImpactForMonth(
+        investmentAllocations,
+        calendarYear,
+        monthIndex,
+        { excludeProtection: true },
+    );
+}
+
+/**
+ * Ordered residual: ledger + carry → Protection → FFA → other allocations.
+ * @returns {{ protectionImpact: number, journeyImpact: number, otherAllocImpact: number, leftover: number }}
+ */
+export function computeOrderedMonthResidual({
+    available,
+    investmentAllocations = [],
+    journeyAdjustments = [],
+    calendarYear,
+    monthIndex,
+    excludeInvestmentAllocations = false,
+    /** When true, only Protection drains before FFA (growth ignored) — for FFA validation. */
+    protectionBeforeFfaOnly = false,
+}) {
+    const allocs = excludeInvestmentAllocations ? [] : investmentAllocations;
+    const protectionImpact = computeProtectionImpactForMonth(allocs, calendarYear, monthIndex);
+    const journeyImpact = computeJourneyAdjustmentImpactForMonth(
+        journeyAdjustments,
+        calendarYear,
+        monthIndex,
+    );
+    const otherAllocImpact = protectionBeforeFfaOnly
+        ? 0
+        : computeNonProtectionAllocationImpactForMonth(allocs, calendarYear, monthIndex);
+    const afterProtection = available - protectionImpact;
+    const afterFfa = afterProtection - journeyImpact;
+    const leftover = Math.max(0, afterFfa - otherAllocImpact);
+    return {
+        protectionImpact,
+        journeyImpact,
+        otherAllocImpact,
+        afterProtection: Math.max(0, afterProtection),
+        afterFfa: Math.max(0, afterFfa),
+        leftover,
+        rawLeftover: afterFfa - otherAllocImpact,
+    };
 }
 
 function getInstrumentDisplayLabel(type) {
@@ -115,6 +203,7 @@ const formatInr = (value) => `₹${Math.round(value).toLocaleString('en-IN')}`;
 
 /**
  * Build deployable-surplus outlook cards for current month + next 2 months.
+ * Residual order: ledger + carry → Protection → FFA → other allocations.
  * @param {boolean} [options.excludeInvestmentAllocations] - journey-adjusted baseline only
  */
 export function buildThreeMonthSurplusOutlook({
@@ -139,24 +228,27 @@ export function buildThreeMonthSurplusOutlook({
         for (let m = start; m <= target; m += 1) {
             const ledger = parseAmount(unallocatedSurplusByMonth[m]);
             const available = ledger + carryIn;
-            const allocImpact = computeAllocationImpactForMonth(allocs, calendarYear, m);
-            const journeyImpact = computeJourneyAdjustmentImpactForMonth(
+            const residual = computeOrderedMonthResidual({
+                available,
+                investmentAllocations: allocs,
                 journeyAdjustments,
                 calendarYear,
-                m,
-            );
-            const leftover = Math.max(0, available - allocImpact - journeyImpact);
+                monthIndex: m,
+            });
+            const allocImpact = residual.protectionImpact + residual.otherAllocImpact;
             steps.push({
                 monthIndex: m,
                 label: MONTH_LABELS_LONG[m],
                 ledger,
                 carryIn,
                 allocImpact,
-                journeyImpact,
-                leftover,
+                protectionImpact: residual.protectionImpact,
+                otherAllocImpact: residual.otherAllocImpact,
+                journeyImpact: residual.journeyImpact,
+                leftover: residual.leftover,
             });
             if (m < target) {
-                carryIn = leftover;
+                carryIn = residual.leftover;
             }
         }
 
@@ -208,6 +300,9 @@ export function buildThreeMonthSurplusOutlook({
             label: sel.label,
             title: `Surplus ${sel.label} ${calendarYear}`,
             ledgerUnallocated: Math.round(last.ledger),
+            protectionImpact: Math.round(last.protectionImpact),
+            journeyImpact: Math.round(last.journeyImpact),
+            otherAllocImpact: Math.round(last.otherAllocImpact),
             deployableSurplus: Math.round(last.leftover),
             carryFromPrior: Math.round(last.carryIn),
             allocationsInMonth,
@@ -271,27 +366,29 @@ export function computeDeployableSurplusWithCarry({
     let carryIn = 0;
     let deployableSurplus = 0;
     let carriedForward = 0;
+    let protectionImpact = 0;
+    let journeyImpact = 0;
+    let otherAllocImpact = 0;
 
     for (let m = start; m <= selected; m += 1) {
         const ledger = parseAmount(unallocatedSurplusByMonth[m]);
         const available = ledger + carryIn;
-        const allocImpact = computeAllocationImpactForMonth(
+        const residual = computeOrderedMonthResidual({
+            available,
             investmentAllocations,
-            calendarYear,
-            m,
-        );
-        const journeyImpact = computeJourneyAdjustmentImpactForMonth(
             journeyAdjustments,
             calendarYear,
-            m,
-        );
-        const leftover = Math.max(0, available - allocImpact - journeyImpact);
+            monthIndex: m,
+        });
 
         if (m < selected) {
-            carryIn = leftover;
+            carryIn = residual.leftover;
         } else {
             carriedForward = carryIn;
-            deployableSurplus = leftover;
+            deployableSurplus = residual.leftover;
+            protectionImpact = residual.protectionImpact;
+            journeyImpact = residual.journeyImpact;
+            otherAllocImpact = residual.otherAllocImpact;
         }
     }
 
@@ -299,6 +396,9 @@ export function computeDeployableSurplusWithCarry({
         deployableSurplus: Math.round(deployableSurplus),
         carriedForward: Math.round(carriedForward),
         monthlyFreeCash: Math.round(parseAmount(unallocatedSurplusByMonth[selected])),
+        protectionImpact: Math.round(protectionImpact),
+        journeyImpact: Math.round(journeyImpact),
+        otherAllocImpact: Math.round(otherAllocImpact),
     };
 }
 
@@ -314,26 +414,40 @@ export const INSTRUMENT_CATEGORIES = [
             'Liquid Mutual Fund': 'These funds will be invested in Liquid Mutual Funds.',
         },
         goalTags: ['Family security'],
+        reportScope: 'gaps',
     },
     {
         id: 'growth',
-        label: 'Growth for most goals',
-        instruments: ['SIP', 'Lumpsum', 'Direct Equity & ETFs'],
+        label: 'Growth Investments',
+        instruments: [
+            'SIP',
+            'Lumpsum',
+            'Direct Equity & ETFs',
+            'Fixed Deposit',
+            'Recurring Deposit',
+            'Life Insurance Saving Plans',
+        ],
         goalTags: ['Education', 'Home', 'Wealth', 'Retirement'],
-    },
-    {
-        id: 'short_term',
-        label: 'Short-term certainty',
-        instruments: ['Fixed Deposit', 'Recurring Deposit'],
-        goalTags: ['Near-term goals'],
+        reportScope: 'pymtw',
     },
     {
         id: 'retirement',
-        label: 'Retirement & long horizon',
-        instruments: ['PPF', 'NPS', 'Life Insurance Saving Plans'],
+        label: 'Retirement Avenues',
+        instruments: ['PPF', 'NPS'],
         goalTags: ['Retirement', 'Legacy'],
+        reportScope: 'pymtw',
     },
 ];
+
+/** Categories shown on Fix Your Financial Gaps (Protection only). */
+export function getGapsInstrumentCategories() {
+    return INSTRUMENT_CATEGORIES.filter((c) => c.reportScope === 'gaps');
+}
+
+/** Categories shown on Put Your Money To Work (Growth + Retirement). */
+export function getPymtwInstrumentCategories() {
+    return INSTRUMENT_CATEGORIES.filter((c) => c.reportScope === 'pymtw');
+}
 
 export function getGoalFutureValue(goal) {
     if (goal.futureValue) return parseAmount(goal.futureValue);
@@ -369,17 +483,20 @@ export function getSelectableMonths(planStartMonth = 0, currentMonth = new Date(
     return months;
 }
 
+/** PYMTW loan start months: same window as surplus planning (current + 2 months). */
 export function getLoanStartMonths(
     selectedYear,
     calendarYear,
     currentMonthIndex = new Date().getMonth(),
 ) {
-    const year = parseInt(selectedYear, 10) || calendarYear;
-    const minMonthIndex = year <= calendarYear
-        ? Math.max(0, Math.min(11, currentMonthIndex))
-        : 0;
+    // selectedYear is accepted for call-site compatibility; PYMTW loans stay in the
+    // current planning window (current month + 2), matching surplus allocation months.
+    void selectedYear;
+    void calendarYear;
+    const anchorMonth = Math.max(0, Math.min(11, currentMonthIndex));
+    const end = Math.min(11, anchorMonth + 2);
     const months = [];
-    for (let m = minMonthIndex; m < 12; m += 1) {
+    for (let m = anchorMonth; m <= end; m += 1) {
         months.push({
             monthIndex: m,
             value: m + 1,
@@ -395,10 +512,10 @@ export function clampLoanStartMonth(
     calendarYear,
     currentMonthIndex = new Date().getMonth(),
 ) {
-    const year = parseInt(startYear, 10) || calendarYear;
     const month = parseInt(startMonth, 10) || (currentMonthIndex + 1);
-    const minMonth = year <= calendarYear ? currentMonthIndex + 1 : 1;
-    return Math.max(month, minMonth);
+    const minMonth = currentMonthIndex + 1;
+    const maxMonth = Math.min(12, currentMonthIndex + 3);
+    return Math.min(Math.max(month, minMonth), maxMonth);
 }
 
 export function computeJourneyAdjustmentImpactForMonth(
@@ -432,37 +549,80 @@ export function computeJourneyAdjustmentImpactForMonth(
 }
 
 /**
- * Ensures journey expense amounts + loan EMIs do not exceed each month's unallocated surplus.
+ * Ensures journey expense amounts + loan EMIs fit within residual surplus after
+ * Protection allocations (Protection claims surplus before FFA).
+ * Growth/retirement allocations do not block FFA validation.
+ * When selectableMonths is provided (PYMTW window), only those months are enforced —
+ * loan EMI beyond the planning window must not block save against empty later-month ledger cells.
  * @returns {{ ok: true } | { ok: false, message: string, monthLabel: string, monthIndex: number, surplus: number, impact: number }}
  */
 export function validateJourneyAdjustmentsAgainstSurplus(
     adjustments = [],
     unallocatedSurplusByMonth = [],
     calendarYear = new Date().getFullYear(),
+    {
+        investmentAllocations = [],
+        planStartMonth = 0,
+        selectableMonths = null,
+    } = {},
 ) {
     if (!adjustments.length) {
         return { ok: true };
     }
 
+    const start = Math.max(0, Math.min(11, planStartMonth));
+    const windowMonths = Array.isArray(selectableMonths) && selectableMonths.length > 0
+        ? new Set(selectableMonths.map((m) => m.monthIndex))
+        : null;
+    const hasProtection = (investmentAllocations || []).some(
+        (a) => parseAmount(a?.amount) > 0 && isProtectionAllocationType(a?.type),
+    );
+    let carryIn = 0;
+
     for (let monthIndex = 0; monthIndex < 12; monthIndex += 1) {
-        const impact = computeJourneyAdjustmentImpactForMonth(
-            adjustments,
+        const ledger = parseAmount(unallocatedSurplusByMonth[monthIndex]);
+        const available = monthIndex >= start ? ledger + carryIn : ledger;
+        const residual = computeOrderedMonthResidual({
+            available,
+            investmentAllocations,
+            journeyAdjustments: adjustments,
             calendarYear,
             monthIndex,
-        );
-        if (impact <= 0) continue;
+            protectionBeforeFfaOnly: true,
+        });
+        const leftover = residual.rawLeftover;
+        const inPlanningWindow = !windowMonths || windowMonths.has(monthIndex);
 
-        const surplus = Math.round(parseAmount(unallocatedSurplusByMonth[monthIndex]));
-        if (impact > surplus) {
+        if (inPlanningWindow && residual.journeyImpact > 0 && leftover < 0) {
+            const surplus = Math.max(0, Math.round(residual.afterProtection));
+            const impact = Math.round(residual.journeyImpact);
             const monthLabel = MONTH_LABELS_LONG[monthIndex] || 'Month';
+            const afterAllocNote = hasProtection ? ' after Protection allocations' : '';
             return {
                 ok: false,
                 monthIndex,
                 monthLabel,
                 surplus,
                 impact,
-                message: `${monthLabel} surplus is ₹${surplus.toLocaleString('en-IN')}; planned impact is ₹${impact.toLocaleString('en-IN')}. Reduce expenses or loan EMI so they fit within the available surplus.`,
+                message: surplus <= 0
+                    ? `${monthLabel} has no surplus available for future financial adjustments${afterAllocNote}. Planned impact is ₹${impact.toLocaleString('en-IN')}. Use a later month with remaining surplus, or reduce Protection allocations first.`
+                    : `${monthLabel} surplus available for future financial adjustments is ₹${surplus.toLocaleString('en-IN')}${afterAllocNote}; planned impact is ₹${impact.toLocaleString('en-IN')}. Reduce expenses or loan EMI so they fit within the available surplus.`,
             };
+        }
+
+        if (monthIndex >= start) {
+            // Outside the PYMTW window, do not let negative loan EMI residuals poison carry.
+            // Inside window, carry full residual including growth (consistent leftover).
+            const fullResidual = computeOrderedMonthResidual({
+                available,
+                investmentAllocations,
+                journeyAdjustments: adjustments,
+                calendarYear,
+                monthIndex,
+            });
+            carryIn = inPlanningWindow
+                ? fullResidual.leftover
+                : Math.max(0, residual.afterProtection);
         }
     }
 
@@ -518,7 +678,7 @@ export function summarizeJourneyConstraints(journeyAdjustments = [], journeyProj
     return { items, hasItems: items.length > 0, totalAnnualImpact };
 }
 
-export function buildInstrumentCards(investmentAllocations = []) {
+export function buildInstrumentCards(investmentAllocations = [], { reportScope = null } = {}) {
     const byType = {};
     investmentAllocations.forEach((alloc) => {
         const type = alloc.type === 'RD' ? 'Recurring Deposit' : alloc.type === 'FD' ? 'Fixed Deposit' : alloc.type;
@@ -548,7 +708,11 @@ export function buildInstrumentCards(investmentAllocations = []) {
         }
     });
 
-    return INSTRUMENT_CATEGORIES.map((category) => ({
+    const categories = reportScope
+        ? INSTRUMENT_CATEGORIES.filter((c) => c.reportScope === reportScope)
+        : INSTRUMENT_CATEGORIES;
+
+    return categories.map((category) => ({
         ...category,
         instruments: category.instruments.map((type) => {
             const data = byType[type] || {
@@ -967,6 +1131,8 @@ export function buildAllocationStudioContext({
     goalMappings = {},
     goals = [],
     selectedMonthIndex,
+    /** 'gaps' | 'pymtw' | null (all categories) */
+    reportScope = null,
 }) {
     if (!moneyFlowReport?.meta) {
         return { meta: { hasData: false } };
@@ -1015,7 +1181,7 @@ export function buildAllocationStudioContext({
         calendarYear,
     );
 
-    const instrumentCategories = buildInstrumentCards(investmentAllocations);
+    const instrumentCategories = buildInstrumentCards(investmentAllocations, { reportScope });
     const instrumentCardCount = instrumentCategories.reduce(
         (sum, cat) => sum + cat.instruments.length,
         0,
@@ -1074,12 +1240,11 @@ export function buildAllocationStudioContext({
 
     const journeyAdjustedOutlook = buildThreeMonthSurplusOutlook({
         unallocatedSurplusByMonth: ledger.unallocatedSurplus || [],
-        investmentAllocations: [],
+        investmentAllocations,
         journeyAdjustments,
         calendarYear,
         planStartMonth,
         currentMonth: meta.currentMonth,
-        excludeInvestmentAllocations: true,
     });
 
     return {

@@ -50,6 +50,32 @@ describe('investSurplusLogic', () => {
         expect(summary.items[1].studioPlanKey).toBeNull();
     });
 
+    it('excludes zero-amount allocations from planned summary', () => {
+        const summary = summarizeInvestmentAllocations([
+            {
+                id: 1,
+                type: 'SIP',
+                name: 'Studio SIP',
+                amount: 0,
+                studioPlanKey: '2026-6',
+                startMonth: 7,
+                startYear: 2026,
+            },
+            {
+                id: 2,
+                type: 'PPF',
+                name: 'Studio PPF',
+                amount: 60000,
+                studioPlanKey: '2026-6',
+                startMonth: 7,
+                startYear: 2026,
+            },
+        ]);
+        expect(summary.count).toBe(1);
+        expect(summary.items.map((i) => i.type)).toEqual(['PPF']);
+        expect(summary.monthlyCommitted).toBe(5000);
+    });
+
     it('builds deployment slices from surplus', () => {
         const slices = buildDeploymentSlices(20000, { hasGap: true }, {});
         expect(slices.length).toBe(3);

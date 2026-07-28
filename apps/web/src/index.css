@@ -1505,37 +1505,8 @@ select.conversational-input,
 }
 
 /* Your Money's Magic â€” presentation only */
-.ymm-coverage-compare {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  gap: 0.75rem;
-  align-items: stretch;
-  margin-bottom: 1rem;
-}
 
-.ymm-coverage-bridge {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 0.25rem 0.15rem;
-  min-width: 72px;
-}
-
-@media (max-width: 720px) {
-  .ymm-coverage-compare {
-    grid-template-columns: 1fr;
-  }
-
-  .ymm-coverage-bridge {
-    flex-direction: row;
-    min-width: 0;
-    padding: 0.15rem 0;
-  }
-}
-
-/* Funding route map (Track Surplus summary) */
+/* Funding route map: where the money comes from */
 .ymm-route-card {
   padding: 1.25rem 1.35rem 1.2rem;
   border: none;
@@ -1679,6 +1650,10 @@ select.conversational-input,
   background: #059669;
 }
 
+.ymm-map-pin-surplus .ymm-map-pin-dot {
+  background: #7c3aed;
+}
+
 .ymm-map-pin-tooltip {
   position: absolute;
   left: 50%;
@@ -1804,6 +1779,111 @@ select.conversational-input,
   color: #059669;
 }
 
+.ymm-map-pin-surplus .ymm-map-pin-tooltip span {
+  color: #7c3aed;
+}
+
+.ymm-goal-timeline {
+  position: relative;
+  margin: 1.25rem 0.5rem 0.35rem;
+  padding: 1.75rem 0.5rem 0.25rem;
+  min-height: 3.5rem;
+}
+
+.ymm-goal-timeline-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 1.85rem;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #94a3b8, #dc2626 55%, #0f172a);
+}
+
+.ymm-goal-timeline-marker {
+  position: absolute;
+  top: 1.35rem;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  z-index: 1;
+}
+
+.ymm-goal-timeline-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #2563eb;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.25);
+}
+
+.ymm-goal-timeline-start .ymm-goal-timeline-dot {
+  background: #172d9d;
+}
+
+.ymm-goal-timeline-end .ymm-goal-timeline-dot,
+.ymm-goal-timeline-retire .ymm-goal-timeline-dot {
+  background: #0f172a;
+}
+
+.ymm-goal-timeline-label {
+  font-size: 0.7rem;
+  font-weight: 650;
+  color: var(--text-muted);
+  white-space: nowrap;
+  text-align: center;
+  max-width: 7.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  line-height: 1.2;
+}
+
+.ymm-goal-timeline-label em {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.ymm-customize-readonly {
+  margin-top: 0.75rem;
+}
+
+.ymm-customize-readonly-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  background: var(--bg-card);
+  margin-top: 0.55rem;
+}
+
+.ymm-customize-readonly-row strong {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.ymm-customize-readonly .ymm-calc-toggle {
+  margin-top: 0.35rem;
+}
+
+.ymm-calc-row.ymm-calc-total {
+  margin-top: 0.25rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--border);
+  font-weight: 750;
+  color: var(--text-main);
+}
+
 .ymm-map-legend {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -1893,6 +1973,14 @@ select.conversational-input,
   color: #059669;
 }
 
+.ymm-map-legend-surplus .ymm-map-legend-swatch {
+  background: #7c3aed;
+}
+
+.ymm-map-legend-surplus strong {
+  color: #7c3aed;
+}
+
 @media (max-width: 720px) {
   .ymm-map-surface {
     min-height: 180px;
@@ -1910,6 +1998,454 @@ select.conversational-input,
 @media (max-width: 480px) {
   .ymm-map-legend {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Future Invested Surplus explainer */
+.ymm-surplus-explainer {
+  padding: 1.25rem 1.35rem 1.2rem;
+  border: none;
+  border-radius: 14px;
+  background: var(--bg-card);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.ymm-surplus-explainer .ymm-route-header-icon {
+  color: #7c3aed;
+}
+
+.ymm-surplus-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ymm-surplus-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 0.85rem;
+  border-radius: 10px;
+  background: var(--bg-main);
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+.ymm-surplus-line strong {
+  font-size: 0.95rem;
+  color: var(--text-main);
+  white-space: nowrap;
+}
+
+.ymm-surplus-footer {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.85rem 1rem;
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.28);
+}
+
+.ymm-surplus-footer-label {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 0.15rem;
+}
+
+.ymm-surplus-footer strong {
+  font-size: 1.02rem;
+  color: #7c3aed;
+}
+
+/* Goal card — one accent colour identity per goal */
+.ymm-goal-card {
+  padding: 1.5rem 1.5rem 1.35rem;
+  border: none;
+  border-radius: 16px;
+  background: var(--bg-card);
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.05);
+}
+
+.ymm-goal-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.35rem;
+}
+
+.ymm-goal-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 0.4rem;
+}
+
+.ymm-goal-title-row h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.ymm-goal-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.ymm-goal-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.ymm-goal-chip {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+.ymm-goal-sub {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.ymm-goal-amount {
+  text-align: right;
+}
+
+.ymm-goal-amount-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.ymm-goal-amount-value {
+  margin-top: 2px;
+  font-size: 1.45rem;
+  font-weight: 800;
+}
+
+/* Scenario progression — layout/headings only, not separate dominant colours */
+.ymm-milestone-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-bottom: 1.15rem;
+}
+
+.ymm-milestone {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 0.75rem;
+}
+
+.ymm-milestone-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ymm-milestone-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+.ymm-milestone-connector {
+  width: 2px;
+  flex: 1;
+  min-height: 18px;
+  margin: 4px 0;
+  border-radius: 2px;
+}
+
+.ymm-milestone-body {
+  padding-bottom: 0.95rem;
+}
+
+.ymm-milestone-label {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.ymm-milestone-desc {
+  margin: 0.2rem 0 0.55rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.ymm-milestone-figures {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem 1rem;
+}
+
+.ymm-milestone-figures > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.ymm-milestone-figures span {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.ymm-milestone-figures strong {
+  font-size: 1.02rem;
+  font-weight: 750;
+}
+
+.ymm-gap-open {
+  color: #dc2626;
+}
+
+.ymm-gap-clear {
+  color: #059669;
+}
+
+/* Stacked composition bar */
+.ymm-composition {
+  margin-bottom: 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 12px;
+  background: var(--bg-main);
+}
+
+.ymm-composition-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 0.55rem;
+}
+
+.ymm-composition-bar {
+  display: flex;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(148, 163, 184, 0.2);
+  margin-bottom: 0.65rem;
+}
+
+.ymm-composition-seg {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+}
+
+.ymm-composition-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.ymm-composition-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.ymm-composition-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ymm-composition-name {
+  flex: 1;
+}
+
+.ymm-composition-legend strong {
+  color: var(--text-main);
+  font-weight: 650;
+}
+
+.ymm-composition-empty {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 1rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  background: var(--bg-main);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.ymm-calc-details {
+  margin-bottom: 1rem;
+}
+
+.ymm-calc-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 0.84rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.ymm-calc-table {
+  margin-top: 0.65rem;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg-main);
+}
+
+.ymm-calc-row {
+  display: grid;
+  grid-template-columns: 1.4fr repeat(3, 1fr);
+  gap: 0.5rem;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.ymm-calc-row:first-child {
+  border-top: none;
+}
+
+.ymm-calc-head {
+  font-weight: 700;
+  color: var(--text-main);
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.ymm-goal-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.ymm-goal-actions-note {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.ymm-customize {
+  margin-top: 0.35rem;
+  padding: 1rem 1.05rem 1.1rem;
+  border-radius: 12px;
+  border: 1px solid;
+}
+
+.ymm-customize-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.ymm-customize-sub {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.ymm-customize-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: 0.9rem;
+}
+
+.ymm-customize-row {
+  display: grid;
+  grid-template-columns: 1fr 140px;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  background: var(--bg-card);
+}
+
+.ymm-customize-avenue {
+  font-size: 0.88rem;
+  font-weight: 650;
+  color: var(--text-main);
+}
+
+.ymm-customize-meta {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+}
+
+.ymm-customize-row input {
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 650;
+  text-align: right;
+}
+
+.ymm-customize-gap {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  margin-top: 0.85rem;
+  font-size: 0.84rem;
+  color: var(--text-muted);
+}
+
+.ymm-customize-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.9rem;
+  justify-content: flex-end;
+}
+
+@media (max-width: 720px) {
+  .ymm-milestone-figures {
+    grid-template-columns: 1fr;
+  }
+
+  .ymm-customize-row {
+    grid-template-columns: 1fr;
+  }
+
+  .ymm-calc-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .ymm-calc-head span:nth-child(n+3),
+  .ymm-calc-row span:nth-child(n+3) {
+    display: none;
   }
 }
 

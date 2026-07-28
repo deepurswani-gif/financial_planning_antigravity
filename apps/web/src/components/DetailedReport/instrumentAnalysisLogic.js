@@ -173,7 +173,7 @@ export function getDraftMonthlyImpact(instrumentType, amount) {
 
 export function getTotalDraftAllocated(draftAllocations = {}) {
     return STUDIO_INSTRUMENT_TYPES.reduce(
-        (sum, type) => sum + getDraftMonthlyImpact(type, draftAllocations[type] || 0),
+        (sum, type) => sum + Math.max(0, parseAmount(draftAllocations[type])),
         0,
     );
 }
@@ -510,16 +510,28 @@ export function applyAllocationPlan({
     draftAllocations = {},
     calendarYear,
     monthIndex,
+    /** When set, only replace these instrument types for the month plan; other types are preserved. */
+    replaceTypes = null,
 }) {
     const planKey = getAllocationPlanKey(calendarYear, monthIndex);
     const startMonth = monthIndex + 1;
-    const filtered = investmentAllocations.filter((a) => a.studioPlanKey !== planKey);
+    const typesToWrite = Array.isArray(replaceTypes) && replaceTypes.length > 0
+        ? replaceTypes.filter((t) => STUDIO_INSTRUMENT_TYPES.includes(t))
+        : STUDIO_INSTRUMENT_TYPES;
+    const replaceSet = new Set(typesToWrite);
+
+    const filtered = investmentAllocations.filter((a) => {
+        if (a.studioPlanKey !== planKey) return true;
+        const type = normalizeAllocType(a.type) || a.type;
+        return !replaceSet.has(type);
+    });
     const additions = [];
 
-    STUDIO_INSTRUMENT_TYPES.forEach((instrumentType) => {
+    typesToWrite.forEach((instrumentType) => {
         const amount = draftAllocations[instrumentType] || 0;
         if (amount <= 0) return;
         const def = INSTRUMENT_REGISTRY[instrumentType];
+        if (!def) return;
         additions.push({
             id: Date.now() + additions.length,
             type: def.allocType,
@@ -543,9 +555,19 @@ export function clearStudioMonthPlan({
     investmentAllocations = [],
     calendarYear,
     monthIndex,
+    /** When set, only clear these instrument types for the month. */
+    clearTypes = null,
 }) {
     const planKey = getAllocationPlanKey(calendarYear, monthIndex);
-    return investmentAllocations.filter((a) => a.studioPlanKey !== planKey);
+    if (!Array.isArray(clearTypes) || clearTypes.length === 0) {
+        return investmentAllocations.filter((a) => a.studioPlanKey !== planKey);
+    }
+    const clearSet = new Set(clearTypes);
+    return investmentAllocations.filter((a) => {
+        if (a.studioPlanKey !== planKey) return true;
+        const type = normalizeAllocType(a.type) || a.type;
+        return !clearSet.has(type);
+    });
 }
 
 export function removeInvestmentAllocationById(investmentAllocations = [], id) {

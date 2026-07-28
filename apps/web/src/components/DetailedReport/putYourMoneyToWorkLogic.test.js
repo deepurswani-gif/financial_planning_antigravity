@@ -14,6 +14,7 @@ import {
     computeJourneyAdjustmentImpactForMonth,
     getAllocationPlanKey,
     getGoalFutureValue,
+    getRecurringMonthlyAmount,
     getSelectableMonths,
     getLoanStartMonths,
     clampLoanStartMonth,
@@ -49,26 +50,29 @@ describe('putYourMoneyToWorkLogic', () => {
         expect(months[2].label).toBe('September');
     });
 
-    it('restricts future loan start months to current month onward in the current year', () => {
+    it('restricts future loan start months to the PYMTW window (current + 2 months)', () => {
         const months = getLoanStartMonths(2026, 2026, 6);
-        expect(months).toHaveLength(6);
+        expect(months).toHaveLength(3);
         expect(months[0].label).toBe('July');
-        expect(months[months.length - 1].label).toBe('December');
+        expect(months[1].label).toBe('August');
+        expect(months[months.length - 1].label).toBe('September');
     });
 
-    it('allows all months for future loan start years', () => {
+    it('keeps future loan start years within the same current + 2 month window', () => {
         const months = getLoanStartMonths(2027, 2026, 6);
-        expect(months).toHaveLength(12);
-        expect(months[0].label).toBe('January');
+        expect(months).toHaveLength(3);
+        expect(months[0].label).toBe('July');
+        expect(months[months.length - 1].label).toBe('September');
     });
 
-    it('clamps past loan start months when the year is current', () => {
+    it('clamps loan start months to the PYMTW window', () => {
         expect(clampLoanStartMonth(3, 2026, 2026, 6)).toBe(7);
         expect(clampLoanStartMonth(9, 2026, 2026, 6)).toBe(9);
+        expect(clampLoanStartMonth(12, 2026, 2026, 6)).toBe(9);
     });
 
-    it('does not clamp loan start months for future years', () => {
-        expect(clampLoanStartMonth(3, 2027, 2026, 6)).toBe(3);
+    it('clamps loan start months for future years into the PYMTW window', () => {
+        expect(clampLoanStartMonth(3, 2027, 2026, 6)).toBe(7);
     });
 
     it('summarizes journey adjustments', () => {
@@ -202,6 +206,61 @@ describe('putYourMoneyToWorkLogic', () => {
         expect(ctx.hero.carriedForward).toBe(8000);
     });
 
+    it('treats studio Life Insurance Saving Plans annual amount as monthly (not full year in one month)', () => {
+        // Draft ₹3,000/mo → stored annual ₹36,000. Surplus ₹8,000/mo from July.
+        const ledger = [0, 0, 0, 0, 0, 0, 8000, 8000, 8000, 0, 0, 0];
+        const allocations = [{
+            id: 1,
+            type: 'Life Insurance Saving Plans',
+            name: 'Studio Life Insurance Saving Plans (Jul 2026)',
+            amount: 36000,
+            frequency: 'Monthly',
+            startMonth: 7,
+            startYear: 2026,
+            studioPlanKey: '2026-6',
+        }];
+
+        expect(getRecurringMonthlyAmount(allocations[0])).toBe(3000);
+        expect(computeAllocationImpactForMonth(allocations, 2026, 6)).toBe(3000);
+        expect(computeAllocationImpactForMonth(allocations, 2026, 7)).toBe(3000);
+
+        const july = computeDeployableSurplusWithCarry({
+            unallocatedSurplusByMonth: ledger,
+            investmentAllocations: allocations,
+            journeyAdjustments: [],
+            calendarYear: 2026,
+            planStartMonth: 6,
+            selectedMonthIndex: 6,
+        });
+        expect(july.deployableSurplus).toBe(5000);
+
+        const aug = computeDeployableSurplusWithCarry({
+            unallocatedSurplusByMonth: ledger,
+            investmentAllocations: allocations,
+            journeyAdjustments: [],
+            calendarYear: 2026,
+            planStartMonth: 6,
+            selectedMonthIndex: 7,
+        });
+        // Aug: 8000 + 5000 July leftover - 3000 recurring = 10000
+        expect(aug.carriedForward).toBe(5000);
+        expect(aug.deployableSurplus).toBe(10000);
+
+        const outlook = buildThreeMonthSurplusOutlook({
+            unallocatedSurplusByMonth: ledger,
+            investmentAllocations: allocations,
+            journeyAdjustments: [],
+            calendarYear: 2026,
+            planStartMonth: 6,
+            currentMonth: 6,
+        });
+        const augustCard = outlook.find((m) => m.monthIndex === 7);
+        expect(augustCard.deployableSurplus).toBe(10000);
+        const julyRecurringOnAug = augustCard.recurringFromPriorMonths
+            .find((r) => r.type === 'Life Insurance Saving Plans');
+        expect(julyRecurringOnAug.amount).toBe(3000);
+    });
+
     it('carries unused one-time allocation leftovers across months', () => {
         const ledger = [0, 0, 0, 0, 0, 0, 20000, 20000, 20000, 0, 0, 0];
         const allocations = [{
@@ -261,6 +320,211 @@ describe('putYourMoneyToWorkLogic', () => {
             },
         ], surplus, 2026);
         expect(ok).toEqual({ ok: true });
+    });
+
+    it('allows future loans when EMI fits the PYMTW window even if later ledger months are empty', () => {
+        // July–Sep have surplus; Oct–Dec are 0 (common when only near-term months are projected).
+        const surplus = [0, 0, 0, 0, 0, 0, 30000, 30000, 30000, 0, 0, 0];
+        const selectableMonths = [
+            { monthIndex: 6, label: 'July' },
+            { monthIndex: 7, label: 'August' },
+            { monthIndex: 8, label: 'September' },
+        ];
+
+        const result = validateJourneyAdjustmentsAgainstSurplus(
+            [{
+                id: 1,
+                type: 'loan',
+                name: 'Personal Loan',
+                startYear: 2026,
+                startMonth: 7,
+                emi: 10000,
+                tenure: 24,
+                amount: 120000,
+                principal: 200000,
+                rate: 12,
+            }],
+            surplus,
+            2026,
+            { planStartMonth: 6, selectableMonths },
+        );
+        expect(result).toEqual({ ok: true });
+    });
+
+    it('still rejects future loans when EMI exceeds surplus inside the PYMTW window', () => {
+        const surplus = [0, 0, 0, 0, 0, 0, 8000, 8000, 8000, 0, 0, 0];
+        const selectableMonths = [
+            { monthIndex: 6, label: 'July' },
+            { monthIndex: 7, label: 'August' },
+            { monthIndex: 8, label: 'September' },
+        ];
+
+        const result = validateJourneyAdjustmentsAgainstSurplus(
+            [{
+                id: 1,
+                type: 'loan',
+                name: 'Personal Loan',
+                startYear: 2026,
+                startMonth: 7,
+                emi: 10000,
+                tenure: 24,
+                amount: 120000,
+            }],
+            surplus,
+            2026,
+            { planStartMonth: 6, selectableMonths },
+        );
+        expect(result.ok).toBe(false);
+        expect(result.monthLabel).toBe('July');
+        expect(result.surplus).toBe(8000);
+        expect(result.impact).toBe(10000);
+    });
+
+    it('rejects future financial adjustments when the month surplus is already fully allocated', () => {
+        const surplus = [0, 0, 0, 0, 0, 0, 30000, 25000, 20000, 0, 0, 0];
+        const allocations = [{
+            id: 1,
+            type: 'Liquid Mutual Fund',
+            name: 'Emergency Fund',
+            amount: 30000,
+            startMonth: 7,
+            startYear: 2026,
+            studioPlanKey: '2026-6',
+        }];
+
+        const over = validateJourneyAdjustmentsAgainstSurplus(
+            [{ id: 1, type: 'expense', name: 'Vacation', startYear: 2026, startMonth: 7, amount: 30000 }],
+            surplus,
+            2026,
+            { investmentAllocations: allocations, planStartMonth: 6 },
+        );
+        expect(over.ok).toBe(false);
+        expect(over.monthLabel).toBe('July');
+        expect(over.surplus).toBe(0);
+        expect(over.impact).toBe(30000);
+        expect(over.message).toMatch(/no surplus available for future financial adjustments/i);
+        expect(over.message).toMatch(/Protection/i);
+
+        const laterMonthOk = validateJourneyAdjustmentsAgainstSurplus(
+            [{ id: 2, type: 'expense', name: 'Laptop', startYear: 2026, startMonth: 8, amount: 20000 }],
+            surplus,
+            2026,
+            { investmentAllocations: allocations, planStartMonth: 6 },
+        );
+        expect(laterMonthOk).toEqual({ ok: true });
+    });
+
+    it('limits future financial adjustments to residual surplus after partial allocation', () => {
+        const surplus = [0, 0, 0, 0, 0, 0, 30000, 0, 0, 0, 0, 0];
+        const allocations = [{
+            id: 1,
+            type: 'Liquid Mutual Fund',
+            name: 'Emergency Fund',
+            amount: 20000,
+            startMonth: 7,
+            startYear: 2026,
+            studioPlanKey: '2026-6',
+        }];
+
+        const over = validateJourneyAdjustmentsAgainstSurplus(
+            [{ id: 1, type: 'expense', name: 'Trip', startYear: 2026, startMonth: 7, amount: 15000 }],
+            surplus,
+            2026,
+            { investmentAllocations: allocations, planStartMonth: 6 },
+        );
+        expect(over.ok).toBe(false);
+        expect(over.surplus).toBe(10000);
+        expect(over.impact).toBe(15000);
+
+        const ok = validateJourneyAdjustmentsAgainstSurplus(
+            [{ id: 1, type: 'expense', name: 'Trip', startYear: 2026, startMonth: 7, amount: 10000 }],
+            surplus,
+            2026,
+            { investmentAllocations: allocations, planStartMonth: 6 },
+        );
+        expect(ok).toEqual({ ok: true });
+    });
+
+    it('deducts Protection before FFA in deployable surplus and outlook breakdown', () => {
+        const ledger = [0, 0, 0, 0, 0, 0, 50000, 50000, 50000, 0, 0, 0];
+        const protection = [{
+            id: 1,
+            type: 'Term Insurance',
+            name: 'Term',
+            amount: 120000, // ₹10,000/mo annual storage
+            startMonth: 7,
+            startYear: 2026,
+            studioPlanKey: '2026-6',
+        }];
+        const ffa = [{
+            id: 1,
+            type: 'expense',
+            name: 'Trip',
+            startYear: 2026,
+            startMonth: 7,
+            amount: 15000,
+        }];
+
+        const july = computeDeployableSurplusWithCarry({
+            unallocatedSurplusByMonth: ledger,
+            investmentAllocations: protection,
+            journeyAdjustments: ffa,
+            calendarYear: 2026,
+            planStartMonth: 6,
+            selectedMonthIndex: 6,
+        });
+        // 50000 - 10000 protection - 15000 FFA = 25000
+        expect(july.protectionImpact).toBe(10000);
+        expect(july.journeyImpact).toBe(15000);
+        expect(july.deployableSurplus).toBe(25000);
+
+        const outlook = buildThreeMonthSurplusOutlook({
+            unallocatedSurplusByMonth: ledger,
+            investmentAllocations: protection,
+            journeyAdjustments: ffa,
+            calendarYear: 2026,
+            planStartMonth: 6,
+            currentMonth: 6,
+        });
+        const julyCard = outlook.find((m) => m.monthIndex === 6);
+        expect(julyCard.ledgerUnallocated).toBe(50000);
+        expect(julyCard.protectionImpact).toBe(10000);
+        expect(julyCard.journeyImpact).toBe(15000);
+        expect(julyCard.deployableSurplus).toBe(25000);
+    });
+
+    it('does not let growth allocations block FFA validation (Protection-before-FFA only)', () => {
+        const surplus = [0, 0, 0, 0, 0, 0, 30000, 0, 0, 0, 0, 0];
+        const growth = [{
+            id: 1,
+            type: 'SIP',
+            name: 'SIP',
+            amount: 300000, // ₹25,000/mo
+            startMonth: 7,
+            startYear: 2026,
+            studioPlanKey: '2026-6',
+        }];
+
+        const ok = validateJourneyAdjustmentsAgainstSurplus(
+            [{ id: 1, type: 'expense', name: 'Trip', startYear: 2026, startMonth: 7, amount: 20000 }],
+            surplus,
+            2026,
+            { investmentAllocations: growth, planStartMonth: 6 },
+        );
+        expect(ok).toEqual({ ok: true });
+    });
+
+    it('scopes instrument categories by report', () => {
+        const all = buildInstrumentCards([]);
+        expect(all.map((c) => c.id)).toEqual(['protection', 'growth', 'retirement']);
+        expect(all.find((c) => c.id === 'growth').instruments.map((i) => i.type)).toContain('Fixed Deposit');
+        expect(all.find((c) => c.id === 'retirement').instruments.map((i) => i.type)).toEqual(['PPF', 'NPS']);
+
+        const gaps = buildInstrumentCards([], { reportScope: 'gaps' });
+        expect(gaps.map((c) => c.id)).toEqual(['protection']);
+
+        const pymtw = buildInstrumentCards([], { reportScope: 'pymtw' });
+        expect(pymtw.map((c) => c.id)).toEqual(['growth', 'retirement']);
     });
 
     it('deducts one-time standard expenses from deployable surplus in the selected month', () => {

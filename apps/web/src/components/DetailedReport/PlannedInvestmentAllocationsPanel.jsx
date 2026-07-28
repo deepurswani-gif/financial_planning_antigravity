@@ -35,6 +35,8 @@ const PlannedInvestmentAllocationsPanel = ({
     onRemove,
     onClearMonthPlan,
     onEditMonthPlan,
+    clearDisabled = false,
+    clearDisabledReason = '',
     delay = 200,
     className = '',
 }) => {
@@ -71,7 +73,8 @@ const PlannedInvestmentAllocationsPanel = ({
     const filteredItems = useMemo(() => {
         if (!selectedChip) return [];
         return (allocationsSummary?.items || []).filter(
-            (item) => monthKeyForItem(item) === selectedChip.key,
+            (item) => monthKeyForItem(item) === selectedChip.key
+                && Math.round(item.amount || 0) > 0,
         );
     }, [allocationsSummary, selectedChip]);
 
@@ -79,6 +82,8 @@ const PlannedInvestmentAllocationsPanel = ({
         () => filteredItems.reduce((sum, item) => sum + (item.amount || 0), 0),
         [filteredItems],
     );
+
+    const hasPending = filteredItems.some((item) => item.pending);
 
     if (!allocationsSummary?.count) return null;
 
@@ -112,7 +117,8 @@ const PlannedInvestmentAllocationsPanel = ({
                 {selectedChip && selectedChip.key !== 'other' && (
                     <>
                         {' '}
-                        ₹{Math.round(selectedMonthCommitted).toLocaleString('en-IN')}/month committed for{' '}
+                        ₹{Math.round(selectedMonthCommitted).toLocaleString('en-IN')}/month
+                        {hasPending ? ' pending' : ' committed'} for{' '}
                         {selectedChip.label}.
                     </>
                 )}
@@ -125,6 +131,8 @@ const PlannedInvestmentAllocationsPanel = ({
                             type="button"
                             className="btn ius-alloc-plan-btn ius-alloc-clear-btn"
                             onClick={() => onClearMonthPlan(selectedChip.planKey)}
+                            disabled={clearDisabled}
+                            title={clearDisabled ? clearDisabledReason : undefined}
                         >
                             <Trash2 size={14} />
                             Clear {selectedChip.label} plan
@@ -156,8 +164,15 @@ const PlannedInvestmentAllocationsPanel = ({
                     </thead>
                     <tbody>
                         {filteredItems.map((item) => (
-                            <tr key={item.id}>
-                                <td>{item.type}</td>
+                            <tr key={item.id} className={item.pending ? 'ius-alloc-row-pending' : undefined}>
+                                <td>
+                                    <span className="ius-alloc-type-cell">
+                                        {item.type}
+                                        {item.pending && (
+                                            <span className="ius-alloc-pending-badge">Pending</span>
+                                        )}
+                                    </span>
+                                </td>
                                 <td>{monthLabelForItem(item)}</td>
                                 <td>{formatCurrency(item.amount)}</td>
                                 <td>{item.isMonthly ? 'Monthly' : 'One-time (annual impact)'}</td>
@@ -166,7 +181,7 @@ const PlannedInvestmentAllocationsPanel = ({
                                         <button
                                             type="button"
                                             className="ius-alloc-remove-btn"
-                                            onClick={() => onRemove(item.id)}
+                                            onClick={() => onRemove(item)}
                                             aria-label={`Remove ${item.type} for ${monthLabelForItem(item)}`}
                                         >
                                             <Trash2 size={14} />
@@ -235,6 +250,10 @@ const PlannedInvestmentAllocationsPanel = ({
                     padding: 0.45rem 0.85rem;
                     font-weight: 600;
                 }
+                .ius-alloc-plan-btn:disabled {
+                    opacity: 0.55;
+                    cursor: not-allowed;
+                }
                 .ius-alloc-edit-btn {
                     box-shadow: 0 1px 2px rgba(16, 185, 129, 0.25);
                 }
@@ -243,7 +262,7 @@ const PlannedInvestmentAllocationsPanel = ({
                     background: rgba(254, 226, 226, 0.55);
                     color: #b91c1c;
                 }
-                .ius-alloc-clear-btn:hover {
+                .ius-alloc-clear-btn:hover:not(:disabled) {
                     background: rgba(254, 202, 202, 0.85);
                     border-color: rgba(185, 28, 28, 0.55);
                     color: #991b1b;
@@ -253,6 +272,26 @@ const PlannedInvestmentAllocationsPanel = ({
                 .ius-alloc-table th, .ius-alloc-table td { padding: 0.65rem 0.75rem; border-bottom: 1px solid var(--border); text-align: left; }
                 .ius-alloc-table th { background: var(--bg-main); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
                 .ius-alloc-table tr:last-child td { border-bottom: none; }
+                .ius-alloc-row-pending td { background: rgba(245, 158, 11, 0.06); }
+                .ius-alloc-type-cell {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.45rem;
+                    flex-wrap: wrap;
+                }
+                .ius-alloc-pending-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    font-size: 0.68rem;
+                    font-weight: 700;
+                    letter-spacing: 0.03em;
+                    text-transform: uppercase;
+                    color: #b45309;
+                    background: rgba(251, 191, 36, 0.22);
+                    border: 1px solid rgba(245, 158, 11, 0.35);
+                    border-radius: 999px;
+                    padding: 0.12rem 0.45rem;
+                }
                 .ius-alloc-empty { color: var(--text-muted); font-style: italic; }
                 .ius-alloc-actions-col { width: 7rem; }
                 .ius-alloc-remove-btn {

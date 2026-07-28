@@ -618,7 +618,8 @@ const ReportView = ({ onBack }) => {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                             {[...goalResults.short, ...goalResults.medium, ...goalResults.long].map((g, i) => {
                                 const mappingDict = goalMappings[g.id] || {};
-                                const selectedSources = Object.keys(mappingDict);
+                                const selectedSources = Object.keys(mappingDict)
+                                    .filter((key) => (parseFloat(mappingDict[key]) || 0) > 0);
                                 const totalAssigned = Object.values(mappingDict).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
                                 const shortfall = (g.futureCost || 0) - totalAssigned;
                                 const isFullyFunded = Math.round(shortfall) <= 0;
@@ -687,6 +688,7 @@ const ReportView = ({ onBack }) => {
                                                             { id: 'sip', name: 'SIP' },
                                                             { id: 'lumpsum', name: 'Lumpsum' },
                                                             { id: 'equity', name: 'Direct Equity & ETFs' },
+                                                            { id: 'futureSurplus', name: 'Accumulated surplus not yet invested' },
                                                             { id: 'fd', name: 'Fixed Deposit (FD)' },
                                                             { id: 'rd', name: 'Recurring Deposit (RD)' },
                                                             { id: 'realEstate', name: 'Real Estate Investment' },

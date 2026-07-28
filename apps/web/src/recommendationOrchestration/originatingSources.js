@@ -50,6 +50,12 @@ export const SOURCE_BY_REPORT = Object.freeze({
     engineId: 'investSurplusLogic',
     engineName: 'Invest Surplus Logic',
   }),
+  fix_your_financial_gaps: Object.freeze({
+    reportId: 'fix_your_financial_gaps',
+    reportName: 'Fix Your Financial Gaps',
+    engineId: 'investSurplusLogic',
+    engineName: 'Invest Surplus Logic',
+  }),
   put_your_money_to_work: Object.freeze({
     reportId: 'put_your_money_to_work',
     reportName: 'Put Your Money To Work',

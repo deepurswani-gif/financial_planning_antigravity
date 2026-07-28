@@ -54,13 +54,13 @@ describe('allocationStudioValidation', () => {
         expect(result.issues.some((i) => i.id === 'journey-deficit-exists')).toBe(true);
     });
 
-    it('excludes lumpsum from monthly draft total', () => {
+    it('includes lumpsum in draft total for surplus checks', () => {
         const total = getTotalDraftAllocated({
             SIP: 3000,
             Lumpsum: 3000,
             'Direct Equity & ETFs': 2000,
         });
-        expect(total).toBe(3000);
+        expect(total).toBe(8000);
     });
 
     it('allows PPF reduction when editing existing studio plan', () => {

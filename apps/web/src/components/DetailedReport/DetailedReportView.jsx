@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate, useParams, Navigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import YourMoneyFlowSection from './YourMoneyFlowSection';
+import FixYourFinancialGapsSection from './FixYourFinancialGapsSection';
 import PutYourMoneyToWorkSection from './PutYourMoneyToWorkSection';
 import TrackSurplusAllocationSection from './TrackSurplusAllocationSection';
 import {
@@ -13,6 +14,7 @@ import {
 
 const SECTION_BY_SLUG = {
     your_money_flow: YourMoneyFlowSection,
+    fix_your_financial_gaps: FixYourFinancialGapsSection,
     put_your_money_to_work: PutYourMoneyToWorkSection,
     your_moneys_magic: TrackSurplusAllocationSection,
 };

@@ -55,15 +55,35 @@ describe('Landing resolver', () => {
   it('resolves life insurance to the detailed life-insurance question', () => {
     const life = getExperienceById('protection.lifeInsurance');
     const landing = resolveLanding(life, { capability: 'full' });
-    expect(landing.control).toBe('collection');
+    expect(landing.control).toBe('question');
     expect(landing.questionId).toBe('life-insurance');
-    expect(landing.collectionFieldId).toBe('protection.life.policies');
+    expect(landing.collectionFieldId).toBeNull();
   });
 
-  it('resolves personal loan to the emi-loans configure question', () => {
-    const loans = getExperienceById('debt.loans');
-    const landing = resolveLanding(loans, { capability: 'full' });
-    expect(landing.questionId).toBe('emi-loans');
+  it('resolves PPF/NPS to the savings-breakdown configure question', () => {
+    const ppf = resolveLanding(getExperienceById('savings.ppf'), { capability: 'full' });
+    expect(ppf.control).toBe('configure');
+    expect(ppf.questionId).toBe('savings-breakdown');
+
+    const addRd = resolveLanding(getExperienceById('savings.addRecurringDeposit'), { capability: 'full' });
+    expect(addRd.control).toBe('collection');
+    expect(addRd.questionId).toBe('savings-breakdown');
+  });
+
+  it('resolves Loans & EMIs to the recap-emi gate (Yes/No)', () => {
+    const landing = resolveLanding(getExperienceById('debt.loans'), { capability: 'full' });
+    expect(landing.landingTargetId).toBe('loan.emiGate');
+    expect(landing.control).toBe('question');
+    expect(landing.questionId).toBe('recap-emi');
+  });
+
+  it('resolves vehicle insurance to the vehicle-other-insurance question', () => {
+    const landing = resolveLanding(getExperienceById('protection.vehicleInsurance'), {
+      capability: 'full',
+    });
+    expect(landing.landingTargetId).toBe('insurance.vehicle');
+    expect(landing.control).toBe('question');
+    expect(landing.questionId).toBe('vehicle-other-insurance');
   });
 
   it('resolves goals sub-questions distinctly', () => {
@@ -102,8 +122,7 @@ describe('resolveLaunch — landing descriptor', () => {
     const descriptor = resolveLaunch(life, { capability: 'full' });
     expect(descriptor.sectionId).toBeTruthy();
     expect(descriptor.landingQuestionId).toBe('life-insurance');
-    expect(descriptor.landingControl).toBe('collection');
-    expect(descriptor.collectionFieldId).toBe('protection.life.policies');
+    expect(descriptor.landingControl).toBe('question');
   });
 
   it('focused edits still resolve a landing target id', () => {

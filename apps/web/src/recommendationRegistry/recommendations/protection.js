@@ -91,7 +91,7 @@ export const PROTECTION_RECOMMENDATIONS = [
     severity: 'medium',
     priority: 40,
     triggerId: 'HAS_PROTECTION_GAP',
-    reports: ['put_your_money_to_work'],
+    reports: ['fix_your_financial_gaps'],
     relatedDomains: ['protection'],
     relatedFields: ['protection.life.totalCover'],
     relatedMetrics: ['protectionGap'],

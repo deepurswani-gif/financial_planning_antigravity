@@ -5,6 +5,8 @@ import {
 import { formatCurrency } from '../CashFlowModule/CashFlowLogic';
 import ReportReveal from './ReportReveal';
 import { INSTRUMENT_REGISTRY } from './instrumentAnalysisLogic';
+import AllocationStudioStickyBar from './AllocationStudioStickyBar';
+import { isCategoryDirty, sumCategoryDraft } from './allocationStudioUiState';
 
 const ICONS = {
     SIP: TrendingUp,
@@ -96,8 +98,12 @@ const InstrumentCard = ({
                     min={0}
                     max={Math.max(0, maxAmount)}
                     step={def?.step || 500}
-                    value={Math.min(draftAmount, Math.max(0, maxAmount))}
-                    onChange={(e) => onDraftChange(instrument.type, parseInt(e.target.value, 10))}
+                    value={Math.min(draftAmount || 0, Math.max(0, maxAmount))}
+                    onChange={(e) => {
+                        const next = parseInt(e.target.value, 10) || 0;
+                        if (next === Math.round(draftAmount || 0)) return;
+                        onDraftChange(instrument.type, next);
+                    }}
                     aria-label={`${displayName || instrument.type} allocation slider`}
                 />
                 <div className="pymtw-sip-slider-labels">
@@ -129,10 +135,11 @@ const getInstrumentDisplayName = (category, instrument) => (
     category.instrumentLabels?.[instrument.type] || instrument.type
 );
 
-
 const InstrumentCardGrid = ({
     instrumentCategories,
     draftAllocations,
+    headerAllocations = null,
+    baselineAllocations = null,
     remainingSurplus,
     getMaxAmountForInstrument,
     onDraftChange,
@@ -143,8 +150,30 @@ const InstrumentCardGrid = ({
     selectedMonthIndex,
     onMonthChange,
     calendarYear,
+    isDirty = false,
+    showStickyBar = true,
+    editingMonthLabel = '',
+    totalMonthlyAllocation = 0,
+    saveLabel = 'Save Plan',
+    statusHint = '',
+    saveSuccessMessage = '',
+    onDiscardChanges,
+    showUnsavedBanner = false,
+    replaceConfirm = null,
+    monthSwitchConfirm = null,
+    showMonthPicker = true,
 }) => {
-    const [expandedId, setExpandedId] = useState(null);
+    const [expandedId, setExpandedId] = useState(
+        () => (instrumentCategories?.length === 1 ? instrumentCategories[0].id : null),
+    );
+    const headerDraft = headerAllocations || draftAllocations;
+    const baseline = baselineAllocations || headerDraft;
+
+    useEffect(() => {
+        if (instrumentCategories?.length === 1) {
+            setExpandedId(instrumentCategories[0].id);
+        }
+    }, [instrumentCategories]);
 
     const toggleCategory = (id) => {
         setExpandedId((prev) => (prev === id ? null : id));
@@ -162,7 +191,7 @@ const InstrumentCardGrid = ({
                         </strong>
                     </p>
                 </div>
-                {selectableMonths.length > 0 && onMonthChange && (
+                {showMonthPicker && selectableMonths.length > 0 && onMonthChange && (
                     <div className="pymtw-month-picker">
                         <Calendar size={16} />
                         <select
@@ -180,12 +209,21 @@ const InstrumentCardGrid = ({
                 )}
             </div>
 
+            {showUnsavedBanner && (
+                <div className="pymtw-unsaved-banner" role="status">
+                    <strong>You have unsaved changes.</strong>
+                    <span>Save Plan to update your monthly allocation.</span>
+                </div>
+            )}
+
+            {monthSwitchConfirm}
+
+            {replaceConfirm}
+
             {instrumentCategories.map((category) => {
                 const isOpen = expandedId === category.id;
-                const allocatedInCategory = category.instruments.reduce(
-                    (sum, instrument) => sum + (draftAllocations[instrument.type] || 0),
-                    0,
-                );
+                const allocatedInCategory = sumCategoryDraft(category, headerDraft);
+                const categoryDirty = isCategoryDirty(category, headerDraft, baseline);
 
                 return (
                     <div key={category.id} className={`pymtw-category-block ${isOpen ? 'pymtw-category-open' : ''}`}>
@@ -209,11 +247,16 @@ const InstrumentCardGrid = ({
                                         </span>
                                     ))}
                                 </div>
-                                {allocatedInCategory > 0 && (
+                                <div className="pymtw-category-status-row">
                                     <span className="pymtw-category-meta">
-                                        {formatCurrency(allocatedInCategory)} allocated
+                                        {formatCurrency(allocatedInCategory)}/month allocated
                                     </span>
-                                )}
+                                    <span
+                                        className={`pymtw-category-save-chip ${categoryDirty ? 'pymtw-category-save-chip-dirty' : 'pymtw-category-save-chip-saved'}`}
+                                    >
+                                        {categoryDirty ? '● Unsaved' : '✓ Saved'}
+                                    </span>
+                                </div>
                             </div>
                             <span className={`pymtw-category-action ${isOpen ? 'pymtw-category-action-open' : ''}`}>
                                 <span className="pymtw-category-action-label">
@@ -253,22 +296,21 @@ const InstrumentCardGrid = ({
                 );
             })}
 
-            {onApplyManualAllocations && (
-                <div className="pymtw-manual-apply-row">
-                    <button
-                        type="button"
-                        className="btn btn-primary"
-                        onClick={onApplyManualAllocations}
-                        disabled={!canApplyManual}
-                    >
-                        Apply my allocations
-                    </button>
-                    {applyError && (
-                        <div className="pymtw-apply-error" role="alert">
-                            {applyError}
-                        </div>
-                    )}
-                </div>
+            {showStickyBar && (
+                <AllocationStudioStickyBar
+                    editingMonthLabel={editingMonthLabel}
+                    remainingSurplus={remainingSurplus}
+                    totalMonthlyAllocation={totalMonthlyAllocation}
+                    isDirty={isDirty}
+                    canSave={canApplyManual && isDirty}
+                    saveLabel={saveLabel}
+                    statusHint={statusHint}
+                    applyError={applyError}
+                    saveSuccessMessage={saveSuccessMessage}
+                    onDiscard={onDiscardChanges}
+                    onSave={onApplyManualAllocations}
+                    discardDisabled={!isDirty}
+                />
             )}
         </ReportReveal>
     );

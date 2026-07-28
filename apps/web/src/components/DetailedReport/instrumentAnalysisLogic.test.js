@@ -104,6 +104,53 @@ describe('instrumentAnalysisLogic', () => {
         expect(appliedPpf?.duration).toBe(15);
     });
 
+    it('merges scoped replaceTypes without wiping other instruments in the same month', () => {
+        const existing = applyAllocationPlan({
+            investmentAllocations: [],
+            draftAllocations: { ...createEmptyDraftAllocations(), SIP: 10000, 'Term Insurance': 2000 },
+            calendarYear: 2026,
+            monthIndex: 6,
+        });
+        expect(existing.filter((a) => a.studioPlanKey === '2026-6')).toHaveLength(2);
+
+        const afterProtectionEdit = applyAllocationPlan({
+            investmentAllocations: existing,
+            draftAllocations: { ...createEmptyDraftAllocations(), 'Term Insurance': 3000 },
+            calendarYear: 2026,
+            monthIndex: 6,
+            replaceTypes: ['Term Insurance', 'Health Insurance', 'Liquid Mutual Fund'],
+        });
+        expect(afterProtectionEdit.find((a) => a.type === 'SIP')?.amount).toBe(120000);
+        expect(afterProtectionEdit.find((a) => a.type === 'Term Insurance')?.amount).toBe(36000);
+
+        const afterGrowthEdit = applyAllocationPlan({
+            investmentAllocations: afterProtectionEdit,
+            draftAllocations: { ...createEmptyDraftAllocations(), SIP: 5000 },
+            calendarYear: 2026,
+            monthIndex: 6,
+            replaceTypes: ['SIP', 'Lumpsum', 'Direct Equity & ETFs', 'Fixed Deposit', 'Recurring Deposit', 'Life Insurance Saving Plans', 'PPF', 'NPS'],
+        });
+        expect(afterGrowthEdit.find((a) => a.type === 'Term Insurance')?.amount).toBe(36000);
+        expect(afterGrowthEdit.find((a) => a.type === 'SIP')?.amount).toBe(60000);
+    });
+
+    it('clears only scoped instrument types for a month', () => {
+        const applied = applyAllocationPlan({
+            investmentAllocations: [],
+            draftAllocations: { ...createEmptyDraftAllocations(), SIP: 10000, 'Term Insurance': 2000 },
+            calendarYear: 2026,
+            monthIndex: 6,
+        });
+        const clearedGrowth = clearStudioMonthPlan({
+            investmentAllocations: applied,
+            calendarYear: 2026,
+            monthIndex: 6,
+            clearTypes: ['SIP', 'PPF'],
+        });
+        expect(clearedGrowth.find((a) => a.type === 'SIP')).toBeUndefined();
+        expect(clearedGrowth.find((a) => a.type === 'Term Insurance')).toBeTruthy();
+    });
+
     it('clears all studio allocations for a month', () => {
         const applied = applyAllocationPlan({
             investmentAllocations: [{ id: 99, type: 'SIP', amount: 60000, studioPlanKey: '2026-5' }],

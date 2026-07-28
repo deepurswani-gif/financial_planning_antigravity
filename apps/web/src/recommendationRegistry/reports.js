@@ -17,6 +17,7 @@ export const REPORT_IDS = Object.freeze([
   'useful_insights',
   // Detailed reports
   'your_money_flow',
+  'fix_your_financial_gaps',
   'put_your_money_to_work',
   'your_moneys_magic',
   'invest_surplus',

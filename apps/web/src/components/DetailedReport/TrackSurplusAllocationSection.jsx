@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useNavigateToDetailReport } from './reportNavigation';
 import {
     Target,
@@ -8,24 +8,57 @@ import {
     CheckCircle2,
     AlertCircle,
     ArrowRight,
-    ArrowDown,
     MapPin,
     Flag,
     Map,
+    ChevronDown,
+    ChevronUp,
+    Pencil,
 } from 'lucide-react';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 import { formatCurrency } from '../CashFlowModule/CashFlowLogic';
-import { buildTrackSurplusAllocationReport } from './trackSurplusAllocationLogic';
+import { resolveEmploymentType } from '../DetailedFlow/employmentTypeSync';
+import { calculateRetirementYear } from '../ProfileModule/ProfileLogic';
+import { buildYourMoneyFlowReport } from './moneyFlowLedgerLogic';
+import {
+    buildApplyPayload,
+    buildTrackSurplusAllocationReport,
+    clampAvenueAmount,
+    FUTURE_SURPLUS_AVENUE_ID,
+    mergeGoalMapping,
+    sanitizePlanningMappings,
+    SCENARIO_WEALTH,
+} from './trackSurplusAllocationLogic';
 import ReportReveal from './ReportReveal';
 
-const coveragePct = (amount, goalAmount) => {
-    if (!goalAmount || goalAmount <= 0) return 0;
-    return Math.min(100, Math.round((Math.max(0, amount) / goalAmount) * 100));
-};
-
-/** Winding route across a 640×220 map canvas (Google Maps–style). */
+/** Winding route across a 640×220 map canvas. */
 const ROUTE_PATH = 'M 48 168 C 110 40, 170 200, 240 112 S 340 36, 400 128 S 470 210, 592 72';
 const MAP_VIEWBOX = { w: 640, h: 220 };
+
+const mappingsEqual = (a = {}, b = {}) => {
+    const keys = [FUTURE_SURPLUS_AVENUE_ID, 'sip', 'equity', 'lumpsum'];
+    return keys.every((key) => Math.round(a[key] || 0) === Math.round(b[key] || 0));
+};
+
+const CUSTOMIZED_STORAGE_KEY = 'ymm_customized_goal_ids';
+
+const loadCustomizedGoalIds = () => {
+    try {
+        const raw = sessionStorage.getItem(CUSTOMIZED_STORAGE_KEY);
+        const list = raw ? JSON.parse(raw) : [];
+        return new Set(Array.isArray(list) ? list : []);
+    } catch {
+        return new Set();
+    }
+};
+
+const persistCustomizedGoalIds = (ids) => {
+    try {
+        sessionStorage.setItem(CUSTOMIZED_STORAGE_KEY, JSON.stringify([...ids]));
+    } catch {
+        /* ignore quota / private mode */
+    }
+};
 
 const pointAlongPath = (pathEl, pct) => {
     if (!pathEl) return { x: 0, y: 0 };
@@ -34,7 +67,12 @@ const pointAlongPath = (pathEl, pct) => {
     return { x: point.x, y: point.y };
 };
 
-const RoutePin = ({ tone, label, amount, x, y, icon: Icon }) => (
+const yearProgress = (year, startYear, endYear) => {
+    if (endYear <= startYear) return year <= startYear ? 0 : 1;
+    return Math.min(1, Math.max(0, (year - startYear) / (endYear - startYear)));
+};
+
+const JourneyMilestone = ({ tone, label, sublabel, x, y, icon: Icon }) => (
     <button
         type="button"
         className={`ymm-map-pin ymm-map-pin-${tone}`}
@@ -42,76 +80,126 @@ const RoutePin = ({ tone, label, amount, x, y, icon: Icon }) => (
             left: `${(x / MAP_VIEWBOX.w) * 100}%`,
             top: `${(y / MAP_VIEWBOX.h) * 100}%`,
         }}
-        aria-label={`${label}: ${formatCurrency(amount)}`}
+        aria-label={sublabel ? `${label}: ${sublabel}` : label}
     >
         <span className="ymm-map-pin-dot" aria-hidden="true">
             <Icon size={14} />
         </span>
         <span className="ymm-map-pin-tooltip" role="tooltip">
             <strong>{label}</strong>
-            <span>{formatCurrency(amount)}</span>
+            {sublabel ? <span>{sublabel}</span> : null}
         </span>
     </button>
 );
 
-const FundingRouteMap = ({ asOfCorpus, totals }) => {
+const GoalTimeline = ({ currentYear, endYear, retirementYear, goals = [] }) => {
+    const span = Math.max(1, endYear - currentYear);
+    return (
+        <div className="ymm-goal-timeline" aria-label="Goals timeline">
+            <div className="ymm-goal-timeline-bar" />
+            <div
+                className="ymm-goal-timeline-marker ymm-goal-timeline-start"
+                style={{ left: '0%' }}
+            >
+                <span className="ymm-goal-timeline-dot" />
+                <span className="ymm-goal-timeline-label">{currentYear}</span>
+            </div>
+            {retirementYear >= currentYear && retirementYear <= endYear && (
+                <div
+                    className="ymm-goal-timeline-marker ymm-goal-timeline-retire"
+                    style={{ left: `${((retirementYear - currentYear) / span) * 100}%` }}
+                >
+                    <span className="ymm-goal-timeline-dot" />
+                    <span className="ymm-goal-timeline-label">Retire {retirementYear}</span>
+                </div>
+            )}
+            {goals.map((goal) => {
+                const pct = ((goal.targetYear - currentYear) / span) * 100;
+                return (
+                    <div
+                        key={goal.goalId}
+                        className="ymm-goal-timeline-marker"
+                        style={{ left: `${Math.min(100, Math.max(0, pct))}%` }}
+                        title={`${goal.name} · ${goal.targetYear}`}
+                    >
+                        <span className="ymm-goal-timeline-dot" style={{ background: goal.accent?.hex }} />
+                        <span className="ymm-goal-timeline-label">
+                            {goal.name}
+                            <em>{goal.targetYear}</em>
+                        </span>
+                    </div>
+                );
+            })}
+            <div
+                className="ymm-goal-timeline-marker ymm-goal-timeline-end"
+                style={{ left: '100%' }}
+            >
+                <span className="ymm-goal-timeline-dot" />
+                <span className="ymm-goal-timeline-label">{endYear}</span>
+            </div>
+        </div>
+    );
+};
+
+const JourneyMap = ({
+    currentYear,
+    retirementYear,
+    farthestGoalYear,
+    goals = [],
+}) => {
     const pathRef = useRef(null);
-    const [pinPoints, setPinPoints] = useState({
-        start: { x: 48, y: 168 },
-        mid: { x: 320, y: 110 },
-        busy: { x: 460, y: 140 },
-        end: { x: 592, y: 72 },
-    });
+    const [pinPoints, setPinPoints] = useState(null);
 
-    const futureValue = Math.max(0, totals.futureValue || 0);
-    const afterAllocation = Math.max(0, totals.afterAllocation || 0);
-    const shortfall = Math.max(0, totals.shortfall || 0);
-    const fullyFunded = futureValue > 0 && shortfall <= 0;
+    const endYear = Math.max(retirementYear || currentYear, farthestGoalYear || currentYear, currentYear);
 
-    const travelledPct = futureValue > 0
-        ? Math.min(100, (afterAllocation / futureValue) * 100)
-        : 0;
+    const milestones = useMemo(() => {
+        const items = [
+            {
+                id: 'here',
+                tone: 'start',
+                label: `You are here (${currentYear})`,
+                sublabel: null,
+                year: currentYear,
+                icon: MapPin,
+            },
+            ...goals.map((goal) => ({
+                id: `goal-${goal.goalId}`,
+                tone: 'travelled',
+                label: goal.name,
+                sublabel: String(goal.targetYear),
+                year: goal.targetYear,
+                icon: Target,
+            })),
+            {
+                id: 'retire',
+                tone: 'dest',
+                label: `Retirement Year (${retirementYear})`,
+                sublabel: null,
+                year: retirementYear,
+                icon: Flag,
+            },
+        ];
+        return items;
+    }, [currentYear, retirementYear, goals]);
 
     useLayoutEffect(() => {
         const pathEl = pathRef.current;
-        if (!pathEl || futureValue <= 0) return;
-        const midPct = travelledPct / 100;
-        const busyPct = midPct + (1 - midPct) / 2;
-        setPinPoints({
-            start: pointAlongPath(pathEl, 0),
-            mid: pointAlongPath(pathEl, midPct <= 0 ? 0.08 : Math.min(0.92, Math.max(0.08, midPct))),
-            busy: pointAlongPath(pathEl, Math.min(0.96, Math.max(midPct + 0.06, busyPct))),
-            end: pointAlongPath(pathEl, 1),
+        if (!pathEl) return;
+        const next = {};
+        milestones.forEach((item) => {
+            next[item.id] = pointAlongPath(pathEl, yearProgress(item.year, currentYear, endYear));
         });
-    }, [travelledPct, futureValue]);
-
-    if (futureValue <= 0) {
-        return (
-            <div className="card ymm-route-card">
-                <div className="ymm-route-header">
-                    <Map size={18} className="ymm-route-header-icon" />
-                    <div>
-                        <div className="ymm-route-title">Your funding route</div>
-                        <p className="ymm-route-sub">
-                            From today&apos;s position to the total value of your goals.
-                        </p>
-                    </div>
-                </div>
-                <p className="ymm-route-empty">No goals to route toward yet.</p>
-            </div>
-        );
-    }
-
-    const clearDash = `${travelledPct} ${Math.max(0, 100 - travelledPct)}`;
+        setPinPoints(next);
+    }, [milestones, currentYear, endYear]);
 
     return (
-        <div className={`card ymm-route-card${fullyFunded ? ' ymm-route-arrived' : ''}`}>
+        <div className="card ymm-route-card">
             <div className="ymm-route-header">
                 <Map size={18} className="ymm-route-header-icon" />
                 <div>
-                    <div className="ymm-route-title">Your funding route</div>
+                    <div className="ymm-route-title">Where the money comes from</div>
                     <p className="ymm-route-sub">
-                        From today&apos;s position to the total value of your goals.
+                        Your journey from today to retirement. Goals appear as milestones along the way.
                     </p>
                 </div>
             </div>
@@ -119,7 +207,7 @@ const FundingRouteMap = ({ asOfCorpus, totals }) => {
             <div
                 className="ymm-map-canvas"
                 role="img"
-                aria-label={`Funding route: ${formatCurrency(afterAllocation)} of ${formatCurrency(futureValue)} covered`}
+                aria-label={`Journey from ${currentYear} to retirement ${retirementYear}`}
             >
                 <div className="ymm-map-surface">
                     <svg
@@ -137,135 +225,128 @@ const FundingRouteMap = ({ asOfCorpus, totals }) => {
                                     strokeWidth="1"
                                 />
                             </pattern>
-                            <filter id="ymm-route-glow" x="-20%" y="-20%" width="140%" height="140%">
-                                <feDropShadow dx="0" dy="1" stdDeviation="1.2" floodOpacity="0.25" />
-                            </filter>
                         </defs>
                         <rect width={MAP_VIEWBOX.w} height={MAP_VIEWBOX.h} fill="url(#ymm-map-grid)" />
-                        <rect x="70" y="30" width="70" height="48" rx="6" fill="rgba(148, 163, 184, 0.12)" />
-                        <rect x="200" y="150" width="90" height="40" rx="6" fill="rgba(148, 163, 184, 0.1)" />
-                        <rect x="420" y="24" width="80" height="55" rx="6" fill="rgba(148, 163, 184, 0.11)" />
-                        <rect x="500" y="140" width="70" height="45" rx="6" fill="rgba(148, 163, 184, 0.1)" />
-
-                        {/* Road casing */}
-                        <path
-                            d={ROUTE_PATH}
-                            fill="none"
-                            stroke="rgba(255, 255, 255, 0.95)"
-                            strokeWidth="14"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                        />
-
-                        {/* Busy roads — dashed full route; clear stroke covers the travelled portion */}
-                        {!fullyFunded && (
-                            <path
-                                d={ROUTE_PATH}
-                                fill="none"
-                                stroke="#dc2626"
-                                strokeWidth="7"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeDasharray="5 5"
-                                filter="url(#ymm-route-glow)"
-                            />
-                        )}
-
-                        {/* Easy-travel road */}
                         <path
                             ref={pathRef}
                             d={ROUTE_PATH}
                             pathLength="100"
                             fill="none"
-                            stroke={fullyFunded ? '#059669' : '#2563eb'}
+                            stroke="#2563eb"
                             strokeWidth="7"
                             strokeLinecap="round"
                             strokeLinejoin="round"
-                            strokeDasharray={clearDash}
-                            filter="url(#ymm-route-glow)"
                         />
                     </svg>
                 </div>
 
-                <div className="ymm-map-pins">
-                    <RoutePin
-                        tone="start"
-                        label="Current Position"
-                        amount={asOfCorpus.total}
-                        x={pinPoints.start.x}
-                        y={pinPoints.start.y}
-                        icon={MapPin}
-                    />
-                    {travelledPct > 0 && travelledPct < 100 && (
-                        <RoutePin
-                            tone="travelled"
-                            label="Distance you can easily travel"
-                            amount={afterAllocation}
-                            x={pinPoints.mid.x}
-                            y={pinPoints.mid.y}
-                            icon={MapPin}
-                        />
-                    )}
-                    {shortfall > 0 && (
-                        <RoutePin
-                            tone="busy"
-                            label="Busy roads in your journey"
-                            amount={shortfall}
-                            x={pinPoints.busy.x}
-                            y={pinPoints.busy.y}
-                            icon={AlertCircle}
-                        />
-                    )}
-                    <RoutePin
-                        tone={fullyFunded ? 'arrived' : 'dest'}
-                        label={fullyFunded ? 'Arrived — All goals' : 'All goals'}
-                        amount={futureValue}
-                        x={pinPoints.end.x}
-                        y={pinPoints.end.y}
-                        icon={fullyFunded ? CheckCircle2 : Flag}
-                    />
-                </div>
-            </div>
-
-            <div className="ymm-map-legend">
-                <div className="ymm-map-legend-item ymm-map-legend-start">
-                    <span className="ymm-map-legend-swatch" aria-hidden="true" />
-                    <div>
-                        <div className="ymm-map-legend-label">Current Position</div>
-                        <strong>{formatCurrency(asOfCorpus.total)}</strong>
-                    </div>
-                </div>
-                <div className="ymm-map-legend-item ymm-map-legend-travelled">
-                    <span className="ymm-map-legend-swatch" aria-hidden="true" />
-                    <div>
-                        <div className="ymm-map-legend-label">Distance you can easily travel</div>
-                        <strong>{formatCurrency(afterAllocation)}</strong>
-                        <em>Funds you can manage</em>
-                    </div>
-                </div>
-                {shortfall > 0 ? (
-                    <div className="ymm-map-legend-item ymm-map-legend-busy">
-                        <span className="ymm-map-legend-swatch" aria-hidden="true" />
-                        <div>
-                            <div className="ymm-map-legend-label">Busy roads in your journey</div>
-                            <strong>{formatCurrency(shortfall)}</strong>
-                            <em>Funds still needed</em>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="ymm-map-legend-item ymm-map-legend-arrived">
-                        <span className="ymm-map-legend-swatch" aria-hidden="true" />
-                        <div>
-                            <div className="ymm-map-legend-label">Route clear</div>
-                            <strong>Nothing more needed</strong>
-                        </div>
+                {pinPoints && (
+                    <div className="ymm-map-pins">
+                        {milestones.map((item) => {
+                            const pt = pinPoints[item.id];
+                            if (!pt) return null;
+                            return (
+                                <JourneyMilestone
+                                    key={item.id}
+                                    tone={item.tone}
+                                    label={item.label}
+                                    sublabel={item.sublabel}
+                                    x={pt.x}
+                                    y={pt.y}
+                                    icon={item.icon}
+                                />
+                            );
+                        })}
                     </div>
                 )}
-                <div className={`ymm-map-legend-item ${fullyFunded ? 'ymm-map-legend-arrived' : 'ymm-map-legend-dest'}`}>
-                    <span className="ymm-map-legend-swatch" aria-hidden="true" />
+            </div>
+
+            <GoalTimeline
+                currentYear={currentYear}
+                endYear={endYear}
+                retirementYear={retirementYear}
+                goals={goals}
+            />
+        </div>
+    );
+};
+
+const CompositionBar = ({ composition, accent }) => {
+    const total = composition.reduce((sum, item) => sum + item.amount, 0);
+    if (total <= 0) {
+        return (
+            <div className="ymm-composition-empty">
+                <AlertCircle size={14} />
+                Nothing is funding this goal yet.
+            </div>
+        );
+    }
+
+    return (
+        <div className="ymm-composition">
+            <div className="ymm-composition-title">Suggested allocation for this Goal</div>
+            <div className="ymm-composition-bar" aria-hidden="true">
+                {composition.map((item, index) => {
+                    const pct = (item.amount / total) * 100;
+                    const opacity = 1 - index * 0.12;
+                    return (
+                        <span
+                            key={item.id}
+                            className="ymm-composition-seg"
+                            style={{
+                                width: `${pct}%`,
+                                background: item.id === FUTURE_SURPLUS_AVENUE_ID
+                                    ? '#7c3aed'
+                                    : accent.hex,
+                                opacity: Math.max(0.45, opacity),
+                            }}
+                            title={`${item.label}: ${formatCurrency(item.amount)}`}
+                        />
+                    );
+                })}
+            </div>
+            <ul className="ymm-composition-legend">
+                {composition.map((item) => (
+                    <li key={item.id}>
+                        <span
+                            className="ymm-composition-dot"
+                            style={{
+                                background: item.id === FUTURE_SURPLUS_AVENUE_ID
+                                    ? '#7c3aed'
+                                    : accent.hex,
+                            }}
+                        />
+                        <span>{item.label}</span>
+                        <strong>{formatCurrency(item.amount)}</strong>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+};
+
+const WealthMilestone = ({ scenario, accent }) => {
+    const covered = scenario.remainingGap <= 0;
+    return (
+        <div className="ymm-milestone">
+            <div className="ymm-milestone-rail">
+                <span
+                    className="ymm-milestone-dot"
+                    style={{ background: accent.hex, boxShadow: `0 0 0 4px ${accent.soft}` }}
+                />
+            </div>
+            <div className="ymm-milestone-body">
+                <div className="ymm-milestone-label">{scenario.label}</div>
+                <div className="ymm-milestone-figures">
                     <div>
-                        <div className="ymm-map-legend-label">{fullyFunded ? 'Arrived' : 'All goals'}</div>
-                        <strong>{formatCurrency(futureValue)}</strong>
+                        <span>Projected wealth</span>
+                        <strong style={{ color: accent.ink }}>{formatCurrency(scenario.projectedWealth)}</strong>
+                    </div>
+                    <div>
+                        <span>Shortfall</span>
+                        <strong className={covered ? 'ymm-gap-clear' : 'ymm-gap-open'}>
+                            {covered ? 'Nothing more needed' : formatCurrency(scenario.remainingGap)}
+                        </strong>
                     </div>
                 </div>
             </div>
@@ -273,82 +354,291 @@ const FundingRouteMap = ({ asOfCorpus, totals }) => {
     );
 };
 
-const goalStatus = (goal) => {
-    if (goal.shortfall <= 0) {
-        return { label: 'Fully Funded', tone: 'success' };
-    }
-    if (goal.afterAllocation > 0) {
-        return { label: 'Partially Funded', tone: 'partial' };
-    }
-    return { label: 'Shortfall', tone: 'danger' };
+const CalculationDetails = ({ audit, accent }) => {
+    const [open, setOpen] = useState(false);
+    if (!audit?.length) return null;
+
+    return (
+        <div className="ymm-calc-details">
+            <button
+                type="button"
+                className="ymm-calc-toggle"
+                onClick={() => setOpen((value) => !value)}
+                style={{ color: accent.ink }}
+            >
+                How this was calculated
+                {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+            {open && (
+                <div className="ymm-calc-table">
+                    <div className="ymm-calc-row ymm-calc-head">
+                        <span>Avenue</span>
+                        <span>Available</span>
+                        <span>Allocated</span>
+                        <span>Remaining</span>
+                    </div>
+                    {audit.map((row) => (
+                        <div key={row.id} className="ymm-calc-row">
+                            <span>{row.label}</span>
+                            <span>{formatCurrency(row.availableBefore)}</span>
+                            <span>{formatCurrency(row.allocated)}</span>
+                            <span>{formatCurrency(row.remainingAfter)}</span>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
 };
 
-const ProgressBar = ({ percent, tone = 'muted' }) => {
-    const clamped = Math.max(0, Math.min(100, percent));
-    const fill = tone === 'primary'
-        ? 'var(--primary)'
-        : tone === 'success'
-            ? '#059669'
-            : 'rgba(100, 116, 139, 0.45)';
+const ResidualExpandable = ({ breakdown }) => {
+    const [open, setOpen] = useState(false);
+    if (!breakdown) return null;
+
     return (
-        <div style={{ marginTop: 8 }}>
-            <div
-                className="ymm-progress-track"
-                style={{
-                    height: 8,
-                    borderRadius: 999,
-                    background: 'rgba(148, 163, 184, 0.25)',
-                    overflow: 'hidden',
-                }}
+        <div className="ymm-customize-readonly">
+            <button
+                type="button"
+                className="ymm-calc-toggle"
+                onClick={() => setOpen((value) => !value)}
             >
-                <div
-                    style={{
-                        width: `${clamped}%`,
-                        height: '100%',
-                        borderRadius: 999,
-                        background: fill,
-                        transition: 'width 0.4s ease',
-                    }}
-                />
+                Accumulated surplus calculation
+                {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+            {open && (
+                <div className="ymm-calc-table">
+                    {(breakdown.lines || []).map((line) => (
+                        <div
+                            key={line.id}
+                            className={`ymm-calc-row${line.id === 'total' ? ' ymm-calc-total' : ''}`}
+                        >
+                            <span>{line.label}</span>
+                            <span />
+                            <span />
+                            <span>{formatCurrency(line.amount)}</span>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
+const CustomizePanel = ({
+    goal,
+    draft,
+    onChange,
+    onReset,
+    onCancel,
+    onSave,
+}) => {
+    const accent = goal.accent;
+    const nonEditableComposition = (goal.scenario?.composition || [])
+        .filter((item) => ![
+            FUTURE_SURPLUS_AVENUE_ID,
+            'sip',
+            'equity',
+            'lumpsum',
+        ].includes(item.id));
+    const draftTotal = Object.values(draft).reduce((sum, value) => sum + (parseFloat(value) || 0), 0);
+    const liveGap = Math.max(
+        0,
+        goal.goalAmount
+            - draftTotal
+            - nonEditableComposition.reduce((sum, item) => sum + item.amount, 0),
+    );
+
+    return (
+        <div className="ymm-customize" style={{ borderColor: accent.hex, background: accent.soft }}>
+            <div className="ymm-customize-head">
+                <div>
+                    <div className="ymm-customize-title" style={{ color: accent.ink }}>
+                        Customize allocation
+                    </div>
+                    <p className="ymm-customize-sub">
+                        Edit accumulated surplus, SIP, Equity and Lumpsum for this goal. FD / RD
+                        maturities stay automatic.
+                    </p>
+                </div>
             </div>
-            <div
-                style={{
-                    marginTop: 6,
-                    fontSize: '0.72rem',
-                    fontWeight: 650,
-                    color: tone === 'primary' ? 'var(--primary)' : 'var(--text-muted)',
-                }}
-            >
-                Funded: {clamped}%
+
+            <div className="ymm-customize-rows">
+                {goal.editableAvenues.map((avenue) => (
+                    <label key={avenue.id} className="ymm-customize-row">
+                        <div>
+                            <div className="ymm-customize-avenue">{avenue.label}</div>
+                            <div className="ymm-customize-meta">
+                                Recommended {formatCurrency(avenue.recommended)}
+                                {' · '}
+                                Max {formatCurrency(avenue.availableMax)}
+                            </div>
+                        </div>
+                        <input
+                            type="number"
+                            min={0}
+                            max={avenue.availableMax}
+                            step={1000}
+                            value={draft[avenue.id] ?? 0}
+                            onChange={(event) => onChange(avenue.id, event.target.value, avenue.availableMax)}
+                        />
+                    </label>
+                ))}
+            </div>
+
+            <ResidualExpandable breakdown={goal.residualBreakdown} />
+
+            {(goal.maturityAtGoalYear || []).map((row) => (
+                <div key={row.id} className="ymm-customize-readonly-row">
+                    <div>
+                        <div className="ymm-customize-avenue">{row.label}</div>
+                        <div className="ymm-customize-meta">
+                            Display only · matures in {goal.targetYear}
+                        </div>
+                    </div>
+                    <strong>{formatCurrency(row.amount)}</strong>
+                </div>
+            ))}
+
+            <div className="ymm-customize-gap">
+                <span>Remaining gap after your edit</span>
+                <strong style={{ color: liveGap > 0 ? '#dc2626' : '#059669' }}>
+                    {liveGap > 0 ? formatCurrency(liveGap) : 'Nothing more needed'}
+                </strong>
+            </div>
+
+            <div className="ymm-customize-actions">
+                <button type="button" className="btn" onClick={onReset}>
+                    Reset to recommendation
+                </button>
+                <button type="button" className="btn" onClick={onCancel}>
+                    Cancel
+                </button>
+                <button
+                    type="button"
+                    className="btn btn-primary"
+                    style={{ background: accent.hex, borderColor: accent.hex }}
+                    onClick={onSave}
+                >
+                    Save
+                </button>
             </div>
         </div>
     );
 };
 
-const StatusBadge = ({ status }) => {
-    const styles = {
-        success: { bg: 'rgba(16, 185, 129, 0.12)', color: '#059669' },
-        partial: { bg: 'rgba(37, 99, 235, 0.1)', color: 'var(--primary)' },
-        danger: { bg: 'rgba(239, 68, 68, 0.1)', color: '#dc2626' },
-    }[status.tone] || { bg: 'var(--bg-main)', color: 'var(--text-muted)' };
+const GoalCard = ({
+    goal,
+    editing,
+    draft,
+    onStartEdit,
+    onDraftChange,
+    onReset,
+    onCancel,
+    onSave,
+    cardRef,
+    isCustomized,
+}) => {
+    const accent = goal.accent;
+    const scenario = goal.scenario || goal.scenarios?.[SCENARIO_WEALTH];
+    const status = scenario.remainingGap <= 0
+        ? { label: 'Fully Funded', tone: 'success' }
+        : scenario.projectedWealth > 0
+            ? { label: 'Partially Funded', tone: 'partial' }
+            : { label: 'Shortfall', tone: 'danger' };
 
     return (
-        <span
+        <div
+            ref={cardRef}
+            className="card ymm-goal-card"
             style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                fontSize: '0.75rem',
-                fontWeight: 700,
-                padding: '4px 10px',
-                borderRadius: 999,
-                background: styles.bg,
-                color: styles.color,
+                borderTop: `4px solid ${accent.hex}`,
+                background: `linear-gradient(180deg, ${accent.soft} 0%, var(--bg-card) 88px)`,
             }}
+            data-goal-id={goal.goalId}
         >
-            {status.tone === 'success' ? <CheckCircle2 size={13} /> : null}
-            {status.label}
-        </span>
+            <div className="ymm-goal-head">
+                <div>
+                    <div className="ymm-goal-title-row">
+                        <span
+                            className="ymm-goal-icon"
+                            style={{ background: accent.hex }}
+                            aria-hidden="true"
+                        >
+                            <Target size={16} color="#fff" />
+                        </span>
+                        <h3>{goal.name}</h3>
+                        <span
+                            className="ymm-goal-badge"
+                            style={{ background: accent.soft, color: accent.ink }}
+                        >
+                            {status.tone === 'success' ? <CheckCircle2 size={13} /> : null}
+                            {status.label}
+                        </span>
+                        {isCustomized && (
+                            <span className="ymm-goal-chip" style={{ background: accent.soft, color: accent.ink }}>
+                                Customized
+                            </span>
+                        )}
+                        {goal.isRetirement && (
+                            <span className="ymm-goal-chip" style={{ background: accent.soft, color: accent.ink }}>
+                                Retirement
+                            </span>
+                        )}
+                    </div>
+                    <div className="ymm-goal-sub">Needed by {goal.targetYear}</div>
+                </div>
+                <div className="ymm-goal-amount">
+                    <div className="ymm-goal-amount-label">Goal amount</div>
+                    <div className="ymm-goal-amount-value" style={{ color: accent.ink }}>
+                        {formatCurrency(goal.goalAmount)}
+                    </div>
+                </div>
+            </div>
+
+            <div className="ymm-milestone-list">
+                <WealthMilestone scenario={scenario} accent={accent} />
+            </div>
+
+            <CompositionBar
+                composition={scenario.composition}
+                accent={accent}
+            />
+
+            <CalculationDetails audit={goal.calculationAudit} accent={accent} />
+
+            {editing ? (
+                <CustomizePanel
+                    goal={goal}
+                    draft={draft}
+                    onChange={onDraftChange}
+                    onReset={onReset}
+                    onCancel={onCancel}
+                    onSave={onSave}
+                />
+            ) : (
+                <div className="ymm-goal-actions">
+                    <button
+                        type="button"
+                        className="btn"
+                        style={{ borderColor: accent.hex, color: accent.ink }}
+                        onClick={onStartEdit}
+                        disabled={!goal.editableAvenues.length
+                            && !(goal.futureSurplusUsed > 0)
+                            && !(goal.maturityAtGoalYear || []).length}
+                    >
+                        <Pencil size={14} style={{ marginRight: 6 }} />
+                        Customize Allocation
+                    </button>
+                    {!goal.editableAvenues.length
+                        && !(goal.futureSurplusUsed > 0)
+                        && !(goal.maturityAtGoalYear || []).length && (
+                        <span className="ymm-goal-actions-note">
+                            No SIP, Equity, Lumpsum, surplus or maturities to review for this goal.
+                        </span>
+                    )}
+                </div>
+            )}
+        </div>
     );
 };
 
@@ -362,7 +652,47 @@ const TrackSurplusAllocationSection = () => {
         investmentAllocations = [],
         familyMembers = [],
         policies = [],
+        journeyProjections = [],
+        currentYearLedger,
+        planStartMonth = 0,
+        income,
+        hasSpouseIncome,
+        goalMappings = {},
+        setGoalMappings,
     } = useFinancialPlan();
+
+    const [editingGoalId, setEditingGoalId] = useState(null);
+    const [draftByGoalId, setDraftByGoalId] = useState({});
+    const [customizedGoalIds, setCustomizedGoalIds] = useState(() => loadCustomizedGoalIds());
+    const cardRefs = useRef({});
+    const syncingRef = useRef(false);
+
+    const moneyFlowReport = useMemo(
+        () => buildYourMoneyFlowReport({
+            currentYearLedger,
+            planStartMonth,
+            familyMembers,
+            income,
+            expenseCategories,
+            hasSpouseIncome,
+            resolveEmploymentType,
+            journeyProjections,
+        }),
+        [
+            currentYearLedger,
+            planStartMonth,
+            familyMembers,
+            income,
+            expenseCategories,
+            hasSpouseIncome,
+            journeyProjections,
+        ],
+    );
+
+    const overridesByGoalId = useMemo(() => {
+        if (!editingGoalId || !draftByGoalId[editingGoalId]) return {};
+        return { [editingGoalId]: draftByGoalId[editingGoalId] };
+    }, [editingGoalId, draftByGoalId]);
 
     const report = useMemo(
         () => buildTrackSurplusAllocationReport({
@@ -373,7 +703,13 @@ const TrackSurplusAllocationSection = () => {
             investmentAllocations,
             familyMembers,
             policies,
+            journeyProjections,
+            monthlyUnallocatedSurplus: moneyFlowReport.ledger.unallocatedSurplus,
+            planStartMonth: moneyFlowReport.meta.planStartMonth,
             asOfDate: new Date(),
+            goalMappings,
+            overridesByGoalId,
+            customizedGoalIds: [...customizedGoalIds],
         }),
         [
             goals,
@@ -383,10 +719,112 @@ const TrackSurplusAllocationSection = () => {
             investmentAllocations,
             familyMembers,
             policies,
+            journeyProjections,
+            moneyFlowReport,
+            goalMappings,
+            overridesByGoalId,
+            customizedGoalIds,
         ],
     );
 
-    const { meta, asOfCorpus, totals, goalCards, plannedMonths } = report;
+    const { meta, goalCards, plannedMonths } = report;
+
+    const retirementYear = useMemo(() => {
+        const retirementGoal = (goalCards || []).find((card) => card.isRetirement);
+        if (retirementGoal?.targetYear) return retirementGoal.targetYear;
+
+        const selfMember = (familyMembers || []).find((m) => m.relation?.toLowerCase() === 'self');
+        const age = parseInt(selfMember?.retirementAge, 10) || 60;
+        const year = calculateRetirementYear(selfMember?.dob, age);
+        const parsed = parseInt(year, 10);
+        if (Number.isFinite(parsed) && parsed > 0) return parsed;
+        return meta.asOfYear + Math.max(1, age - 40);
+    }, [goalCards, familyMembers, meta.asOfYear]);
+
+    // Auto-write YMM recommendations into goalMappings for non-customized goals.
+    useEffect(() => {
+        if (syncingRef.current) return;
+        const recommended = sanitizePlanningMappings(report.assignments?.currentPlan || {});
+        const current = sanitizePlanningMappings(goalMappings);
+        const next = { ...current };
+        let changed = false;
+
+        Object.entries(recommended).forEach(([goalId, mapping]) => {
+            if (customizedGoalIds.has(goalId)) return;
+            if (!mappingsEqual(next[goalId], mapping)) {
+                next[goalId] = mapping;
+                changed = true;
+            }
+        });
+
+        Object.keys(next).forEach((goalId) => {
+            if (customizedGoalIds.has(goalId)) return;
+            if (!recommended[goalId]) {
+                delete next[goalId];
+                changed = true;
+            }
+        });
+
+        if (!changed) return;
+        syncingRef.current = true;
+        setGoalMappings(next);
+        // Allow the next render cycle to clear the guard after state settles.
+        queueMicrotask(() => { syncingRef.current = false; });
+    }, [report.assignments?.currentPlan, customizedGoalIds, goalMappings, setGoalMappings]);
+
+    const startEdit = (goal) => {
+        const initial = {};
+        goal.editableAvenues.forEach((avenue) => {
+            initial[avenue.id] = Object.prototype.hasOwnProperty.call(
+                goal.appliedMapping || {},
+                avenue.id,
+            )
+                ? avenue.applied
+                : avenue.recommended;
+        });
+        setDraftByGoalId((prev) => ({ ...prev, [goal.goalId]: initial }));
+        setEditingGoalId(goal.goalId);
+    };
+
+    const resetDraft = (goal) => {
+        const initial = {};
+        goal.editableAvenues.forEach((avenue) => {
+            initial[avenue.id] = avenue.recommended;
+        });
+        setDraftByGoalId((prev) => ({ ...prev, [goal.goalId]: initial }));
+    };
+
+    const handleDraftChange = (goalId, avenueId, value, availableMax) => {
+        setDraftByGoalId((prev) => ({
+            ...prev,
+            [goalId]: {
+                ...(prev[goalId] || {}),
+                [avenueId]: clampAvenueAmount(value, availableMax),
+            },
+        }));
+    };
+
+    const handleSave = (goal) => {
+        // Persist the engine-clamped live result, not a draft that may exceed the
+        // remaining need after the user increases accumulated surplus.
+        const effectiveAmounts = Object.fromEntries(
+            (goal.editableAvenues || []).map((avenue) => [avenue.id, avenue.amount]),
+        );
+        const { mapping } = buildApplyPayload(goal.goalId, effectiveAmounts);
+        setGoalMappings(mergeGoalMapping(goalMappings, goal.goalId, mapping));
+        setCustomizedGoalIds((prev) => {
+            const next = new Set(prev);
+            next.add(goal.goalId);
+            persistCustomizedGoalIds(next);
+            return next;
+        });
+        setEditingGoalId(null);
+        setDraftByGoalId((prev) => {
+            const next = { ...prev };
+            delete next[goal.goalId];
+            return next;
+        });
+    };
 
     return (
         <div
@@ -412,8 +850,9 @@ const TrackSurplusAllocationSection = () => {
                             <h2 style={{ margin: '0 0 0.4rem', color: '#fff', fontSize: '1.45rem', fontWeight: 700 }}>
                                 ✨ Your Money&apos;s Magic
                             </h2>
-                            <p style={{ margin: 0, color: 'rgba(255,255,255,0.88)', fontSize: '0.98rem', lineHeight: 1.55, maxWidth: 560 }}>
-                                Here&apos;s where you stand as of {meta.asOfLabel}, and how much stronger your goals get when you put your surplus to work.
+                            <p style={{ margin: 0, color: 'rgba(255,255,255,0.88)', fontSize: '0.98rem', lineHeight: 1.55, maxWidth: 620 }}>
+                                This report suggests the most suitable allocation for funding each goal.
+                                You can customize it if you wish to make changes.
                             </p>
                         </div>
                     </div>
@@ -469,20 +908,17 @@ const TrackSurplusAllocationSection = () => {
             </ReportReveal>
 
             <ReportReveal delay={120}>
-                <FundingRouteMap asOfCorpus={asOfCorpus} totals={totals} />
+                <JourneyMap
+                    currentYear={meta.asOfYear}
+                    retirementYear={retirementYear}
+                    farthestGoalYear={meta.farthestGoalYear || meta.horizonYear}
+                    goals={goalCards}
+                />
             </ReportReveal>
 
             {!meta.hasPymtwPlans && (
                 <ReportReveal delay={160}>
-                    <div
-                        className="card"
-                        style={{
-                            padding: '1.6rem',
-                            textAlign: 'center',
-                            border: 'none',
-                            borderRadius: 14,
-                        }}
-                    >
+                    <div className="card" style={{ padding: '1.6rem', textAlign: 'center', border: 'none', borderRadius: 14 }}>
                         <p style={{ margin: '0 0 1rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
                             You haven&apos;t planned surplus investments yet. Put your money to work first, then come back to see how each goal improves.
                         </p>
@@ -500,15 +936,7 @@ const TrackSurplusAllocationSection = () => {
 
             {!meta.hasGoals ? (
                 <ReportReveal delay={180}>
-                    <div
-                        className="card"
-                        style={{
-                            padding: '2rem',
-                            textAlign: 'center',
-                            border: 'none',
-                            borderRadius: 14,
-                        }}
-                    >
+                    <div className="card" style={{ padding: '2rem', textAlign: 'center', border: 'none', borderRadius: 14 }}>
                         <Target size={32} style={{ color: 'var(--text-muted)', marginBottom: '0.75rem' }} />
                         <h3 style={{ margin: '0 0 0.5rem' }}>No goals to track yet</h3>
                         <p style={{ margin: 0, color: 'var(--text-muted)', lineHeight: 1.5 }}>
@@ -518,221 +946,29 @@ const TrackSurplusAllocationSection = () => {
                 </ReportReveal>
             ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                    {goalCards.map((goal, index) => {
-                        const status = goalStatus(goal);
-                        const currentPct = coveragePct(goal.todayCorpus, goal.futureValue);
-                        const afterPct = goal.fundedPct ?? coveragePct(goal.afterAllocation, goal.futureValue);
-                        const improvement = Math.max(0, Math.round(goal.afterAllocation - goal.todayCorpus));
-                        const contributingAvenues = (goal.avenues || []).filter(
-                            (avenue) => (avenue.todayValue || 0) > 0 || (avenue.afterValue || 0) > 0,
-                        );
-
-                        return (
-                            <ReportReveal key={goal.goalId || `${goal.name}-${goal.targetYear}`} delay={160 + index * 40}>
-                                <div
-                                    className="card"
-                                    style={{
-                                        padding: '1.5rem 1.5rem 1.35rem',
-                                        border: 'none',
-                                        borderRadius: 16,
-                                        boxShadow: '0 2px 12px rgba(15, 23, 42, 0.05)',
-                                        background: 'var(--bg-card)',
-                                    }}
-                                >
-                                    <div
-                                        style={{
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            gap: '1rem',
-                                            flexWrap: 'wrap',
-                                            marginBottom: '1.35rem',
-                                        }}
-                                    >
-                                        <div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '0.4rem' }}>
-                                                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>
-                                                    {goal.name}
-                                                </h3>
-                                                <StatusBadge status={status} />
-                                                {goal.isRetirement && (
-                                                    <span
-                                                        style={{
-                                                            fontSize: '0.72rem',
-                                                            padding: '3px 9px',
-                                                            borderRadius: '999px',
-                                                            background: 'rgba(37, 99, 235, 0.1)',
-                                                            color: 'var(--primary)',
-                                                            fontWeight: 600,
-                                                        }}
-                                                    >
-                                                        Retirement
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                                                Need by {goal.targetYear}
-                                            </div>
-                                        </div>
-                                        <div style={{ textAlign: 'right' }}>
-                                            <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)' }}>
-                                                Goal amount
-                                            </div>
-                                            <div style={{ fontWeight: 800, fontSize: '1.45rem', marginTop: 2 }}>
-                                                {formatCurrency(goal.futureValue)}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="ymm-coverage-compare">
-                                        <div style={{ padding: '0.9rem 1rem', borderRadius: 12, background: 'var(--bg-main)' }}>
-                                            <div style={{ fontSize: '0.8rem', fontWeight: 650, color: 'var(--text-main)' }}>
-                                                Current Position
-                                            </div>
-                                            <p style={{ margin: '0.25rem 0 0', fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.35 }}>
-                                                Without investing your extra surplus
-                                            </p>
-                                            <strong style={{ display: 'block', marginTop: '0.7rem', fontSize: '1.15rem' }}>
-                                                {formatCurrency(goal.todayCorpus)}
-                                            </strong>
-                                            <ProgressBar percent={currentPct} tone="muted" />
-                                        </div>
-
-                                        <div className="ymm-coverage-bridge">
-                                            <ArrowDown size={18} color="var(--text-muted)" />
-                                            {improvement > 0 && (
-                                                <div style={{ textAlign: 'center' }}>
-                                                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-                                                        ✨ Improvement
-                                                    </div>
-                                                    <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#059669' }}>
-                                                        +{formatCurrency(improvement)}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <div
-                                            style={{
-                                                padding: '0.9rem 1rem',
-                                                borderRadius: 12,
-                                                background: 'rgba(37, 99, 235, 0.06)',
-                                            }}
-                                        >
-                                            <div style={{ fontSize: '0.8rem', fontWeight: 650, color: 'var(--primary)' }}>
-                                                After Putting Your Money to Work
-                                            </div>
-                                            <p style={{ margin: '0.25rem 0 0', fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.35 }}>
-                                                After following planned investments
-                                            </p>
-                                            <strong style={{ display: 'block', marginTop: '0.7rem', fontSize: '1.3rem', color: 'var(--primary)' }}>
-                                                {formatCurrency(goal.afterAllocation)}
-                                            </strong>
-                                            <ProgressBar percent={afterPct} tone="primary" />
-                                        </div>
-                                    </div>
-
-                                    <div
-                                        style={{
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            alignItems: 'center',
-                                            gap: '1rem',
-                                            flexWrap: 'wrap',
-                                            padding: '0.85rem 1rem',
-                                            borderRadius: 12,
-                                            marginBottom: '1.25rem',
-                                            background: goal.shortfall > 0 ? 'rgba(239, 68, 68, 0.05)' : 'rgba(16, 185, 129, 0.06)',
-                                        }}
-                                    >
-                                        <div>
-                                            <div style={{ fontSize: '0.8rem', fontWeight: 650 }}>Still Needed</div>
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>
-                                                To fully reach this goal
-                                            </div>
-                                        </div>
-                                        <strong
-                                            style={{
-                                                fontSize: '1.2rem',
-                                                color: goal.shortfall > 0 ? '#dc2626' : '#059669',
-                                            }}
-                                        >
-                                            {goal.shortfall <= 0 ? 'Nothing more needed' : formatCurrency(goal.shortfall)}
-                                        </strong>
-                                    </div>
-
-                                    {contributingAvenues.length === 0 ? (
-                                        <div
-                                            style={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '8px',
-                                                color: 'var(--text-muted)',
-                                                fontSize: '0.9rem',
-                                            }}
-                                        >
-                                            <AlertCircle size={16} />
-                                            No investments are contributing to this goal yet.
-                                        </div>
-                                    ) : (
-                                        <div>
-                                            <div
-                                                style={{
-                                                    fontSize: '0.92rem',
-                                                    fontWeight: 700,
-                                                    marginBottom: '0.75rem',
-                                                }}
-                                            >
-                                                Your investments helping this goal
-                                            </div>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
-                                                {contributingAvenues.map((avenue) => (
-                                                    <div
-                                                        key={avenue.id}
-                                                        style={{
-                                                            display: 'grid',
-                                                            gridTemplateColumns: '1.3fr 1fr 1fr',
-                                                            gap: '0.75rem',
-                                                            alignItems: 'center',
-                                                            padding: '0.75rem 0.9rem',
-                                                            borderRadius: 10,
-                                                            background: 'var(--bg-main)',
-                                                        }}
-                                                    >
-                                                        <div>
-                                                            <div style={{ fontWeight: 650, fontSize: '0.92rem' }}>
-                                                                {avenue.type}
-                                                            </div>
-                                                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>
-                                                                {avenue.kind === 'maturity'
-                                                                    ? 'Matures this year'
-                                                                    : 'Available for this goal'}
-                                                            </div>
-                                                        </div>
-                                                        <div style={{ textAlign: 'right' }}>
-                                                            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: 2 }}>
-                                                                Current Value
-                                                            </div>
-                                                            <div style={{ fontSize: '0.9rem' }}>
-                                                                {formatCurrency(avenue.currentValue ?? avenue.todayValue)}
-                                                            </div>
-                                                        </div>
-                                                        <div style={{ textAlign: 'right' }}>
-                                                            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: 2 }}>
-                                                                Funds Allocated for this goal
-                                                            </div>
-                                                            <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--primary)' }}>
-                                                                {formatCurrency(avenue.afterValue)}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </ReportReveal>
-                        );
-                    })}
+                    {goalCards.map((goal, index) => (
+                        <ReportReveal key={goal.goalId || `${goal.name}-${goal.targetYear}`} delay={180 + index * 40}>
+                            <GoalCard
+                                goal={goal}
+                                editing={editingGoalId === goal.goalId}
+                                draft={draftByGoalId[goal.goalId] || {}}
+                                isCustomized={customizedGoalIds.has(goal.goalId)}
+                                cardRef={(node) => { cardRefs.current[goal.goalId] = node; }}
+                                onStartEdit={() => startEdit(goal)}
+                                onDraftChange={(avenueId, value, max) => handleDraftChange(goal.goalId, avenueId, value, max)}
+                                onReset={() => resetDraft(goal)}
+                                onCancel={() => {
+                                    setEditingGoalId(null);
+                                    setDraftByGoalId((prev) => {
+                                        const next = { ...prev };
+                                        delete next[goal.goalId];
+                                        return next;
+                                    });
+                                }}
+                                onSave={() => handleSave(goal)}
+                            />
+                        </ReportReveal>
+                    ))}
                 </div>
             )}
         </div>
