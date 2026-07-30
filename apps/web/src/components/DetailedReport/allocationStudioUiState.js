@@ -1,17 +1,23 @@
 import {
     INSTRUMENT_REGISTRY,
     STUDIO_INSTRUMENT_TYPES,
+    LISP_INSTRUMENT_TYPE,
     createEmptyDraftAllocations,
     getTotalDraftAllocated,
+    getDraftTypeAmount,
+    areDraftTypeValuesEqual,
+    isLispDraft,
+    getLispDraftMonthly,
     normalizeAllocType,
 } from './instrumentAnalysisLogic';
 import { summarizeInvestmentAllocations } from './investSurplusLogic';
+import { isProtectionAllocationType } from './putYourMoneyToWorkLogic';
 
 const parseAmount = (value) => parseFloat(value) || 0;
 
 export function areDraftsEqual(a = {}, b = {}) {
     return STUDIO_INSTRUMENT_TYPES.every(
-        (type) => Math.round(parseAmount(a[type])) === Math.round(parseAmount(b[type])),
+        (type) => areDraftTypeValuesEqual(a[type], b[type], type),
     );
 }
 
@@ -21,17 +27,20 @@ export function isStudioDirty(draft = {}, baseline = {}) {
 
 export function sumCategoryDraft(category, draftAllocations = {}) {
     if (!category?.instruments?.length) return 0;
-    return category.instruments.reduce(
-        (sum, type) => sum + Math.max(0, Math.round(parseAmount(draftAllocations[type]))),
-        0,
-    );
+    return category.instruments.reduce((sum, entry) => {
+        const type = typeof entry === 'string' ? entry : entry?.type;
+        if (!type) return sum;
+        return sum + Math.max(0, Math.round(getDraftTypeAmount(draftAllocations, type)));
+    }, 0);
 }
 
 export function isCategoryDirty(category, draft = {}, baseline = {}) {
     if (!category?.instruments?.length) return false;
-    return category.instruments.some(
-        (type) => Math.round(parseAmount(draft[type])) !== Math.round(parseAmount(baseline[type])),
-    );
+    return category.instruments.some((entry) => {
+        const type = typeof entry === 'string' ? entry : entry?.type;
+        if (!type) return false;
+        return !areDraftTypeValuesEqual(draft[type], baseline[type], type);
+    });
 }
 
 export function getDisplayDraftAllocations({
@@ -44,6 +53,16 @@ export function getDisplayDraftAllocations({
 }
 
 /**
+ * @param {'protection'|'investment'|null} scope
+ * @returns {(type: string) => boolean}
+ */
+export function allocationTypeMatchesScope(scope) {
+    if (scope === 'protection') return (type) => isProtectionAllocationType(type);
+    if (scope === 'investment') return (type) => !isProtectionAllocationType(type);
+    return () => true;
+}
+
+/**
  * Build Planned-table summary items for a draft month (display-only).
  * Amounts match summarizeInvestmentAllocations: monthly instruments show monthly amount.
  */
@@ -52,17 +71,21 @@ export function buildDraftSummaryItems({
     planKey,
     calendarYear,
     monthIndex,
+    scope = null,
 }) {
     const startMonth = monthIndex + 1;
     const items = [];
+    const typeAllowed = allocationTypeMatchesScope(scope);
 
     STUDIO_INSTRUMENT_TYPES.forEach((type) => {
-        const amount = Math.max(0, Math.round(parseAmount(draftAllocations[type])));
+        if (!typeAllowed(type)) return;
+        const amount = Math.max(0, Math.round(getDraftTypeAmount(draftAllocations, type)));
         if (amount <= 0) return;
         const def = INSTRUMENT_REGISTRY[type];
         if (!def) return;
         const isMonthly = def.inputMode === 'monthly';
-        items.push({
+        const value = draftAllocations[type];
+        const item = {
             id: `draft-${planKey}-${type}`,
             type: def.allocType || type,
             name: `Studio ${type}`,
@@ -74,7 +97,14 @@ export function buildDraftSummaryItems({
             startYear: calendarYear,
             pending: true,
             instrumentType: type,
-        });
+        };
+        if (type === LISP_INSTRUMENT_TYPE && isLispDraft(value)) {
+            item.insuredMember = value.insuredMember || '';
+            item.frequency = value.frequency || 'Monthly';
+            item.duration = parseInt(value.duration, 10) || 10;
+            item.premium = Math.round(parseAmount(value.premium));
+        }
+        items.push(item);
     });
 
     return items;
@@ -83,6 +113,7 @@ export function buildDraftSummaryItems({
 /**
  * Overlay draft for the editing month onto committed allocations for display.
  * Other months stay committed; editing month uses draft rows with pending badges.
+ * @param {'protection'|'investment'|null} [scope] - Gaps vs PYMTW planned tables
  */
 export function summarizeWithDraftOverlay({
     investmentAllocations = [],
@@ -91,12 +122,16 @@ export function summarizeWithDraftOverlay({
     calendarYear,
     monthIndex,
     showDraft = false,
+    scope = null,
 }) {
+    const typeAllowed = allocationTypeMatchesScope(scope);
+    const scopedAllocations = (investmentAllocations || []).filter((a) => typeAllowed(a?.type));
+
     if (!showDraft || !planKey) {
-        return summarizeInvestmentAllocations(investmentAllocations);
+        return summarizeInvestmentAllocations(scopedAllocations);
     }
 
-    const committedOthers = (investmentAllocations || []).filter(
+    const committedOthers = scopedAllocations.filter(
         (a) => a.studioPlanKey !== planKey,
     );
     const otherSummary = summarizeInvestmentAllocations(committedOthers);
@@ -105,6 +140,7 @@ export function summarizeWithDraftOverlay({
         planKey,
         calendarYear,
         monthIndex,
+        scope,
     });
 
     const items = [...otherSummary.items, ...draftItems];
@@ -127,4 +163,6 @@ export function draftInstrumentTypeFromSummaryItem(item) {
 export {
     createEmptyDraftAllocations,
     getTotalDraftAllocated,
+    getDraftTypeAmount,
+    getLispDraftMonthly,
 };

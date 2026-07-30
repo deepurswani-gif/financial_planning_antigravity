@@ -357,6 +357,7 @@ export function reconcileMemberLifePremiumSummary(summaryMonthly, memberEntry) {
 export const STUDIO_PROTECTION_ALLOC_TYPES = [
     'Term Insurance',
     'Life Insurance',
+    'Life Insurance Saving Plans',
     'Health Insurance',
 ];
 
@@ -364,7 +365,8 @@ export function mapPlanTypeToAllocType(planType = '') {
     const type = String(planType).toLowerCase();
     if (type.includes('health') || type.includes('medical')) return 'Health Insurance';
     if (type.includes('term')) return 'Term Insurance';
-    if (type.includes('life') || type.includes('saving') || type.includes('ulip') || !planType) {
+    if (type.includes('saving') || type.includes('ulip')) return 'Life Insurance Saving Plans';
+    if (type.includes('life') || !planType) {
         return 'Life Insurance';
     }
     return 'Life Insurance';
@@ -405,7 +407,10 @@ export function findStudioAllocationForPolicy(policy = {}, investmentAllocations
     const candidates = list.filter((a) => {
         if (!STUDIO_PROTECTION_ALLOC_TYPES.includes(a.type)) return false;
         if (a.type !== allocType) return false;
-        if (allocType === 'Life Insurance' && memberName) {
+        if (
+            (allocType === 'Life Insurance' || allocType === 'Life Insurance Saving Plans')
+            && memberName
+        ) {
             return (a.insuredMember || '') === memberName;
         }
         return true;

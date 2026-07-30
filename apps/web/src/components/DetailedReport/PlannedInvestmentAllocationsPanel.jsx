@@ -39,6 +39,9 @@ const PlannedInvestmentAllocationsPanel = ({
     clearDisabledReason = '',
     delay = 200,
     className = '',
+    title = 'Planned investment allocations',
+    editLabel = 'Edit – Show Investment Avenues',
+    monthChipsAriaLabel = 'Allocation months',
 }) => {
     const monthChips = useMemo(() => {
         const order = [];
@@ -87,15 +90,19 @@ const PlannedInvestmentAllocationsPanel = ({
 
     if (!allocationsSummary?.count) return null;
 
+    const displayType = (item) => (
+        item.type === 'Liquid Mutual Fund' ? 'Emergency Fund' : item.type
+    );
+
     return (
         <ReportReveal className={`card ius-alloc-card ${className}`.trim()} delay={delay}>
             <div className="ius-alloc-header">
                 <h3 className="ius-section-title">
                     <PieChart size={18} />
-                    Planned investment allocations
+                    {title}
                 </h3>
                 {monthChips.length > 0 && (
-                    <div className="ius-alloc-month-chips" role="tablist" aria-label="Allocation months">
+                    <div className="ius-alloc-month-chips" role="tablist" aria-label={monthChipsAriaLabel}>
                         {monthChips.map((chip) => (
                             <button
                                 key={chip.key}
@@ -145,7 +152,7 @@ const PlannedInvestmentAllocationsPanel = ({
                             onClick={() => onEditMonthPlan(selectedChip.planKey)}
                         >
                             <Pencil size={14} />
-                            Edit – Show Investment Avenues
+                            {editLabel}
                         </button>
                     )}
                 </div>
@@ -167,7 +174,7 @@ const PlannedInvestmentAllocationsPanel = ({
                             <tr key={item.id} className={item.pending ? 'ius-alloc-row-pending' : undefined}>
                                 <td>
                                     <span className="ius-alloc-type-cell">
-                                        {item.type}
+                                        {displayType(item)}
                                         {item.pending && (
                                             <span className="ius-alloc-pending-badge">Pending</span>
                                         )}
@@ -182,7 +189,7 @@ const PlannedInvestmentAllocationsPanel = ({
                                             type="button"
                                             className="ius-alloc-remove-btn"
                                             onClick={() => onRemove(item)}
-                                            aria-label={`Remove ${item.type} for ${monthLabelForItem(item)}`}
+                                            aria-label={`Remove ${displayType(item)} for ${monthLabelForItem(item)}`}
                                         >
                                             <Trash2 size={14} />
                                             Remove

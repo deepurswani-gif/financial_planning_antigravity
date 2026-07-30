@@ -261,6 +261,49 @@ describe('putYourMoneyToWorkLogic', () => {
         expect(julyRecurringOnAug.amount).toBe(3000);
     });
 
+    it('treats Life Insurance Saving Plans with insuredMember as installment premium', () => {
+        const alloc = {
+            id: 1,
+            type: 'Life Insurance Saving Plans',
+            amount: 6000,
+            frequency: 'Quarterly',
+            insuredMember: 'Priya',
+            startMonth: 7,
+            startYear: 2026,
+            studioPlanKey: '2026-6',
+        };
+        expect(getRecurringMonthlyAmount(alloc)).toBe(2000);
+        expect(computeAllocationImpactForMonth([alloc], 2026, 6)).toBe(2000);
+    });
+
+    it('buildInstrumentCards skips zero amounts and builds month history', () => {
+        const cards = buildInstrumentCards([
+            {
+                id: 1,
+                type: 'SIP',
+                amount: 0,
+                studioPlanKey: '2026-6',
+                startMonth: 7,
+                startYear: 2026,
+            },
+            {
+                id: 2,
+                type: 'SIP',
+                amount: 36000,
+                studioPlanKey: '2026-5',
+                startMonth: 6,
+                startYear: 2026,
+            },
+        ], { reportScope: 'pymtw' });
+        const growth = cards.find((c) => c.id === 'growth');
+        const sip = growth.instruments.find((i) => i.type === 'SIP');
+        expect(sip.count).toBe(1);
+        expect(sip.hasAllocations).toBe(true);
+        expect(sip.monthHistory).toHaveLength(1);
+        expect(sip.monthHistory[0].monthLabel).toBe('June 2026');
+        expect(Math.round(sip.monthHistory[0].monthlyAmount)).toBe(3000);
+    });
+
     it('carries unused one-time allocation leftovers across months', () => {
         const ledger = [0, 0, 0, 0, 0, 0, 20000, 20000, 20000, 0, 0, 0];
         const allocations = [{

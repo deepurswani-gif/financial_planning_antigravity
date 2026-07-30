@@ -42,6 +42,16 @@ export const getProtectionAllocationAnnual = (alloc = {}) => {
     const amount = parseFloat(alloc.amount) || 0;
     const type = alloc.type;
 
+    // New LISP installment+member rows (and legacy Life without studio key)
+    const isInstallment = (
+        (type === 'Life Insurance' && !alloc.studioPlanKey)
+        || (type === 'Life Insurance Saving Plans' && alloc.insuredMember)
+    );
+    if (isInstallment) {
+        const interval = getInsuranceFrequencyInterval(alloc.frequency || 'Monthly');
+        return amount * (12 / interval);
+    }
+
     if ((type === 'Life Insurance' || type === 'Life Insurance Saving Plans') && alloc.studioPlanKey) {
         return amount;
     }
@@ -64,10 +74,10 @@ export const getProtectionAllocationImpactForYear = (alloc = {}, year) => {
 
     const isLegacyInstallmentLife = (
         (alloc.type === 'Life Insurance' || alloc.type === 'Life Insurance Saving Plans')
-        && !alloc.studioPlanKey
+        && (!alloc.studioPlanKey || alloc.insuredMember)
     );
 
-    if (isLegacyInstallmentLife) {
+    if (isLegacyInstallmentLife && (alloc.insuredMember || !alloc.studioPlanKey)) {
         const interval = getInsuranceFrequencyInterval(alloc.frequency || 'Monthly');
         const installmentAmount = parseFloat(alloc.amount) || 0;
         let installmentsThisYear = 0;
@@ -77,12 +87,15 @@ export const getProtectionAllocationImpactForYear = (alloc = {}, year) => {
         return installmentAmount * installmentsThisYear;
     }
 
-    // Studio-keyed Life: annual storage — remaining months in the start year
+    // Studio-keyed Life annual storage — remaining months in the start year
     return (yearlyAmount / 12) * (13 - allocStartMonth);
 };
 
 /** True when this row belongs in the Investments insurance bucket (not unallocated surplus). */
-const isInsuranceColumnAllocation = (alloc = {}) => alloc.type === 'Life Insurance';
+const isInsuranceColumnAllocation = (alloc = {}) => (
+    alloc.type === 'Life Insurance'
+    || (alloc.type === 'Life Insurance Saving Plans' && Boolean(alloc.insuredMember))
+);
 
 /** Studio Term/Health (annual storage) — deplete unallocated surplus like SIP/PPF. */
 const isSurplusAllocationProtection = (alloc = {}) => (

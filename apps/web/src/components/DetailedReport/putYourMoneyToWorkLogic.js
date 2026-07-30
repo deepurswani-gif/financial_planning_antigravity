@@ -48,15 +48,19 @@ export function getRecurringMonthlyAmount(alloc = {}) {
     const type = alloc.type;
     const freq = String(alloc.frequency || 'Monthly').toLowerCase();
 
-    // Legacy Allocation-module Life Insurance: amount is the installment premium.
-    if (type === 'Life Insurance' && !alloc.studioPlanKey) {
+    // Legacy Life Insurance OR new LISP installment+member rows: amount is installment premium.
+    const isInstallmentLife = (
+        (type === 'Life Insurance' && !alloc.studioPlanKey)
+        || (type === 'Life Insurance Saving Plans' && alloc.insuredMember)
+    );
+    if (isInstallmentLife) {
         if (freq === 'quarterly') return amount / 3;
         if (freq === 'half-yearly' || freq === 'half yearly') return amount / 6;
         if (freq === 'annual' || freq === 'annually') return amount / 12;
         return amount; // Monthly installment
     }
 
-    // Studio rows (SIP, Term/Health, Life Insurance Saving Plans, studio Life, etc.): annual ÷ 12
+    // Studio rows (SIP, Term/Health, legacy annual LISP, etc.): annual ÷ 12
     return amount / 12;
 }
 
@@ -683,11 +687,27 @@ export function buildInstrumentCards(investmentAllocations = [], { reportScope =
     investmentAllocations.forEach((alloc) => {
         const type = alloc.type === 'RD' ? 'Recurring Deposit' : alloc.type === 'FD' ? 'Fixed Deposit' : alloc.type;
         if (!byType[type]) {
-            byType[type] = { type, items: [], monthlyTotal: 0, annualTotal: 0, count: 0 };
+            byType[type] = {
+                type,
+                items: [],
+                monthlyTotal: 0,
+                annualTotal: 0,
+                count: 0,
+                monthHistory: [],
+            };
         }
         const amount = parseAmount(alloc.amount);
         const isMonthly = RECURRING_ALLOC_TYPES.includes(alloc.type)
             || alloc.type === 'Recurring Deposit';
+        const monthlyAmount = isMonthly
+            ? (alloc.studioPlanKey || alloc.insuredMember
+                ? getRecurringMonthlyAmount({ ...alloc, type })
+                : amount)
+            : 0;
+
+        // Skip zero-amount placeholders (fixes Entry=1 with empty slider)
+        if (Math.round(isMonthly ? monthlyAmount : amount) <= 0) return;
+
         byType[type].items.push({
             id: alloc.id,
             name: alloc.name || alloc.type,
@@ -695,16 +715,51 @@ export function buildInstrumentCards(investmentAllocations = [], { reportScope =
             isMonthly,
             startMonth: alloc.startMonth,
             startYear: alloc.startYear,
+            studioPlanKey: alloc.studioPlanKey || null,
         });
         byType[type].count += 1;
         if (isMonthly) {
-            const monthlyAmount = alloc.studioPlanKey
-                ? getRecurringMonthlyAmount({ ...alloc, type })
-                : amount;
             byType[type].monthlyTotal += monthlyAmount;
-            byType[type].annualTotal += alloc.studioPlanKey ? amount : amount * 12;
+            const isInstallment = (
+                (alloc.type === 'Life Insurance' && !alloc.studioPlanKey)
+                || (alloc.type === 'Life Insurance Saving Plans' && alloc.insuredMember)
+            );
+            byType[type].annualTotal += isInstallment
+                ? monthlyAmount * 12
+                : (alloc.studioPlanKey ? amount : amount * 12);
         } else {
             byType[type].annualTotal += amount;
+        }
+
+        let monthIndex = null;
+        let year = parseInt(alloc.startYear, 10);
+        if (alloc.studioPlanKey && typeof alloc.studioPlanKey === 'string') {
+            const [y, m] = alloc.studioPlanKey.split('-').map((v) => parseInt(v, 10));
+            if (Number.isFinite(y) && Number.isFinite(m)) {
+                year = y;
+                monthIndex = m;
+            }
+        }
+        if (monthIndex == null) {
+            const sm = parseInt(alloc.startMonth, 10);
+            if (Number.isFinite(sm)) monthIndex = sm - 1;
+        }
+        if (Number.isFinite(year) && Number.isFinite(monthIndex) && monthIndex >= 0 && monthIndex <= 11) {
+            const planKey = alloc.studioPlanKey || `${year}-${monthIndex}`;
+            const monthLabel = `${MONTH_LABELS_LONG[monthIndex]} ${year}`;
+            const existing = byType[type].monthHistory.find((h) => h.planKey === planKey);
+            if (existing) {
+                existing.monthlyAmount += isMonthly ? monthlyAmount : amount;
+            } else {
+                byType[type].monthHistory.push({
+                    planKey,
+                    monthIndex,
+                    year,
+                    monthLabel,
+                    monthlyAmount: isMonthly ? monthlyAmount : amount,
+                    isMonthly,
+                });
+            }
         }
     });
 
@@ -721,9 +776,14 @@ export function buildInstrumentCards(investmentAllocations = [], { reportScope =
                 monthlyTotal: 0,
                 annualTotal: 0,
                 count: 0,
+                monthHistory: [],
             };
+            const monthHistory = (data.monthHistory || [])
+                .filter((h) => Math.round(h.monthlyAmount || 0) > 0)
+                .sort((a, b) => (a.year - b.year) || (a.monthIndex - b.monthIndex));
             return {
                 ...data,
+                monthHistory,
                 hasAllocations: data.count > 0,
                 isInteractive: true,
                 registry: INSTRUMENT_REGISTRY[type] || null,

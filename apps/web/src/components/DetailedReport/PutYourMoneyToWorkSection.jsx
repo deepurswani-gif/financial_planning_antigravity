@@ -9,7 +9,6 @@ import {
     computeAllocationImpactForMonth,
     createEmptyDraftAllocations,
     getAllocationPlanKey,
-    getTotalDraftAllocated,
     PROTECTION_ALLOCATION_TYPES,
     getPymtwInstrumentCategories,
 } from './putYourMoneyToWorkLogic';
@@ -24,6 +23,12 @@ import {
     normalizeAllocType,
     pruneAllocationPlansForAllocations,
     removeInvestmentAllocationById,
+    LISP_INSTRUMENT_TYPE,
+    createEmptyLispDraft,
+    isLispDraft,
+    lispDraftFromAllocation,
+    getDraftTypeAmount,
+    areDraftTypeValuesEqual,
 } from './instrumentAnalysisLogic';
 import AllocationStudioHero from './AllocationStudioHero';
 import JourneyConstraintsRail from './JourneyConstraintsRail';
@@ -35,7 +40,7 @@ import StudioInsightsRail from './StudioInsightsRail';
 import PlannedInvestmentAllocationsPanel from './PlannedInvestmentAllocationsPanel';
 import RecalculatedSurplusPanel from './RecalculatedSurplusPanel';
 import SurplusMonthChips from './SurplusMonthChips';
-import AllocationStudioStickyBar from './AllocationStudioStickyBar';
+import AllocateSurplusPanel from './AllocateSurplusPanel';
 import { useNavigateToDetailReport } from './reportNavigation';
 import {
     validateDraftPlan,
@@ -44,7 +49,6 @@ import {
     buildEnhancedBriefingLines,
 } from './allocationStudioValidation';
 import {
-    areDraftsEqual,
     draftInstrumentTypeFromSummaryItem,
     getDisplayDraftAllocations,
     summarizeWithDraftOverlay,
@@ -121,7 +125,17 @@ const analysisParams = ({
 const draftFromPlanItems = (items) => {
     const draft = createEmptyDraftAllocations();
     items?.forEach((item) => {
-        if (item.instrumentType) draft[item.instrumentType] = item.amount || 0;
+        if (!item.instrumentType) return;
+        if (item.instrumentType === LISP_INSTRUMENT_TYPE) {
+            draft[LISP_INSTRUMENT_TYPE] = {
+                premium: Math.round(parseAmount(item.premium ?? item.amount)),
+                frequency: item.frequency || 'Monthly',
+                duration: parseInt(item.duration, 10) || 10,
+                insuredMember: item.insuredMember || '',
+            };
+            return;
+        }
+        draft[item.instrumentType] = item.amount || 0;
     });
     return draft;
 };
@@ -134,6 +148,10 @@ const draftFromStudioAllocations = (investmentAllocations = [], studioPlanKey) =
             const type = normalizeAllocType(alloc.type) || alloc.type;
             const def = INSTRUMENT_REGISTRY[type];
             if (!def || !(type in draft)) return;
+            if (type === LISP_INSTRUMENT_TYPE) {
+                draft[type] = lispDraftFromAllocation(alloc);
+                return;
+            }
             const raw = Math.round(parseAmount(alloc.amount));
             const amount = def.inputMode === 'monthly' ? Math.round(raw / 12) : raw;
             draft[type] = (draft[type] || 0) + Math.max(0, amount);
@@ -212,7 +230,7 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
     const [showReplaceConfirm, setShowReplaceConfirm] = useState(false);
     const [pendingMonthIndex, setPendingMonthIndex] = useState(null);
     const [pendingLeaveToAi, setPendingLeaveToAi] = useState(false);
-    const [activeAvenueType, setActiveAvenueType] = useState('SIP');
+    const [expandedAvenueType, setExpandedAvenueType] = useState(null);
     const persistedGate = getPymtwGate(allocationPlans);
     const inferredUnlocked = hasUnlockedInvestmentAvenues(allocationPlans, investmentAllocations);
     const adjustmentsSaved = persistedGate.adjustmentsSaved || inferredUnlocked;
@@ -292,11 +310,11 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
     const replaceTypeSet = useMemo(() => new Set(replaceTypes), [replaceTypes]);
 
     const scopedDraftTotal = useCallback((draft) => (
-        replaceTypes.reduce((sum, type) => sum + Math.max(0, parseAmount(draft?.[type])), 0)
+        replaceTypes.reduce((sum, type) => sum + Math.max(0, getDraftTypeAmount(draft, type)), 0)
     ), [replaceTypes]);
 
     const areScopedDraftsEqual = useCallback((a, b) => (
-        replaceTypes.every((type) => Math.round(parseAmount(a?.[type])) === Math.round(parseAmount(b?.[type])))
+        replaceTypes.every((type) => areDraftTypeValuesEqual(a?.[type], b?.[type], type))
     ), [replaceTypes]);
 
     const hasScopedMonthPlan = useMemo(() => {
@@ -433,7 +451,7 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
         const display = isEditingMonth
             ? draftAllocations
             : (hasAppliedMonthPlan ? appliedBaseline : draftAllocations);
-        const currentDraft = display[instrumentType] || 0;
+        const currentDraft = getDraftTypeAmount(display, instrumentType);
         const genericMax = currentDraft + Math.max(0, remaining);
         if (instrumentType !== 'PPF') return genericMax;
         return Math.min(genericMax, Math.max(currentDraft, ppfMaxByCap));
@@ -582,7 +600,7 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
             ? analyzeInstrument(
                 activePanelType,
                 analysisBase,
-                draftAllocations[activePanelType] || 0,
+                getDraftTypeAmount(draftAllocations, activePanelType),
                 effectiveMonth,
                 studio.meta.calendarYear,
             )
@@ -643,13 +661,13 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
             const avail = (studio.hero?.deployableSurplus || 0)
                 + impact
                 + (isGaps ? (studio.hero?.journeyMonthDeduction || 0) : 0);
-            const others = scopedDraftTotal(base) - (base[instrumentType] || 0);
-            maxAllowed = Math.max(base[instrumentType] || 0, avail - others);
+            const others = scopedDraftTotal(base) - getDraftTypeAmount(base, instrumentType);
+            maxAllowed = Math.max(getDraftTypeAmount(base, instrumentType), avail - others);
             if (instrumentType === 'PPF') {
                 maxAllowed = Math.min(
                     maxAllowed,
                     Math.max(
-                        base.PPF || 0,
+                        getDraftTypeAmount(base, 'PPF'),
                         getMonthlyPpfCap(expenseCategories, investmentAllocations, { ...base, PPF: 0 }, planKey),
                     ),
                 );
@@ -689,6 +707,46 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
         scopedDraftTotal,
         isGaps,
     ]);
+
+    const handleLispDraftChange = useCallback((lispDraft) => {
+        const leavingAppliedView = avenuesMode !== 'manual_edit' && hasAppliedMonthPlan;
+        const base = leavingAppliedView ? appliedBaseline : draftAllocations;
+        const nextLisp = isLispDraft(lispDraft) ? { ...createEmptyLispDraft(), ...lispDraft } : createEmptyLispDraft();
+        const next = { ...base, [LISP_INSTRUMENT_TYPE]: nextLisp };
+        setDraftAllocations(next);
+        setActiveBundleId(null);
+        setAppliedPlanKey(null);
+        setAvenuesMode('manual_edit');
+        setIsManualEditing(true);
+        setApplyError('');
+        setSaveSuccessMessage('');
+        if (leavingAppliedView) {
+            setDraftHydratedFromApplied(true);
+        } else if (avenuesMode !== 'manual_edit') {
+            setDraftHydratedFromApplied(false);
+        }
+        persistDraft(next, null);
+    }, [
+        avenuesMode,
+        hasAppliedMonthPlan,
+        appliedBaseline,
+        draftAllocations,
+        persistDraft,
+    ]);
+
+    const enterManualEditIfNeeded = useCallback(() => {
+        if (avenuesMode === 'choose') {
+            setDraftAllocations({ ...appliedBaseline });
+            setAvenuesMode('manual_edit');
+            setIsManualEditing(true);
+            setDraftHydratedFromApplied(hasAppliedMonthPlan);
+        }
+    }, [avenuesMode, appliedBaseline, hasAppliedMonthPlan]);
+
+    const handleExpandAvenue = useCallback((type) => {
+        enterManualEditIfNeeded();
+        setExpandedAvenueType((prev) => (prev === type ? null : type));
+    }, [enterManualEditIfNeeded]);
 
     const commitAppliedPlan = useCallback((allocations, bundleId) => {
         if (!planKey || !studio.meta?.hasData) return false;
@@ -805,13 +863,19 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
     }, [isGaps, navigateToDetailReport]);
 
     // Gaps: keep Protection studio in edit mode so sliders/save work without AI gate.
+    // Always hydrate from the month's committed Protection rows so we don't look "dirty"
+    // with an empty draft and block month chips after the first switch.
     useEffect(() => {
-        if (!isGaps || !studio.meta?.hasData) return;
-        if (avenuesMode === 'choose') {
-            setAvenuesMode('manual_edit');
-            setIsManualEditing(true);
-        }
-    }, [isGaps, studio.meta?.hasData, avenuesMode]);
+        if (!isGaps || !studio.meta?.hasData || !planKey) return;
+        if (avenuesMode !== 'choose') return;
+        const baseline = draftFromStudioAllocations(investmentAllocations, planKey);
+        setDraftAllocations(baseline);
+        setDraftHydratedFromApplied(
+            GAPS_REPLACE_TYPES.some((type) => parseAmount(baseline[type]) > 0),
+        );
+        setAvenuesMode('manual_edit');
+        setIsManualEditing(true);
+    }, [isGaps, studio.meta?.hasData, avenuesMode, planKey, investmentAllocations]);
 
     const performSavePlan = useCallback(() => {
         const ok = commitAppliedPlan(draftAllocations, null);
@@ -936,6 +1000,7 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
             calendarYear: studio.meta?.calendarYear,
             monthIndex: effectiveMonth,
             showDraft: isEditingMonth,
+            scope: isGaps ? 'protection' : 'investment',
         }),
         [
             investmentAllocations,
@@ -944,6 +1009,7 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
             studio.meta?.calendarYear,
             effectiveMonth,
             isEditingMonth,
+            isGaps,
         ],
     );
 
@@ -1289,8 +1355,9 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
             note: category.instrumentNotes?.[instrument.type],
         }))
     ));
-    const activeAvenue = pymtwAvenueInstruments.find((i) => i.type === activeAvenueType)
-        || pymtwAvenueInstruments[0];
+    const displayDraftForPanel = isEditingMonth
+        ? draftAllocations
+        : (hasAppliedMonthPlan ? appliedBaseline : draftAllocations);
 
     return (
         <div className={`pymtw-section ${isGaps ? 'fyfg-section' : ''}`}>
@@ -1330,7 +1397,19 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
                         baselineAllocations={appliedBaseline}
                         remainingSurplus={remaining}
                         getMaxAmountForInstrument={maxForInstrument}
-                        onDraftChange={handleDraftChange}
+                        currentPlanKey={planKey}
+                        onDraftChange={(type, amount) => {
+                            const current = Math.round(
+                                getDraftTypeAmount(
+                                    isEditingMonth
+                                        ? draftAllocations
+                                        : (hasAppliedMonthPlan ? appliedBaseline : draftAllocations),
+                                    type,
+                                ),
+                            );
+                            if (Math.round(amount || 0) === current) return;
+                            handleDraftChange(type, amount);
+                        }}
                         onApplyManualAllocations={handleApplyManualAllocations}
                         canApplyManual={validation.canApply}
                         applyError={applyError}
@@ -1350,6 +1429,18 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
                         showUnsavedBanner={isDirty}
                         monthSwitchConfirm={null}
                         replaceConfirm={null}
+                    />
+
+                    <PlannedInvestmentAllocationsPanel
+                        allocationsSummary={allocationsSummary}
+                        onRemove={handleRemoveAllocation}
+                        onEditMonthPlan={handleEditMonthPlan}
+                        onClearMonthPlan={handleClearMonthPlan}
+                        clearDisabled={isDirty}
+                        clearDisabledReason="Save or discard changes before clearing this month plan."
+                        title="Planned Protection allocations"
+                        editLabel="Edit – Show Protection avenues"
+                        monthChipsAriaLabel="Protection allocation months"
                     />
 
                     <JourneyConstraintsRail
@@ -1399,129 +1490,48 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
                 </>
             ) : (
                 <>
-                    <div className="card pymtw-available-surplus">
-                        <h3 className="pymtw-zone-title">Available Surplus for Investment</h3>
-                        <p className="pymtw-zone-sub">
-                            Remaining after Protection and future financial adjustments.
-                        </p>
-                        <SurplusMonthChips
-                            months={studio.selectableMonths}
-                            outlook={studio.hero.journeyAdjustedOutlook}
-                            selectedMonthIndex={effectiveMonth}
-                            onSelect={handleMonthChange}
-                            amountKey="deployable"
-                        />
-                        {monthSwitchConfirm}
-                        {replaceConfirm}
-                    </div>
-
-                    <div className="card pymtw-avenue-picker">
-                        <h3 className="pymtw-zone-title">Investment avenues</h3>
-                        <p className="pymtw-zone-sub">Select an avenue to set the amount. SIP opens by default.</p>
-                        {studio.instrumentCategories.map((category) => (
-                            <div key={category.id} className="pymtw-avenue-group">
-                                <h4 className="pymtw-avenue-group-label">{category.label}</h4>
-                                <div className="pymtw-avenue-chip-row">
-                                    {category.instruments.map((instrument) => {
-                                        const label = category.instrumentLabels?.[instrument.type] || instrument.type;
-                                        const selected = activeAvenueType === instrument.type;
-                                        return (
-                                            <button
-                                                key={instrument.type}
-                                                type="button"
-                                                className={`pymtw-avenue-chip ${selected ? 'pymtw-avenue-chip-selected' : ''}`}
-                                                onClick={() => {
-                                                    setActiveAvenueType(instrument.type);
-                                                    if (avenuesMode === 'choose') {
-                                                        setDraftAllocations({ ...appliedBaseline });
-                                                        setAvenuesMode('manual_edit');
-                                                        setIsManualEditing(true);
-                                                        setDraftHydratedFromApplied(hasAppliedMonthPlan);
-                                                    }
-                                                }}
-                                            >
-                                                {label}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-
-                    {isDirty && (
-                        <div className="pymtw-unsaved-banner" role="status">
-                            You have unsaved changes. Save Plan to update your monthly allocation.
-                        </div>
-                    )}
-
-                    <div className="pymtw-allocate-split card">
-                        <div className="pymtw-allocate-split-left">
-                            <AllocationStudioStickyBar
-                                editingMonthLabel={editingMonthLabel}
-                                remainingSurplus={remaining}
-                                totalMonthlyAllocation={stickyTotalAllocation}
-                                isDirty={isDirty}
-                                canSave={validation.canApply && isDirty}
-                                saveLabel={saveLabel}
-                                statusHint={statusHint}
-                                applyError={applyError}
-                                saveSuccessMessage={saveSuccessMessage}
-                                onDiscard={handleDiscardChanges}
-                                onSave={handleApplyManualAllocations}
+                    <AllocateSurplusPanel
+                        editingMonthLabel={editingMonthLabel}
+                        totalSurplus={studio.hero?.deployableSurplus || 0}
+                        allocatedAmount={stickyTotalAllocation}
+                        remainingSurplus={remaining}
+                        isDirty={isDirty}
+                        canSave={validation.canApply && isDirty}
+                        saveLabel={saveLabel}
+                        statusHint={statusHint}
+                        applyError={applyError}
+                        saveSuccessMessage={saveSuccessMessage}
+                        onDiscard={handleDiscardChanges}
+                        onSave={handleApplyManualAllocations}
+                        avenues={pymtwAvenueInstruments}
+                        expandedType={expandedAvenueType}
+                        onExpandType={handleExpandAvenue}
+                        draftAllocations={displayDraftForPanel}
+                        getMaxAmountForInstrument={maxForInstrument}
+                        onDraftChange={(type, amount) => {
+                            const current = Math.round(getDraftTypeAmount(displayDraftForPanel, type));
+                            if (Math.round(amount || 0) === current) return;
+                            if (avenuesMode !== 'manual_edit') {
+                                setAvenuesMode('manual_edit');
+                                setIsManualEditing(true);
+                            }
+                            handleDraftChange(type, amount);
+                        }}
+                        onLispDraftChange={handleLispDraftChange}
+                        familyMembers={familyMembers}
+                        currentPlanKey={planKey}
+                        monthSwitchConfirm={monthSwitchConfirm}
+                        replaceConfirm={replaceConfirm}
+                        surplusMonthChips={(
+                            <SurplusMonthChips
+                                months={studio.selectableMonths}
+                                outlook={studio.hero.journeyAdjustedOutlook}
+                                selectedMonthIndex={effectiveMonth}
+                                onSelect={handleMonthChange}
+                                amountKey="deployable"
                             />
-                        </div>
-                        <div className="pymtw-allocate-split-right">
-                            {activeAvenue && (
-                                <InstrumentCardGrid
-                                    instrumentCategories={[{
-                                        ...studio.instrumentCategories.find((c) => c.id === activeAvenue.categoryId),
-                                        instruments: [activeAvenue],
-                                    }].filter((c) => c?.id)}
-                                    draftAllocations={
-                                        isEditingMonth
-                                            ? draftAllocations
-                                            : (hasAppliedMonthPlan ? appliedBaseline : draftAllocations)
-                                    }
-                                    headerAllocations={headerAllocations}
-                                    baselineAllocations={appliedBaseline}
-                                    remainingSurplus={remaining}
-                                    getMaxAmountForInstrument={maxForInstrument}
-                                    onDraftChange={(type, amount) => {
-                                        const current = Math.round(
-                                            (isEditingMonth
-                                                ? draftAllocations[type]
-                                                : (hasAppliedMonthPlan ? appliedBaseline[type] : draftAllocations[type])
-                                            ) || 0,
-                                        );
-                                        if (Math.round(amount || 0) === current) return;
-                                        if (avenuesMode !== 'manual_edit') {
-                                            setAvenuesMode('manual_edit');
-                                            setIsManualEditing(true);
-                                        }
-                                        handleDraftChange(type, amount);
-                                    }}
-                                    onApplyManualAllocations={handleApplyManualAllocations}
-                                    canApplyManual={validation.canApply}
-                                    applyError=""
-                                    selectableMonths={studio.selectableMonths}
-                                    selectedMonthIndex={effectiveMonth}
-                                    onMonthChange={handleMonthChange}
-                                    calendarYear={studio.meta.calendarYear}
-                                    isDirty={isDirty}
-                                    showStickyBar={false}
-                                    showMonthPicker={false}
-                                    editingMonthLabel={editingMonthLabel}
-                                    totalMonthlyAllocation={stickyTotalAllocation}
-                                    saveLabel={saveLabel}
-                                    statusHint={statusHint}
-                                    saveSuccessMessage=""
-                                    onDiscardChanges={handleDiscardChanges}
-                                    showUnsavedBanner={false}
-                                />
-                            )}
-                        </div>
-                    </div>
+                        )}
+                    />
 
                     <PlannedInvestmentAllocationsPanel
                         allocationsSummary={allocationsSummary}
@@ -1530,6 +1540,9 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
                         onClearMonthPlan={handleClearMonthPlan}
                         clearDisabled={isDirty}
                         clearDisabledReason="Save or discard changes before clearing this month plan."
+                        title="Planned investment allocations"
+                        editLabel="Edit – Show Investment Avenues"
+                        monthChipsAriaLabel="Investment allocation months"
                     />
 
                     <AllocationStudioHero hero={studio.hero} />
@@ -1553,13 +1566,13 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
             )}
 
             <InstrumentAnalysisPanel
-                instrumentType={activePanelType}
+                instrumentType={expandedAvenueType}
                 baselineAnalysis={panelBaseline}
                 scenarioAnalysis={panelScenario}
                 goalDeltas={panelGoalDeltas}
-                draftAmount={activePanelType ? (draftAllocations[activePanelType] || 0) : 0}
-                maxAmount={activePanelType ? maxForInstrument(activePanelType) : Math.max(0, remaining)}
-                onAmountChange={(amount) => activePanelType && handleDraftChange(activePanelType, amount)}
+                draftAmount={expandedAvenueType ? getDraftTypeAmount(draftAllocations, expandedAvenueType) : 0}
+                maxAmount={expandedAvenueType ? maxForInstrument(expandedAvenueType) : Math.max(0, remaining)}
+                onAmountChange={(amount) => expandedAvenueType && handleDraftChange(expandedAvenueType, amount)}
                 isOpen={Boolean(activePanelType)}
                 onClose={() => setActivePanelType(null)}
             />
@@ -1585,6 +1598,165 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
                     background: rgba(15,118,110,0.1);
                     font-weight: 600;
                 }
+                .pymtw-allocate-panel { padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
+                .pymtw-allocate-panel-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    gap: 1rem;
+                    flex-wrap: wrap;
+                }
+                .pymtw-editing-month { margin: 0.25rem 0 0; color: var(--text-muted, #64748b); font-size: 0.95rem; }
+                .pymtw-total-surplus { text-align: right; }
+                .pymtw-total-surplus-label {
+                    display: block;
+                    font-size: 0.8rem;
+                    color: var(--text-muted, #64748b);
+                    text-transform: uppercase;
+                    letter-spacing: 0.04em;
+                }
+                .pymtw-total-surplus-value {
+                    display: block;
+                    font-size: 1.75rem;
+                    line-height: 1.2;
+                    color: var(--text-main);
+                }
+                .pymtw-surplus-progress { display: flex; flex-direction: column; gap: 0.4rem; }
+                .pymtw-surplus-progress-row {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: baseline;
+                    font-size: 0.9rem;
+                    color: var(--text-muted, #64748b);
+                }
+                .pymtw-surplus-progress-row strong { color: var(--text-main); }
+                .pymtw-surplus-progress-track {
+                    height: 10px;
+                    border-radius: 999px;
+                    background: rgba(15, 118, 110, 0.12);
+                    overflow: hidden;
+                }
+                .pymtw-surplus-progress-fill {
+                    height: 100%;
+                    background: var(--primary, #0f766e);
+                    border-radius: 999px;
+                    transition: width 0.2s ease;
+                }
+                .pymtw-allocate-actions {
+                    display: flex;
+                    gap: 0.75rem;
+                    flex-wrap: wrap;
+                }
+                .pymtw-avenues-block {
+                    margin-top: 0.5rem;
+                    padding-top: 1rem;
+                    border-top: 1px solid var(--border-color, #e2e8f0);
+                }
+                .pymtw-avenues-title { margin: 0 0 0.35rem; font-size: 1.05rem; }
+                .pymtw-avenue-grid {
+                    display: grid;
+                    grid-template-columns: 1fr;
+                    gap: 0.75rem;
+                    margin-top: 0.85rem;
+                }
+                @media (min-width: 640px) {
+                    .pymtw-avenue-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+                }
+                .pymtw-avenue-chip-card {
+                    border: 1px solid var(--border-color, #e2e8f0);
+                    border-radius: 12px;
+                    background: #fff;
+                    overflow: hidden;
+                    align-self: start;
+                    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+                }
+                .pymtw-avenue-chip-card-expanded {
+                    border-color: var(--primary, #0f766e);
+                    box-shadow: 0 0 0 1px rgba(15, 118, 110, 0.2);
+                }
+                .pymtw-avenue-chip-header {
+                    width: 100%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 0.75rem;
+                    padding: 0.85rem 1rem;
+                    border: none;
+                    background: transparent;
+                    cursor: pointer;
+                    text-align: left;
+                    color: var(--text-main);
+                }
+                .pymtw-avenue-chip-header-main {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.55rem;
+                    min-width: 0;
+                    flex-wrap: wrap;
+                }
+                .pymtw-avenue-chip-icon { flex-shrink: 0; color: var(--primary, #0f766e); }
+                .pymtw-expand-chip-label {
+                    font-size: 0.95rem;
+                    font-weight: 600;
+                }
+                .pymtw-expand-chip-badge {
+                    font-size: 0.75rem;
+                    font-weight: 600;
+                    padding: 0.15rem 0.5rem;
+                    border-radius: 999px;
+                    background: rgba(15, 118, 110, 0.12);
+                    color: var(--primary, #0f766e);
+                }
+                .pymtw-avenue-chip-chevron {
+                    flex-shrink: 0;
+                    color: var(--text-muted, #64748b);
+                    transition: transform 0.2s ease;
+                }
+                .pymtw-avenue-chip-chevron-open {
+                    transform: rotate(180deg);
+                }
+                .pymtw-avenue-chip-body {
+                    padding: 0 1rem 1rem;
+                    border-top: 1px solid var(--border-color, #e2e8f0);
+                }
+                .pymtw-avenue-chip-note {
+                    margin: 0.75rem 0 0.65rem;
+                    font-size: 0.85rem;
+                    color: var(--text-muted, #64748b);
+                    line-height: 1.4;
+                }
+                .pymtw-month-history { margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.35rem; }
+                .pymtw-month-history-row {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 0.5rem;
+                    align-items: baseline;
+                    font-size: 0.85rem;
+                    color: var(--text-muted, #64748b);
+                }
+                .pymtw-month-history-row strong { color: var(--text-main); }
+                .pymtw-month-history-label { margin-left: auto; }
+                .pymtw-lisp-form { display: flex; flex-direction: column; gap: 0.75rem; }
+                .pymtw-lisp-grid {
+                    display: grid;
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                    gap: 0.85rem;
+                }
+                @media (max-width: 700px) {
+                    .pymtw-lisp-grid { grid-template-columns: 1fr; }
+                    .pymtw-total-surplus { text-align: left; }
+                }
+                .pymtw-lisp-field label { display: block; margin-bottom: 0.35rem; font-size: 0.85rem; }
+                .pymtw-lisp-field select,
+                .pymtw-lisp-field input[type="number"] {
+                    width: 100%;
+                    padding: 0.65rem 0.75rem;
+                    border-radius: 8px;
+                    border: 1px solid var(--border-color, #e2e8f0);
+                    background: #fff;
+                    color: var(--text-main);
+                }
+                .pymtw-lisp-hint { display: block; margin-top: 0.35rem; color: var(--text-muted, #64748b); }
                 .pymtw-allocate-split {
                     display: grid;
                     grid-template-columns: 40% 60%;

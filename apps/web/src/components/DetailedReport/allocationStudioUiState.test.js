@@ -25,6 +25,38 @@ describe('allocationStudioUiState', () => {
         expect(isStudioDirty(draft, baseline)).toBe(true);
     });
 
+    it('areDraftsEqual compares Life Insurance Saving Plans object drafts', () => {
+        const a = {
+            ...createEmptyDraftAllocations(),
+            'Life Insurance Saving Plans': {
+                premium: 3000,
+                frequency: 'Monthly',
+                duration: 10,
+                insuredMember: 'Self',
+            },
+        };
+        const b = {
+            ...createEmptyDraftAllocations(),
+            'Life Insurance Saving Plans': {
+                premium: 3000,
+                frequency: 'Monthly',
+                duration: 10,
+                insuredMember: 'Self',
+            },
+        };
+        const c = {
+            ...createEmptyDraftAllocations(),
+            'Life Insurance Saving Plans': {
+                premium: 4000,
+                frequency: 'Monthly',
+                duration: 10,
+                insuredMember: 'Self',
+            },
+        };
+        expect(areDraftsEqual(a, b)).toBe(true);
+        expect(areDraftsEqual(a, c)).toBe(false);
+    });
+
     it('sumCategoryDraft and isCategoryDirty work per accordion', () => {
         const category = { id: 'growth', instruments: ['SIP', 'Lumpsum', 'Direct Equity & ETFs'] };
         const baseline = { ...createEmptyDraftAllocations(), SIP: 5000 };
@@ -99,5 +131,51 @@ describe('allocationStudioUiState', () => {
         expect(july.find((i) => i.type === 'PPF').amount).toBe(2000);
         expect(august).toHaveLength(1);
         expect(august[0].pending).toBeFalsy();
+    });
+
+    it('scopes planned summary to protection vs investment', () => {
+        const investmentAllocations = [
+            {
+                id: 1,
+                type: 'Term Insurance',
+                amount: 24000,
+                studioPlanKey: '2026-6',
+                startMonth: 7,
+                startYear: 2026,
+            },
+            {
+                id: 2,
+                type: 'SIP',
+                amount: 120000,
+                studioPlanKey: '2026-6',
+                startMonth: 7,
+                startYear: 2026,
+            },
+            {
+                id: 3,
+                type: 'Liquid Mutual Fund',
+                amount: 50000,
+                studioPlanKey: '2026-6',
+                startMonth: 7,
+                startYear: 2026,
+            },
+        ];
+
+        const protection = summarizeWithDraftOverlay({
+            investmentAllocations,
+            showDraft: false,
+            scope: 'protection',
+        });
+        expect(protection.items.map((i) => i.type).sort()).toEqual([
+            'Liquid Mutual Fund',
+            'Term Insurance',
+        ]);
+
+        const investment = summarizeWithDraftOverlay({
+            investmentAllocations,
+            showDraft: false,
+            scope: 'investment',
+        });
+        expect(investment.items.map((i) => i.type)).toEqual(['SIP']);
     });
 });

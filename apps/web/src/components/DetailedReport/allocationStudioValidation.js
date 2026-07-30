@@ -1,20 +1,27 @@
-import { INSTRUMENT_REGISTRY, getTotalDraftAllocated } from './instrumentAnalysisLogic';
+import {
+    INSTRUMENT_REGISTRY,
+    getTotalDraftAllocated,
+    getDraftTypeAmount,
+    LISP_INSTRUMENT_TYPE,
+    isLispDraft,
+} from './instrumentAnalysisLogic';
 import { MONTH_LABELS_LONG } from './moneyFlowLedgerLogic';
 
 const parseAmount = (value) => parseFloat(value) || 0;
 const PPF_ANNUAL_CAP = 150000;
 
-export function computeDraftYearImpact(draftAllocations = {}, startMonth, calendarYear) {
+export function computeDraftYearImpact(draftAllocations = {}, startMonth) {
     let impact = 0;
-    Object.entries(draftAllocations).forEach(([type, amount]) => {
-        if (!amount) return;
+    Object.keys(draftAllocations).forEach((type) => {
+        const monthlyOrLump = getDraftTypeAmount(draftAllocations, type);
+        if (!monthlyOrLump) return;
         const def = INSTRUMENT_REGISTRY[type];
         if (!def) return;
         if (def.inputMode === 'monthly') {
             const monthsActive = Math.max(0, 13 - startMonth);
-            impact += amount * monthsActive;
+            impact += monthlyOrLump * monthsActive;
         } else {
-            impact += amount;
+            impact += monthlyOrLump;
         }
     });
     return Math.round(impact);
@@ -90,6 +97,15 @@ export function validateDraftPlan({
                 message: `Only ₹${Math.round(unallocatedAfter).toLocaleString('en-IN')} journey surplus would remain in ${calendarYear} after this plan.`,
             });
         }
+    }
+
+    const lispDraft = draftAllocations[LISP_INSTRUMENT_TYPE];
+    if (isLispDraft(lispDraft) && parseAmount(lispDraft.premium) > 0 && !lispDraft.insuredMember) {
+        issues.push({
+            id: 'lisp-member-required',
+            severity: 'error',
+            message: 'Select an insured member for Life Insurance Saving Plans before saving.',
+        });
     }
 
     const draftPpfMonthly = draftAllocations.PPF || 0;

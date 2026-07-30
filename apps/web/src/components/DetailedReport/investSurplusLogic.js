@@ -10,23 +10,46 @@ const RECURRING_ALLOC_TYPES = [
     'Life Insurance Saving Plans', 'Recurring Deposit',
 ];
 
+function getSummaryMonthlyAmount(alloc) {
+    const rawAmount = parseAmount(alloc.amount);
+    const isMonthly = RECURRING_ALLOC_TYPES.includes(alloc.type);
+    if (!isMonthly) return 0;
+
+    // Installment premium rows (legacy Life / new LISP with insuredMember)
+    const isInstallment = (
+        (alloc.type === 'Life Insurance' && !alloc.studioPlanKey)
+        || (alloc.type === 'Life Insurance Saving Plans' && alloc.insuredMember)
+    );
+    if (isInstallment) {
+        const freq = String(alloc.frequency || 'Monthly').toLowerCase();
+        if (freq === 'quarterly') return rawAmount / 3;
+        if (freq === 'half-yearly' || freq === 'half yearly') return rawAmount / 6;
+        if (freq === 'annual' || freq === 'annually') return rawAmount / 12;
+        return rawAmount;
+    }
+
+    // Studio / calculator rows store recurring amounts as annual totals.
+    return rawAmount / 12;
+}
+
 export function summarizeInvestmentAllocations(allocations = []) {
     const items = allocations
         .map((a) => {
             const rawAmount = parseAmount(a.amount);
             const isMonthly = RECURRING_ALLOC_TYPES.includes(a.type);
-            // Studio / calculator rows store recurring amounts as annual totals.
-            const monthlyAmount = isMonthly ? rawAmount / 12 : 0;
+            const monthlyAmount = isMonthly ? getSummaryMonthlyAmount(a) : 0;
             return {
                 id: a.id,
                 type: a.type,
                 name: a.name || a.type,
                 amount: isMonthly ? monthlyAmount : rawAmount,
                 isMonthly,
-                annualImpact: isMonthly ? rawAmount : rawAmount,
+                annualImpact: isMonthly ? monthlyAmount * 12 : rawAmount,
                 studioPlanKey: a.studioPlanKey || null,
                 startMonth: a.startMonth || null,
                 startYear: a.startYear || null,
+                insuredMember: a.insuredMember || null,
+                frequency: a.frequency || null,
             };
         })
         // Planned table is for committed/pending amounts only — never show ₹0 placeholders

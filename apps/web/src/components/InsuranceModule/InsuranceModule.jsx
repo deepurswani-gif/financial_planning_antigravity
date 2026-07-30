@@ -12,6 +12,16 @@ import { useAuth } from '../../contexts/AuthContext';
 import { buildSupportEmailContextFromUser } from '../../services/supportRequestEmailService';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 
+const isLifeAlloc = (a) => (
+    a
+    && (a.type === 'Life Insurance' || a.type === 'Life Insurance Saving Plans')
+    && a.insuredMember
+);
+
+const findLifeAllocForMember = (investmentAllocations, memberName) => (
+    (investmentAllocations || []).find((a) => isLifeAlloc(a) && a.insuredMember === memberName)
+);
+
 const InsuranceModule = ({ onNext, onBack, setCurrentStep }) => {
     const { familyMembers, policies, setPolicies, expenseCategories, setExpenseCategories, investmentAllocations } = useFinancialPlan();
     const { user } = useAuth();
@@ -30,7 +40,7 @@ const InsuranceModule = ({ onNext, onBack, setCurrentStep }) => {
                 let updated = false;
                 const newPolicies = prev.map(p => {
                     if (p.isProposed) {
-                        const alloc = investmentAllocations.find(a => a.type === 'Life Insurance' && a.insuredMember === p.insuredName);
+                        const alloc = findLifeAllocForMember(investmentAllocations, p.insuredName);
                         if (alloc) {
                             const mappedFrequency = alloc.frequency === 'Annual' ? 'Annually' : (alloc.frequency || 'Monthly');
                             const allocAmount = alloc.amount || '';
@@ -42,7 +52,17 @@ const InsuranceModule = ({ onNext, onBack, setCurrentStep }) => {
 
                             if (mappedFrequency !== p.frequency || allocAmount !== p.premium || allocDuration !== p.paymentTerm || allocStartDate !== p.startDate) {
                                 updated = true;
-                                return { ...p, frequency: mappedFrequency, premium: allocAmount, paymentTerm: allocDuration, startDate: allocStartDate };
+                                const planType = alloc.type === 'Life Insurance Saving Plans'
+                                    ? (p.planType === 'ULIP' ? 'ULIP' : 'Saving Plan')
+                                    : p.planType;
+                                return {
+                                    ...p,
+                                    frequency: mappedFrequency,
+                                    premium: allocAmount,
+                                    paymentTerm: allocDuration,
+                                    startDate: allocStartDate,
+                                    planType,
+                                };
                             }
                         }
                     }
@@ -78,7 +98,7 @@ const InsuranceModule = ({ onNext, onBack, setCurrentStep }) => {
             const newPolicies = Array(toAdd).fill(null).map((_, i) => {
                 let prefill = {};
                 if (isProposed && investmentAllocations.length > 0) {
-                    const alloc = investmentAllocations.find(a => a.type === 'Life Insurance' && a.insuredMember === memberName);
+                    const alloc = findLifeAllocForMember(investmentAllocations, memberName);
                     if (alloc) {
                         const year = parseInt(alloc.startYear) || new Date().getFullYear();
                         const month = parseInt(alloc.startMonth) || 1;
@@ -89,7 +109,8 @@ const InsuranceModule = ({ onNext, onBack, setCurrentStep }) => {
                             premium: alloc.amount || '',
                             frequency: mappedFrequency,
                             paymentTerm: alloc.duration || '',
-                            startDate: dateStr
+                            startDate: dateStr,
+                            planType: alloc.type === 'Life Insurance Saving Plans' ? 'Saving Plan' : 'Term Insurance',
                         };
                     }
                 }
@@ -98,7 +119,7 @@ const InsuranceModule = ({ onNext, onBack, setCurrentStep }) => {
                     insuredName: memberName,
                     company: '',
                     planName: '',
-                    planType: 'Term Insurance',
+                    planType: prefill.planType || 'Term Insurance',
                     isProposed,
                     startDate: prefill.startDate || '',
                     endDate: '',
@@ -117,7 +138,7 @@ const InsuranceModule = ({ onNext, onBack, setCurrentStep }) => {
         }
     };
 
-    const allocationPremiums = (investmentAllocations || []).filter(a => a.type === 'Life Insurance');
+    const allocationPremiums = (investmentAllocations || []).filter(isLifeAlloc);
 
     const allocationAnnual = allocationPremiums.reduce((sum, item) => {
         const freq = item.frequency || 'Monthly';
@@ -135,7 +156,7 @@ const InsuranceModule = ({ onNext, onBack, setCurrentStep }) => {
         // Filter out proposed policies for members who no longer have allocations
         const validPolicies = policies.filter(p => {
             if (p.isProposed) {
-                return (investmentAllocations || []).some(a => a.type === 'Life Insurance' && a.insuredMember === p.insuredName);
+                return (investmentAllocations || []).some(a => isLifeAlloc(a) && a.insuredMember === p.insuredName);
             }
             return true;
         });
@@ -154,7 +175,7 @@ const InsuranceModule = ({ onNext, onBack, setCurrentStep }) => {
     });
 
     const allowedMembersProposed = familyMembers.filter(member => {
-        return (investmentAllocations || []).some(a => a.type === 'Life Insurance' && a.insuredMember === (member.name || member.relation));
+        return (investmentAllocations || []).some(a => isLifeAlloc(a) && a.insuredMember === (member.name || member.relation));
     });
 
     const handleProceed = () => {
@@ -347,14 +368,14 @@ const InsuranceModule = ({ onNext, onBack, setCurrentStep }) => {
                     </div>
 
                     {/* Future Proposed Policies from Allocation Module */}
-                    {investmentAllocations && investmentAllocations.filter(a => a.type === 'Life Insurance').length > 0 && (
+                    {investmentAllocations && investmentAllocations.filter(isLifeAlloc).length > 0 && (
                         <div style={{ marginTop: '2rem', marginBottom: '2.5rem' }}>
                             <h4 style={{ margin: '0 0 1rem 0', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary)' }}>
                                 <TrendingUp size={18} />
                                 Proposed Policies (from Allocation Module)
                             </h4>
                             <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
-                                {Object.entries(investmentAllocations.filter(a => a.type === 'Life Insurance').reduce((acc, item) => {
+                                {Object.entries(investmentAllocations.filter(isLifeAlloc).reduce((acc, item) => {
                                     const memberName = item.insuredMember || 'Unspecified';
                                     if (!acc[memberName]) acc[memberName] = [];
                                     acc[memberName].push(item);

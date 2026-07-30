@@ -34,6 +34,65 @@ describe('instrumentAnalysisLogic', () => {
         expect(getTotalDraftAllocated(draft)).toBe(60000);
     });
 
+    it('sums Life Insurance Saving Plans draft by monthly premium equivalent', () => {
+        const draft = {
+            ...createEmptyDraftAllocations(),
+            SIP: 1000,
+            'Life Insurance Saving Plans': {
+                premium: 6000,
+                frequency: 'Quarterly',
+                duration: 10,
+                insuredMember: 'Self',
+            },
+        };
+        // 6000 quarterly → 2000/mo + 1000 SIP
+        expect(getTotalDraftAllocated(draft)).toBe(3000);
+    });
+
+    it('applies Life Insurance Saving Plans with installment fields', () => {
+        const draft = {
+            ...createEmptyDraftAllocations(),
+            'Life Insurance Saving Plans': {
+                premium: 5000,
+                frequency: 'Monthly',
+                duration: 15,
+                insuredMember: 'Priya',
+            },
+        };
+        const result = applyAllocationPlan({
+            investmentAllocations: [],
+            draftAllocations: draft,
+            calendarYear: 2026,
+            monthIndex: 6,
+        });
+        const lisp = result.find((r) => r.type === 'Life Insurance Saving Plans');
+        expect(lisp).toBeTruthy();
+        expect(lisp.amount).toBe(5000);
+        expect(lisp.frequency).toBe('Monthly');
+        expect(lisp.duration).toBe(15);
+        expect(lisp.insuredMember).toBe('Priya');
+        expect(lisp.studioPlanKey).toBe('2026-6');
+    });
+
+    it('skips Life Insurance Saving Plans without insured member', () => {
+        const draft = {
+            ...createEmptyDraftAllocations(),
+            'Life Insurance Saving Plans': {
+                premium: 5000,
+                frequency: 'Monthly',
+                duration: 10,
+                insuredMember: '',
+            },
+        };
+        const result = applyAllocationPlan({
+            investmentAllocations: [],
+            draftAllocations: draft,
+            calendarYear: 2026,
+            monthIndex: 6,
+        });
+        expect(result.find((r) => r.type === 'Life Insurance Saving Plans')).toBeUndefined();
+    });
+
     it('analyzes SIP scenario with higher headline value', () => {
         const baseline = analyzeInstrument('SIP', baseParams, 0, 6, 2026);
         const scenario = analyzeInstrument('SIP', baseParams, 20000, 6, 2026);

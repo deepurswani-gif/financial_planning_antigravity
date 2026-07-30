@@ -1,29 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import {
-    TrendingUp, ChevronDown, Shield, Coins, Landmark, PiggyBank, BarChart2, Calendar,
-} from 'lucide-react';
+import { ChevronDown, Calendar } from 'lucide-react';
 import { formatCurrency } from '../CashFlowModule/CashFlowLogic';
 import ReportReveal from './ReportReveal';
-import { INSTRUMENT_REGISTRY } from './instrumentAnalysisLogic';
 import AllocationStudioStickyBar from './AllocationStudioStickyBar';
 import { isCategoryDirty, sumCategoryDraft } from './allocationStudioUiState';
-
-const ICONS = {
-    SIP: TrendingUp,
-    Lumpsum: Coins,
-    'Direct Equity & ETFs': BarChart2,
-    PPF: Landmark,
-    NPS: PiggyBank,
-    'Fixed Deposit': Landmark,
-    'Liquid Mutual Fund': Coins,
-    'Recurring Deposit': PiggyBank,
-    'Life Insurance': Shield,
-    'Term Insurance': Shield,
-    'Health Insurance': Shield,
-    'Life Insurance Saving Plans': PiggyBank,
-    Gold: Coins,
-    'Other Investment': Coins,
-};
+import { InstrumentAmountSlider, AVENUE_ICONS } from './AllocateSurplusPanel';
 
 const InstrumentCard = ({
     instrument,
@@ -33,23 +14,9 @@ const InstrumentCard = ({
     onDraftChange,
     displayName,
     note,
+    currentPlanKey = null,
 }) => {
-    const def = INSTRUMENT_REGISTRY[instrument.type] || instrument.registry;
-    const Icon = ICONS[instrument.type] || TrendingUp;
-    const isMonthly = def?.inputMode === 'monthly';
-    const amountSuffix = isMonthly ? '/mo' : '';
-    const [inputValue, setInputValue] = useState(String(draftAmount || 0));
-
-    useEffect(() => {
-        setInputValue(String(draftAmount || 0));
-    }, [draftAmount]);
-
-    const commitAmount = (raw) => {
-        const parsed = Math.round(parseFloat(String(raw).replace(/,/g, '')) || 0);
-        const clamped = Math.max(0, Math.min(parsed, Math.max(0, maxAmount)));
-        onDraftChange(instrument.type, clamped);
-        setInputValue(String(clamped));
-    };
+    const Icon = AVENUE_ICONS[instrument.type] || AVENUE_ICONS.SIP;
 
     return (
         <div className="pymtw-instrument-card pymtw-instrument-active">
@@ -68,65 +35,15 @@ const InstrumentCard = ({
                 ))}
             </div>
 
-            <div className="pymtw-sip-slider-block">
-                <div className="pymtw-sip-slider-head">
-                    <span>Allocate this month</span>
-                    <div className="pymtw-amount-input-wrap">
-                        <span className="pymtw-amount-prefix">₹</span>
-                        <input
-                            type="number"
-                            className="pymtw-amount-input"
-                            min={0}
-                            max={Math.max(0, maxAmount)}
-                            step={1}
-                            value={inputValue}
-                            onChange={(e) => setInputValue(e.target.value)}
-                            onBlur={() => commitAmount(inputValue)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                    e.currentTarget.blur();
-                                }
-                            }}
-                            aria-label={`${displayName || instrument.type} amount`}
-                        />
-                        {amountSuffix && <span className="pymtw-amount-suffix">{amountSuffix}</span>}
-                    </div>
-                </div>
-                <input
-                    type="range"
-                    className="pymtw-sip-slider"
-                    min={0}
-                    max={Math.max(0, maxAmount)}
-                    step={def?.step || 500}
-                    value={Math.min(draftAmount || 0, Math.max(0, maxAmount))}
-                    onChange={(e) => {
-                        const next = parseInt(e.target.value, 10) || 0;
-                        if (next === Math.round(draftAmount || 0)) return;
-                        onDraftChange(instrument.type, next);
-                    }}
-                    aria-label={`${displayName || instrument.type} allocation slider`}
-                />
-                <div className="pymtw-sip-slider-labels">
-                    <span>₹0</span>
-                    <span>{formatCurrency(maxAmount)}</span>
-                </div>
-                {instrument.hasAllocations && (
-                    <div className="pymtw-instrument-stats">
-                        <div>
-                            <span>Already planned</span>
-                            <strong>
-                                {instrument.monthlyTotal > 0
-                                    ? `${formatCurrency(instrument.monthlyTotal)}/mo`
-                                    : formatCurrency(instrument.annualTotal)}
-                            </strong>
-                        </div>
-                        <div>
-                            <span>Entries</span>
-                            <strong>{instrument.count}</strong>
-                        </div>
-                    </div>
-                )}
-            </div>
+            <InstrumentAmountSlider
+                instrumentType={instrument.type}
+                displayName={displayName || instrument.type}
+                draftAmount={draftAmount}
+                maxAmount={maxAmount}
+                onDraftChange={onDraftChange}
+                monthHistory={instrument.monthHistory}
+                currentPlanKey={currentPlanKey}
+            />
         </div>
     );
 };
@@ -162,6 +79,7 @@ const InstrumentCardGrid = ({
     replaceConfirm = null,
     monthSwitchConfirm = null,
     showMonthPicker = true,
+    currentPlanKey = null,
 }) => {
     const [expandedId, setExpandedId] = useState(
         () => (instrumentCategories?.length === 1 ? instrumentCategories[0].id : null),
@@ -288,6 +206,7 @@ const InstrumentCardGrid = ({
                                             ? getMaxAmountForInstrument(instrument.type)
                                             : (draftAllocations[instrument.type] || 0) + Math.max(0, remainingSurplus)}
                                         onDraftChange={onDraftChange}
+                                        currentPlanKey={currentPlanKey}
                                     />
                                 ))}
                             </div>

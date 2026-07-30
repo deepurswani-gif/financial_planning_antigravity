@@ -155,37 +155,137 @@ export const INSTRUMENT_REGISTRY = {
 
 export const STUDIO_INSTRUMENT_TYPES = Object.keys(INSTRUMENT_REGISTRY);
 
+export const LISP_INSTRUMENT_TYPE = 'Life Insurance Saving Plans';
+
+export const LISP_FREQUENCIES = ['Monthly', 'Quarterly', 'Half-Yearly', 'Annual'];
+
 export function normalizeAllocType(type) {
     if (type === 'FD') return 'Fixed Deposit';
     if (type === 'RD') return 'Recurring Deposit';
     return type;
 }
 
+/** True for Life Insurance and Life Insurance Saving Plans allocation rows. */
+export function isLifeInsuranceAllocType(type) {
+    return type === 'Life Insurance' || type === LISP_INSTRUMENT_TYPE;
+}
+
+export function createEmptyLispDraft() {
+    return {
+        premium: 0,
+        frequency: 'Monthly',
+        duration: INSTRUMENT_REGISTRY[LISP_INSTRUMENT_TYPE]?.defaultDuration || 10,
+        insuredMember: '',
+    };
+}
+
+export function isLispDraft(value) {
+    return value != null && typeof value === 'object' && !Array.isArray(value)
+        && ('premium' in value || 'insuredMember' in value || 'frequency' in value);
+}
+
+/** Installment premium → monthly surplus impact (same rules as legacy Life Insurance). */
+export function premiumToMonthlyEquivalent(premium, frequency = 'Monthly') {
+    const amount = Math.max(0, parseAmount(premium));
+    const freq = String(frequency || 'Monthly').toLowerCase();
+    if (freq === 'quarterly') return amount / 3;
+    if (freq === 'half-yearly' || freq === 'half yearly') return amount / 6;
+    if (freq === 'annual' || freq === 'annually') return amount / 12;
+    return amount;
+}
+
+export function getLispDraftMonthly(draft) {
+    if (!isLispDraft(draft)) return Math.max(0, parseAmount(draft));
+    return premiumToMonthlyEquivalent(draft.premium, draft.frequency);
+}
+
+/** Numeric monthly/lumpsum amount used for surplus totals and max clamps. */
+export function getDraftTypeAmount(draftAllocations = {}, type) {
+    const value = draftAllocations?.[type];
+    if (type === LISP_INSTRUMENT_TYPE) return getLispDraftMonthly(value);
+    return Math.max(0, parseAmount(value));
+}
+
 export function createEmptyDraftAllocations() {
-    return Object.fromEntries(STUDIO_INSTRUMENT_TYPES.map((t) => [t, 0]));
+    return Object.fromEntries(STUDIO_INSTRUMENT_TYPES.map((t) => (
+        t === LISP_INSTRUMENT_TYPE ? [t, createEmptyLispDraft()] : [t, 0]
+    )));
 }
 
 export function getDraftMonthlyImpact(instrumentType, amount) {
     const def = INSTRUMENT_REGISTRY[instrumentType];
-    if (!def || amount <= 0) return 0;
+    if (!def) return 0;
+    if (instrumentType === LISP_INSTRUMENT_TYPE) {
+        const monthly = isLispDraft(amount) ? getLispDraftMonthly(amount) : parseAmount(amount);
+        return monthly > 0 ? monthly : 0;
+    }
+    if (amount <= 0) return 0;
     return def.inputMode === 'monthly' ? amount : 0;
 }
 
 export function getTotalDraftAllocated(draftAllocations = {}) {
     return STUDIO_INSTRUMENT_TYPES.reduce(
-        (sum, type) => sum + Math.max(0, parseAmount(draftAllocations[type])),
+        (sum, type) => sum + getDraftTypeAmount(draftAllocations, type),
         0,
     );
 }
 
 export function draftAllocationsToItems(draftAllocations = {}, source = 'user') {
     return STUDIO_INSTRUMENT_TYPES
-        .filter((type) => (draftAllocations[type] || 0) > 0)
-        .map((type) => ({
-            instrumentType: type,
-            amount: draftAllocations[type],
-            source,
-        }));
+        .filter((type) => getDraftTypeAmount(draftAllocations, type) > 0)
+        .map((type) => {
+            const value = draftAllocations[type];
+            if (type === LISP_INSTRUMENT_TYPE && isLispDraft(value)) {
+                return {
+                    instrumentType: type,
+                    amount: getLispDraftMonthly(value),
+                    premium: Math.round(parseAmount(value.premium)),
+                    frequency: value.frequency || 'Monthly',
+                    duration: parseInt(value.duration, 10) || 10,
+                    insuredMember: value.insuredMember || '',
+                    source,
+                };
+            }
+            return {
+                instrumentType: type,
+                amount: value,
+                source,
+            };
+        });
+}
+
+/** Hydrate LISP draft from a persisted allocation row. */
+export function lispDraftFromAllocation(alloc = {}) {
+    const empty = createEmptyLispDraft();
+    if (!alloc) return empty;
+    // New installment+member shape (or any row with insuredMember)
+    if (alloc.insuredMember) {
+        return {
+            premium: Math.round(parseAmount(alloc.amount)),
+            frequency: alloc.frequency || 'Monthly',
+            duration: parseInt(alloc.duration, 10) || empty.duration,
+            insuredMember: alloc.insuredMember || '',
+        };
+    }
+    // Legacy studio annual storage → treat as monthly premium installment
+    return {
+        premium: Math.round(parseAmount(alloc.amount) / 12),
+        frequency: 'Monthly',
+        duration: parseInt(alloc.duration, 10) || empty.duration,
+        insuredMember: '',
+    };
+}
+
+export function areDraftTypeValuesEqual(a, b, type) {
+    if (type === LISP_INSTRUMENT_TYPE) {
+        const left = isLispDraft(a) ? a : createEmptyLispDraft();
+        const right = isLispDraft(b) ? b : createEmptyLispDraft();
+        return Math.round(parseAmount(left.premium)) === Math.round(parseAmount(right.premium))
+            && String(left.frequency || 'Monthly') === String(right.frequency || 'Monthly')
+            && (parseInt(left.duration, 10) || 10) === (parseInt(right.duration, 10) || 10)
+            && String(left.insuredMember || '') === String(right.insuredMember || '');
+    }
+    return Math.round(parseAmount(a)) === Math.round(parseAmount(b));
 }
 
 function buildGoalImpacts(series, goals, goalMappings, currentYear, goalKey, valueField = 'corpus') {
@@ -459,7 +559,7 @@ export function buildGrowthPreview({
     monthIndex,
 }) {
     const retirementYear = getRetirementYear(familyMembers, currentYear);
-    const instrumentKeys = STUDIO_INSTRUMENT_TYPES.filter((t) => (draftAllocations[t] || 0) > 0);
+    const instrumentKeys = STUDIO_INSTRUMENT_TYPES.filter((t) => getDraftTypeAmount(draftAllocations, t) > 0);
 
     const baselineTotal = STUDIO_INSTRUMENT_TYPES.reduce((sum, type) => {
         const a = analyzeInstrument(type, {
@@ -473,7 +573,7 @@ export function buildGrowthPreview({
         const a = analyzeInstrument(type, {
             expenseCategories, assetCategories, investmentAllocations,
             calculatorInputs, goalMappings, goals, familyMembers, currentYear,
-        }, draftAllocations[type] || 0, monthIndex, currentYear);
+        }, getDraftTypeAmount(draftAllocations, type), monthIndex, currentYear);
         return sum + (a?.headlineValue || 0);
     }, 0);
 
@@ -485,13 +585,13 @@ export function buildGrowthPreview({
         const scenario = analyzeInstrument(type, {
             expenseCategories, assetCategories, investmentAllocations,
             calculatorInputs, goalMappings, goals, familyMembers, currentYear,
-        }, draftAllocations[type], monthIndex, currentYear);
+        }, getDraftTypeAmount(draftAllocations, type), monthIndex, currentYear);
         return {
             type,
             baseline: base?.headlineValue || 0,
             scenario: scenario?.headlineValue || 0,
             delta: (scenario?.headlineValue || 0) - (base?.headlineValue || 0),
-            draftAmount: draftAllocations[type] || 0,
+            draftAmount: getDraftTypeAmount(draftAllocations, type),
         };
     });
 
@@ -528,10 +628,49 @@ export function applyAllocationPlan({
     const additions = [];
 
     typesToWrite.forEach((instrumentType) => {
-        const amount = draftAllocations[instrumentType] || 0;
-        if (amount <= 0) return;
         const def = INSTRUMENT_REGISTRY[instrumentType];
         if (!def) return;
+
+        if (instrumentType === LISP_INSTRUMENT_TYPE) {
+            const raw = draftAllocations[instrumentType];
+            if (isLispDraft(raw)) {
+                const premium = Math.round(parseAmount(raw.premium));
+                if (premium <= 0 || !raw.insuredMember) return;
+                additions.push({
+                    id: Date.now() + additions.length,
+                    type: def.allocType,
+                    name: `Studio ${instrumentType} (${MONTH_LABELS_SHORT[monthIndex]} ${calendarYear})`,
+                    amount: premium,
+                    startMonth,
+                    startYear: calendarYear,
+                    duration: parseInt(raw.duration, 10) || def.defaultDuration,
+                    expectedReturn: def.defaultRate,
+                    frequency: raw.frequency || 'Monthly',
+                    insuredMember: raw.insuredMember,
+                    studioPlanKey: planKey,
+                });
+                return;
+            }
+            // Numeric draft (e.g. AI bundle): keep legacy annual storage
+            const monthly = Math.round(parseAmount(raw));
+            if (monthly <= 0) return;
+            additions.push({
+                id: Date.now() + additions.length,
+                type: def.allocType,
+                name: `Studio ${instrumentType} (${MONTH_LABELS_SHORT[monthIndex]} ${calendarYear})`,
+                amount: monthly * 12,
+                startMonth,
+                startYear: calendarYear,
+                duration: def.defaultDuration,
+                expectedReturn: def.defaultRate,
+                frequency: 'Monthly',
+                studioPlanKey: planKey,
+            });
+            return;
+        }
+
+        const amount = draftAllocations[instrumentType] || 0;
+        if (amount <= 0) return;
         additions.push({
             id: Date.now() + additions.length,
             type: def.allocType,
