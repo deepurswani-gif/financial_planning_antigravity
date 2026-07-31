@@ -319,6 +319,23 @@ export function getEmergencyFundAmount(assetCategories = {}, contingencyFund = '
     return parseFloat(contingencyFund) || 0;
 }
 
+/**
+ * Keep summary liquid cash and detailed bank savings aligned.
+ * Safety Net prefers cash.savings when set, so summary-only edits (smart edit /
+ * summary flow) must also update the detail slot or the report stays stale.
+ */
+export function syncEmergencyFundAmount(assetCategories = {}, amount) {
+    const normalized = amount === null || amount === undefined ? '' : String(amount);
+    return {
+        ...assetCategories,
+        summaryLiquidCash: normalized,
+        cash: {
+            ...(assetCategories.cash || {}),
+            savings: normalized,
+        },
+    };
+}
+
 /** Investment portfolio bucket from detailed fields. */
 export function getPortfolioBreakdownTotal(assetCategories = {}) {
     return [

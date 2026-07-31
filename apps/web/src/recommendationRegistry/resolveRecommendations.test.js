@@ -7,8 +7,12 @@ describe('Recommendation Resolver', () => {
   it('returns only recommendations whose trigger applies, filtered by report', () => {
     const signals = {
       hasProtectionGap: true,
+      hasSelfProtectionGap: true,
       protectionGap: 2500000,
       protectionGapDisplay: '₹25.00 L',
+      selfProtectionGap: 2500000,
+      selfProtectionGapDisplay: '₹25.00 L',
+      selfName: 'Alex',
       hasHealthGap: false,
       emergencyGap: 0,
     };
@@ -21,12 +25,15 @@ describe('Recommendation Resolver', () => {
 
   it('interpolates templates from the signals snapshot (byte-for-byte copy)', () => {
     const signals = {
-      hasProtectionGap: true,
-      protectionGap: 2500000,
-      protectionGapDisplay: '₹25.00 L',
+      hasSelfProtectionGap: true,
+      selfProtectionGap: 2500000,
+      selfProtectionGapDisplay: '₹25.00 L',
+      selfName: 'Alex',
     };
     const [rec] = resolveRecommendations(signals, { report: 'safety_net' });
-    expect(rec.summary).toBe("Buy term cover of ₹25.00 L to secure your family's future.");
+    expect(rec.summary).toBe(
+      "Buy term cover of ₹25.00 L on Alex. Life cover pays only on that person's death — underinsurance here leaves the household exposed.",
+    );
   });
 
   it('exposes supporting metrics resolved from signals', () => {
@@ -39,8 +46,12 @@ describe('Recommendation Resolver', () => {
   it('orders safety-net recovery steps by priority (protection, health, emergency)', () => {
     const signals = {
       hasProtectionGap: true,
+      hasSelfProtectionGap: true,
       protectionGap: 1000000,
       protectionGapDisplay: '₹10.00 L',
+      selfProtectionGap: 1000000,
+      selfProtectionGapDisplay: '₹10.00 L',
+      selfName: 'Alex',
       hasHealthGap: true,
       healthStatus: 'partial',
       healthCoverageHave: 500000,
@@ -52,6 +63,21 @@ describe('Recommendation Resolver', () => {
     };
     const ids = resolveRecommendations(signals, { report: 'safety_net' }).map((r) => r.id);
     expect(ids).toEqual(['protection.lifeGap', 'protection.healthPartial', 'emergency.buildFund']);
+  });
+
+  it('includes spouse protection recommendation when spouse gap exists', () => {
+    const signals = {
+      hasSelfProtectionGap: true,
+      selfProtectionGap: 1000000,
+      selfProtectionGapDisplay: '₹10.00 L',
+      selfName: 'Alex',
+      hasSpouseProtectionGap: true,
+      spouseProtectionGap: 2000000,
+      spouseProtectionGapDisplay: '₹20.00 L',
+      spouseName: 'Sam',
+    };
+    const ids = resolveRecommendations(signals, { report: 'safety_net' }).map((r) => r.id);
+    expect(ids).toEqual(['protection.lifeGap', 'protection.lifeGapSpouse']);
   });
 
   it('selects the absent vs partial health recommendation from signals', () => {
@@ -117,7 +143,7 @@ describe('Recommendation Resolver', () => {
       reports: ['safety_net'],
     });
     const list = [...RECOMMENDATION_REGISTRY, dupe];
-    const resolved = resolveFrom(list, { hasProtectionGap: true }, { report: 'safety_net' });
+    const resolved = resolveFrom(list, { hasSelfProtectionGap: true }, { report: 'safety_net' });
     const lifeGaps = resolved.filter((r) => r.id === 'protection.lifeGap');
     expect(lifeGaps).toHaveLength(1);
   });

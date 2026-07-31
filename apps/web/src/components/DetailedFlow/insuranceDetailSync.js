@@ -317,6 +317,16 @@ export function sumPolicySumAssured(policies = [], { lifeOnly = true } = {}) {
         .reduce((sum, p) => sum + (parseFloat(p.sumAssured) || 0), 0);
 }
 
+/** Existing life sum assured for one insured member (excludes proposed + health). */
+export function sumMemberLifeCover(policies = [], memberName = '') {
+    if (!memberName) return 0;
+    return policies
+        .filter((p) => !p.isProposed)
+        .filter((p) => isLifeCoverPolicy(p))
+        .filter((p) => p.insuredName === memberName)
+        .reduce((sum, p) => sum + (parseFloat(p.sumAssured) || 0), 0);
+}
+
 export function sumHealthPolicyCover(policies = []) {
     return policies
         .filter((p) => !p.isProposed)

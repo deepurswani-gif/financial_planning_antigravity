@@ -11,6 +11,8 @@ import {
     getSummaryAssetTotal,
     reconcileWealthBuckets,
     getPortfolioBreakdownTotal,
+    getEmergencyFundAmount,
+    syncEmergencyFundAmount,
 } from './wealthDetailSync';
 
 describe('wealthDetailSync', () => {
@@ -132,5 +134,30 @@ describe('wealthDetailSync', () => {
         expect(getPortfolioBreakdownTotal({
             investments: { equity: '300000', mutualFunds: '100000' },
         })).toBe(400000);
+    });
+
+    it('getEmergencyFundAmount prefers detailed cash.savings over summaryLiquidCash', () => {
+        expect(getEmergencyFundAmount({
+            summaryLiquidCash: '200000',
+            cash: { savings: '500000' },
+        })).toBe(500000);
+    });
+
+    it('getEmergencyFundAmount falls back to summaryLiquidCash when detail is empty', () => {
+        expect(getEmergencyFundAmount({
+            summaryLiquidCash: '200000',
+            cash: { savings: '' },
+        }, '10000')).toBe(200000);
+    });
+
+    it('syncEmergencyFundAmount updates both summary liquid cash and cash.savings', () => {
+        const next = syncEmergencyFundAmount({
+            summaryLiquidCash: '100000',
+            cash: { savings: '100000', cashInHand: '5000' },
+        }, '750000');
+        expect(next.summaryLiquidCash).toBe('750000');
+        expect(next.cash.savings).toBe('750000');
+        expect(next.cash.cashInHand).toBe('5000');
+        expect(getEmergencyFundAmount(next)).toBe(750000);
     });
 });

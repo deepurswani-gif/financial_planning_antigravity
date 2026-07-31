@@ -7,8 +7,11 @@
 import { getEffectiveMonthlyEmi, getEffectiveMonthlyHousehold } from '../DetailedFlow/expenseDetailSync';
 import {
     getEffectiveHealthCover,
-    getEffectiveLifeCover,
+    getMemberInsuranceKey,
+    sumMemberLifeCover,
+    sumPolicySumAssured,
 } from '../DetailedFlow/insuranceDetailSync';
+import { shouldAssessSpouseProtection } from '../ProtectionGapModule/ProtectionGapLogic';
 
 export const MIN_HEALTH_COVER = 1_000_000;
 
@@ -16,13 +19,39 @@ function getEffectiveMonthlyNeed(expenseCategories = {}, familyMembers = []) {
     return getEffectiveMonthlyHousehold(expenseCategories, familyMembers) + getEffectiveMonthlyEmi(expenseCategories);
 }
 
+function buildMemberProtection(role, name, coverageHave, coverageRequired, monthlyNeed) {
+    const annualNeed = monthlyNeed * 12;
+    const gap = Math.max(0, coverageRequired - coverageHave);
+    const coveredPercent = coverageRequired > 0
+        ? Math.min(100, Math.round((coverageHave / coverageRequired) * 100))
+        : 0;
+    const yearsCovered = annualNeed > 0 ? coverageHave / annualNeed : 0;
+
+    return {
+        role,
+        name,
+        coverage: coverageHave,
+        need: coverageRequired,
+        gap,
+        isGap: gap > 0,
+        coveredPercent,
+        yearsCovered: Math.round(yearsCovered * 100) / 100,
+        monthsCovered: Math.round(yearsCovered * 12),
+    };
+}
+
 /**
  * Calculate protection (life insurance) gap data.
  *
  * Uses the HLV (Human Life Value) method from ProtectionGapLogic:
- *   Protection Need = Monthly Expenditure × 200
+ *   Protection Need = Monthly Expenditure × 200 (shared household need per earning member)
  *
- * Cover have prefers detailed policies[].sumAssured over summaryLifeCover.
+ * Life cover pays only on the insured member's death, so self and earning spouse
+ * are assessed separately against the same household need. Aggregate household
+ * cover is not treated as "fine" when any assessed member is underinsured.
+ *
+ * Cover have prefers detailed per-member policies[].sumAssured (life, non-proposed).
+ * Summary life cover is attributed to self when no detailed life SA exists.
  *
  * @param {object} expenseCategories - Expense categories from context
  * @param {string|number} summaryLifeCover - Total life cover from summary flow
@@ -41,28 +70,54 @@ export const calculateProtectionData = (
 
     const multiplier = 200;
     const coverageRequired = monthlyNeed * multiplier;
-    const coverageHave = getEffectiveLifeCover(summaryLifeCover, policies);
-    const protectionGap = Math.max(0, coverageRequired - coverageHave);
 
-    const coveredPercent = coverageRequired > 0
-        ? Math.min(100, Math.round((coverageHave / coverageRequired) * 100))
-        : 0;
+    const selfMember = familyMembers.find((m) => m.relation === 'Self');
+    const spouseMember = familyMembers.find((m) => m.relation === 'Spouse');
+    const selfName = getMemberInsuranceKey(selfMember || { name: 'Self', relation: 'Self' });
+    const detailedLifeTotal = sumPolicySumAssured(policies);
 
-    const yearsCovered = annualNeed > 0 ? coverageHave / annualNeed : 0;
-    const monthsCovered = Math.round(yearsCovered * 12);
+    let selfCoverage;
+    if (detailedLifeTotal > 0) {
+        selfCoverage = sumMemberLifeCover(policies, selfName);
+    } else {
+        selfCoverage = parseFloat(summaryLifeCover) || 0;
+    }
+
+    const self = buildMemberProtection('self', selfName, selfCoverage, coverageRequired, monthlyNeed);
+
+    let spouse = null;
+    if (shouldAssessSpouseProtection(spouseMember)) {
+        const spouseName = getMemberInsuranceKey(spouseMember);
+        // Spouse cover is always policy-based; summary life cover is treated as self's.
+        const spouseCoverage = sumMemberLifeCover(policies, spouseName);
+        spouse = buildMemberProtection('spouse', spouseName, spouseCoverage, coverageRequired, monthlyNeed);
+    }
+
+    const assessedMembers = [self, spouse].filter(Boolean);
+    const weakest = assessedMembers.reduce(
+        (worst, member) => (member.coveredPercent < worst.coveredPercent ? member : worst),
+        assessedMembers[0],
+    );
+    const protectionGap = assessedMembers.reduce((sum, member) => sum + member.gap, 0);
 
     return {
         monthlyNeed,
         annualNeed,
         multiplier,
         coverageRequired,
-        coverageHave,
+        // Weakest earning member — payout on their death is what the household receives
+        coverageHave: weakest?.coverage ?? 0,
         protectionGap,
-        coveredPercent,
-        yearsCovered: Math.round(yearsCovered * 100) / 100, // 2 decimal places
-        monthsCovered,
+        coveredPercent: weakest?.coveredPercent ?? 0,
+        yearsCovered: weakest?.yearsCovered ?? 0,
+        monthsCovered: weakest?.monthsCovered ?? 0,
         hasGap: protectionGap > 0,
-        hasData: monthlyNeed > 0
+        hasData: monthlyNeed > 0,
+        self,
+        spouse,
+        assessedMembers,
+        weakestRole: weakest?.role ?? 'self',
+        weakestName: weakest?.name ?? selfName,
     };
 };
 
@@ -231,16 +286,46 @@ export const buildCrisisTimeline = (contingencyData, protectionData) => {
 export const buildRecoverySteps = (protectionData, healthData, contingencyData) => {
     const steps = [];
 
-    if (protectionData.hasGap) {
+    const self = protectionData.self;
+    const spouse = protectionData.spouse;
+
+    if (self?.isGap) {
+        steps.push({
+            id: 'step-protection-self',
+            step: steps.length + 1,
+            urgency: 'Immediate',
+            title: `Fill ${self.name}'s Protection Gap`,
+            description: `Buy term cover of ${formatCompactSN(self.gap)} on ${self.name}. Life cover pays only on that person's death — underinsurance here leaves the household exposed.`,
+            amount: self.gap,
+            icon: 'shield',
+            color: '#6366F1',
+            memberRole: 'self',
+        });
+    } else if (protectionData.hasGap && !self && !spouse) {
+        // Legacy shape without per-member breakdown
         steps.push({
             id: 'step-protection',
-            step: 1,
+            step: steps.length + 1,
             urgency: 'Immediate',
             title: 'Fill Protection Gap',
             description: `Buy term cover of ${formatCompactSN(protectionData.protectionGap)} to secure your family's future.`,
             amount: protectionData.protectionGap,
             icon: 'shield',
-            color: '#6366F1'
+            color: '#6366F1',
+        });
+    }
+
+    if (spouse?.isGap) {
+        steps.push({
+            id: 'step-protection-spouse',
+            step: steps.length + 1,
+            urgency: 'Immediate',
+            title: `Fill ${spouse.name}'s Protection Gap`,
+            description: `Buy term cover of ${formatCompactSN(spouse.gap)} on ${spouse.name}. If they pass away, only their sum insured supports household expenses — not cover held on other members.`,
+            amount: spouse.gap,
+            icon: 'shield',
+            color: '#6366F1',
+            memberRole: 'spouse',
         });
     }
 

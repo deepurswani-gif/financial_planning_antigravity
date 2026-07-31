@@ -27,6 +27,10 @@ function safetyNetSignals() {
     hasProtectionGap: true,
     protectionGap: 500000,
     protectionGapDisplay: '5.0 L',
+    hasSelfProtectionGap: true,
+    selfProtectionGap: 500000,
+    selfProtectionGapDisplay: '5.0 L',
+    selfName: 'Alex',
     hasHealthGap: true,
     healthStatus: 'none',
     healthCoverageHave: 0,
@@ -99,7 +103,7 @@ describe('instance creation', () => {
     const lifeGap = instances.find((i) => i.recommendationId === 'protection.lifeGap');
     expect(lifeGap).toBeDefined();
     expect(lifeGap.status).toBe(LIFECYCLE_STATUS.ACTIVE);
-    expect(lifeGap.triggerId).toBe('HAS_PROTECTION_GAP');
+    expect(lifeGap.triggerId).toBe('HAS_SELF_PROTECTION_GAP');
     expect(lifeGap.instanceId).toBe('protection.lifeGap');
     expect(lifeGap.severity).toBe('critical');
     expect(lifeGap.category).toBe('protection');

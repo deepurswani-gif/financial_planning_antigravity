@@ -21,31 +21,54 @@ import { getEmergencyFundAmount } from '../DetailedFlow/wealthDetailSync';
 const AnimatedCounter = ({ value, prefix = '₹', duration = 1500 }) => {
     const [display, setDisplay] = useState(0);
     const ref = useRef(null);
-    const hasAnimated = useRef(false);
+    const isVisible = useRef(false);
+    const displayRef = useRef(0);
+    const rafRef = useRef(null);
+    const valueRef = useRef(value);
+    const durationRef = useRef(duration);
+
+    valueRef.current = value;
+    durationRef.current = duration;
+
+    const animateTo = (end) => {
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        const start = displayRef.current;
+        const animDuration = durationRef.current;
+        const startTime = performance.now();
+
+        const animate = (currentTime) => {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / animDuration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+            const next = Math.round(start + (end - start) * eased);
+            displayRef.current = next;
+            setDisplay(next);
+            if (progress < 1) rafRef.current = requestAnimationFrame(animate);
+        };
+        rafRef.current = requestAnimationFrame(animate);
+    };
 
     useEffect(() => {
         const observer = new IntersectionObserver(
             ([entry]) => {
-                if (entry.isIntersecting && !hasAnimated.current) {
-                    hasAnimated.current = true;
-                    const start = 0;
-                    const end = Math.abs(value);
-                    const startTime = performance.now();
-
-                    const animate = (currentTime) => {
-                        const elapsed = currentTime - startTime;
-                        const progress = Math.min(elapsed / duration, 1);
-                        const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
-                        setDisplay(Math.round(start + (end - start) * eased));
-                        if (progress < 1) requestAnimationFrame(animate);
-                    };
-                    requestAnimationFrame(animate);
+                if (entry.isIntersecting && !isVisible.current) {
+                    isVisible.current = true;
+                    animateTo(Math.abs(valueRef.current));
                 }
             },
             { threshold: 0.3 }
         );
         if (ref.current) observer.observe(ref.current);
-        return () => observer.disconnect();
+        return () => {
+            observer.disconnect();
+            if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        };
+    }, []);
+
+    useEffect(() => {
+        if (isVisible.current) {
+            animateTo(Math.abs(value));
+        }
     }, [value, duration]);
 
     const formatted = new Intl.NumberFormat('en-IN').format(display);
@@ -318,11 +341,17 @@ const MoneyStorySection = () => {
                                 {protectionData.hasGap ? formatCurrency(protectionData.protectionGap) : 'Fully Covered'}
                             </div>
                             <p className="ms-suggestion-tenure">
-                                {protectionData.hasGap ? 'Protection gap to close' : 'No protection gap'}
+                                {protectionData.hasGap
+                                    ? (protectionData.spouse ? 'Combined self + spouse term to buy' : 'Protection gap to close')
+                                    : 'No protection gap'}
                             </p>
                             <div className="ms-suggestion-note">
                                 <Info size={14} />
-                                <span>Based on {protectionData.multiplier}× monthly expenses vs your current life cover of {formatCurrency(protectionData.coverageHave)}.</span>
+                                <span>
+                                    {protectionData.spouse
+                                        ? `Each earning member needs ${protectionData.multiplier}× monthly expenses. Weakest cover today: ${formatCurrency(protectionData.coverageHave)} on ${protectionData.weakestName}.`
+                                        : `Based on ${protectionData.multiplier}× monthly expenses vs your current life cover of ${formatCurrency(protectionData.coverageHave)}.`}
+                                </span>
                             </div>
                         </div>
 

@@ -1,3 +1,20 @@
+import {
+    getMemberInsuranceKey,
+    sumMemberLifeCover,
+} from '../DetailedFlow/insuranceDetailSync';
+
+/**
+ * Spouse life cover is assessed for earning spouses only.
+ * Detailed flow asks isSpouseWorking; false means not working (housewife).
+ * Falls back to occupation === 'housewife' for summary/legacy profiles.
+ */
+export function shouldAssessSpouseProtection(spouseMember) {
+    if (!spouseMember) return false;
+    if (spouseMember.isSpouseWorking === false) return false;
+    if (spouseMember.isSpouseWorking === true) return true;
+    return spouseMember.occupation?.toLowerCase() !== 'housewife';
+}
+
 export const calculateProtectionGap = (expenseCategories, policies, familyMembers) => {
     // A. Monthly Expenditure (Household)
     const householdTotal = Object.values(expenseCategories.household || {}).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
@@ -13,13 +30,11 @@ export const calculateProtectionGap = (expenseCategories, policies, familyMember
     const selfMember = familyMembers.find(m => m.relation === 'Self');
     const spouseMember = familyMembers.find(m => m.relation === 'Spouse');
 
-    const calculateIndividualGap = (memberName) => {
-        if (!memberName) return null;
+    const calculateIndividualGap = (member) => {
+        if (!member) return null;
+        const memberName = getMemberInsuranceKey(member);
 
-        const individualCoverage = policies
-            .filter(p => p.insuredName === memberName)
-            .reduce((sum, p) => sum + (parseFloat(p.sumAssured) || 0), 0);
-
+        const individualCoverage = sumMemberLifeCover(policies, memberName);
         const gap = protectionNeed - individualCoverage;
 
         return {
@@ -35,7 +50,7 @@ export const calculateProtectionGap = (expenseCategories, policies, familyMember
         monthlyExpenditure,
         multiplier,
         protectionNeed,
-        self: calculateIndividualGap(selfMember?.name || 'Self'),
-        spouse: (spouseMember && spouseMember.occupation?.toLowerCase() !== 'housewife') ? calculateIndividualGap(spouseMember.name) : null
+        self: calculateIndividualGap(selfMember || { name: 'Self', relation: 'Self' }),
+        spouse: shouldAssessSpouseProtection(spouseMember) ? calculateIndividualGap(spouseMember) : null
     };
 };

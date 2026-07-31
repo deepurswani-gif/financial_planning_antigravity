@@ -4430,6 +4430,14 @@ select.conversational-input,
   padding: 0.5rem 1rem 0.5rem 1.75rem;
 }
 
+.se-row--locked {
+  opacity: 0.92;
+}
+
+.se-row--locked:hover {
+  background: var(--bg-subtle, #f1f5f9);
+}
+
 .se-row-icon {
   display: inline-flex;
   align-items: center;
@@ -4442,6 +4450,11 @@ select.conversational-input,
   color: var(--primary);
 }
 
+.se-row-icon--locked {
+  background: var(--bg-subtle, #e2e8f0);
+  color: var(--text-muted);
+}
+
 .se-row-main {
   display: flex;
   flex-direction: column;
@@ -4451,9 +4464,17 @@ select.conversational-input,
 }
 
 .se-row-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   font-size: 0.88rem;
   font-weight: 600;
   color: var(--text-main);
+}
+
+.se-row-lock-inline {
+  flex-shrink: 0;
+  color: var(--text-muted);
 }
 
 .se-row-desc {

@@ -1,5 +1,20 @@
 import { describe, it, expect } from 'vitest';
-import { calculateProtectionGap } from './ProtectionGapLogic';
+import { calculateProtectionGap, shouldAssessSpouseProtection } from './ProtectionGapLogic';
+
+describe('shouldAssessSpouseProtection', () => {
+    it('skips spouse when isSpouseWorking is false (detailed not-working)', () => {
+        expect(shouldAssessSpouseProtection({ relation: 'Spouse', isSpouseWorking: false })).toBe(false);
+    });
+
+    it('assesses spouse when isSpouseWorking is true', () => {
+        expect(shouldAssessSpouseProtection({ relation: 'Spouse', isSpouseWorking: true })).toBe(true);
+    });
+
+    it('falls back to occupation housewife when isSpouseWorking is unset', () => {
+        expect(shouldAssessSpouseProtection({ relation: 'Spouse', occupation: 'Housewife' })).toBe(false);
+        expect(shouldAssessSpouseProtection({ relation: 'Spouse', occupation: 'Salaried' })).toBe(true);
+    });
+});
 
 describe('ProtectionGapLogic', () => {
     const mockExpenseCategories = {
@@ -10,14 +25,16 @@ describe('ProtectionGapLogic', () => {
 
     const mockFamilyMembers = [
         { name: 'John', relation: 'Self' },
-        { name: 'Jane', relation: 'Spouse' },
+        { name: 'Jane', relation: 'Spouse', isSpouseWorking: true },
         { name: 'Aarav', relation: 'Child' }
     ];
 
     const mockPolicies = [
-        { insuredName: 'John', sumAssured: 1000000 },
-        { insuredName: 'Jane', sumAssured: 500000 },
-        { insuredName: 'Aarav', sumAssured: 200000 } // Should be ignored in gap calculations
+        { insuredName: 'John', sumAssured: 1000000, planType: 'Term Insurance' },
+        { insuredName: 'Jane', sumAssured: 500000, planType: 'Term Insurance' },
+        { insuredName: 'Aarav', sumAssured: 200000, planType: 'Term Insurance' }, // ignored (child)
+        { insuredName: 'John', sumAssured: 999999, planType: 'Health Insurance' }, // ignored (health)
+        { insuredName: 'John', sumAssured: 888888, planType: 'Term Insurance', isProposed: true }, // ignored
     ];
 
     it('calculates protection need correctly (Multiplier 200 of Exp + EMIs)', () => {
@@ -49,6 +66,15 @@ describe('ProtectionGapLogic', () => {
         const results = calculateProtectionGap(mockExpenseCategories, mockPolicies, singleFamily);
 
         expect(results.self.name).toBe('John');
+        expect(results.spouse).toBe(null);
+    });
+
+    it('skips spouse gap when isSpouseWorking is false', () => {
+        const family = [
+            { name: 'John', relation: 'Self' },
+            { name: 'Jane', relation: 'Spouse', isSpouseWorking: false },
+        ];
+        const results = calculateProtectionGap(mockExpenseCategories, mockPolicies, family);
         expect(results.spouse).toBe(null);
     });
 });

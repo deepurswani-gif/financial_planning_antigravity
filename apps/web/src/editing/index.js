@@ -34,6 +34,7 @@ export {
   readValueByPath,
   computeRootUpdate,
 } from './planAccessor';
+export { applySmartEditWriteBack, SMART_EDIT_WRITEBACK_FIELDS } from './smartEditWriteBack';
 
 export { EditingProvider, useEditing, useOptionalEditing } from './EditingProvider';
 export { default as FocusedEditShell } from './FocusedEditShell';

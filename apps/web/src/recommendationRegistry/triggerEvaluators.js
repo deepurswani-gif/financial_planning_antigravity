@@ -20,6 +20,10 @@ export const TRIGGER_EVALUATORS = Object.freeze({
 
   // Protection
   HAS_PROTECTION_GAP: (s) => Boolean(s.hasProtectionGap) || num(s.protectionGap) > 0,
+  HAS_SELF_PROTECTION_GAP: (s) =>
+    Boolean(s.hasSelfProtectionGap) || num(s.selfProtectionGap) > 0,
+  HAS_SPOUSE_PROTECTION_GAP: (s) =>
+    Boolean(s.hasSpouseProtectionGap) || num(s.spouseProtectionGap) > 0,
   HEALTH_COVER_ABSENT: (s) =>
     s.healthStatus === 'none' || (Boolean(s.hasHealthGap) && num(s.healthCoverageHave) === 0),
   HEALTH_COVER_PARTIAL: (s) => Boolean(s.hasHealthGap) && num(s.healthCoverageHave) > 0,

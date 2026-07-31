@@ -2,27 +2,51 @@ import { normalizeRecommendation } from '../schema';
 
 /**
  * Protection recommendations.
- * Text migrated verbatim from SafetyNetLogic.buildRecoverySteps,
+ * Text migrated from SafetyNetLogic.buildRecoverySteps,
  * investSurplusLogic.buildInvestSurplusReport (protection suggestion) and
  * ExecutiveSummaryLogic action priorities.
+ *
+ * Safety Net shows separate self / spouse term gaps because life cover pays
+ * out only on the insured member's death.
  */
 export const PROTECTION_RECOMMENDATIONS = [
   normalizeRecommendation({
     id: 'protection.lifeGap',
-    title: 'Fill Protection Gap',
-    summary: "Buy term cover of {protectionGapDisplay} to secure your family's future.",
+    title: "Fill {selfName}'s Protection Gap",
+    summary:
+      "Buy term cover of {selfProtectionGapDisplay} on {selfName}. Life cover pays only on that person's death — underinsurance here leaves the household exposed.",
     category: 'protection',
     type: 'protectionGap',
     severity: 'critical',
     priority: 10,
-    triggerId: 'HAS_PROTECTION_GAP',
+    triggerId: 'HAS_SELF_PROTECTION_GAP',
     reports: ['safety_net'],
     relatedDomains: ['protection', 'expenses'],
     relatedFields: ['protection.life.totalCover'],
-    relatedMetrics: ['protectionGap', 'coverageRequired', 'coverageHave'],
-    supportingMetrics: ['protectionGap', 'protectionGapDisplay'],
+    relatedMetrics: ['selfProtectionGap', 'coverageRequired', 'coverageHave'],
+    supportingMetrics: ['selfProtectionGap', 'selfProtectionGapDisplay', 'selfName'],
     businessMeaning:
-      'Life cover replaces lost income so dependants can maintain their lifestyle if the earning member passes away (HLV method).',
+      "Each earning member needs cover equal to household HLV because payout only comes from that member's policies.",
+    tags: ['recovery-step'],
+    action: 'viewPlans',
+  }),
+  normalizeRecommendation({
+    id: 'protection.lifeGapSpouse',
+    title: "Fill {spouseName}'s Protection Gap",
+    summary:
+      'Buy term cover of {spouseProtectionGapDisplay} on {spouseName}. If they pass away, only their sum insured supports household expenses — not cover held on other members.',
+    category: 'protection',
+    type: 'protectionGap',
+    severity: 'critical',
+    priority: 11,
+    triggerId: 'HAS_SPOUSE_PROTECTION_GAP',
+    reports: ['safety_net'],
+    relatedDomains: ['protection', 'expenses'],
+    relatedFields: ['protection.life.totalCover'],
+    relatedMetrics: ['spouseProtectionGap', 'coverageRequired'],
+    supportingMetrics: ['spouseProtectionGap', 'spouseProtectionGapDisplay', 'spouseName'],
+    businessMeaning:
+      'Working spouse income also needs HLV-sized cover; household cover on self does not pay out on spouse death.',
     tags: ['recovery-step'],
     action: 'viewPlans',
   }),
@@ -91,7 +115,7 @@ export const PROTECTION_RECOMMENDATIONS = [
     severity: 'medium',
     priority: 40,
     triggerId: 'HAS_PROTECTION_GAP',
-    reports: ['fix_your_financial_gaps'],
+    reports: ['put_your_money_to_work'],
     relatedDomains: ['protection'],
     relatedFields: ['protection.life.totalCover'],
     relatedMetrics: ['protectionGap'],

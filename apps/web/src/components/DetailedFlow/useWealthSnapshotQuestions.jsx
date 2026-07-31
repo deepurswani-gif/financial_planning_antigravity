@@ -8,6 +8,7 @@ import {
     getAssetAmount,
     getTotalAssetBreakdownTotal,
     getTotalLiabilityBreakdownTotal,
+    syncEmergencyFundAmount,
 } from './wealthDetailSync';
 import { reconcileAmounts } from './detailReconcile';
 import ReconciliationBar from './ReconciliationBar';
@@ -111,10 +112,15 @@ export function useWealthSnapshotQuestions() {
     }, [loading]);
 
     const handleAssetChange = useCallback((category, key, value) => {
-        setAssetCategories((prev) => ({
-            ...prev,
-            [category]: { ...prev[category], [key]: value },
-        }));
+        setAssetCategories((prev) => {
+            if (category === 'cash' && key === 'savings') {
+                return syncEmergencyFundAmount(prev, value);
+            }
+            return {
+                ...prev,
+                [category]: { ...prev[category], [key]: value },
+            };
+        });
     }, [setAssetCategories]);
 
     const handleLiabilityChange = useCallback((key, value) => {
@@ -194,12 +200,11 @@ export function useWealthSnapshotQuestions() {
     }, [assetCategories, liabilityCategories]);
 
     const saveRecapEdits = useCallback(() => {
-        setAssetCategories((prev) => ({
+        setAssetCategories((prev) => syncEmergencyFundAmount({
             ...prev,
             summaryPortfolioValue: editPortfolio,
-            summaryLiquidCash: editLiquidCash,
             summaryRealEstateAssets: editRealEstate,
-        }));
+        }, editLiquidCash));
         setLiabilityCategories((prev) => ({
             ...prev,
             summaryOutstandingLoans: editLoans,

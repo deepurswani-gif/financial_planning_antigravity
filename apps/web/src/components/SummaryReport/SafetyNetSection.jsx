@@ -25,32 +25,60 @@ const SAFETY_NET_REPORTS = ['safety_net'];
 const AnimatedCounter = ({ value, prefix = '', suffix = '', duration = 1500, decimals = 0 }) => {
     const [display, setDisplay] = useState(0);
     const ref = useRef(null);
-    const hasAnimated = useRef(false);
+    const isVisible = useRef(false);
+    const displayRef = useRef(0);
+    const rafRef = useRef(null);
+    const valueRef = useRef(value);
+    const durationRef = useRef(duration);
+    const decimalsRef = useRef(decimals);
+
+    valueRef.current = value;
+    durationRef.current = duration;
+    decimalsRef.current = decimals;
+
+    const animateTo = (end) => {
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        const start = displayRef.current;
+        const animDuration = durationRef.current;
+        const animDecimals = decimalsRef.current;
+        const startTime = performance.now();
+
+        const animate = (currentTime) => {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / animDuration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            const current = start + (end - start) * eased;
+            const next = animDecimals > 0
+                ? Math.round(current * Math.pow(10, animDecimals)) / Math.pow(10, animDecimals)
+                : Math.round(current);
+            displayRef.current = next;
+            setDisplay(next);
+            if (progress < 1) rafRef.current = requestAnimationFrame(animate);
+        };
+        rafRef.current = requestAnimationFrame(animate);
+    };
 
     useEffect(() => {
         const observer = new IntersectionObserver(
             ([entry]) => {
-                if (entry.isIntersecting && !hasAnimated.current) {
-                    hasAnimated.current = true;
-                    const start = 0;
-                    const end = Math.abs(value);
-                    const startTime = performance.now();
-
-                    const animate = (currentTime) => {
-                        const elapsed = currentTime - startTime;
-                        const progress = Math.min(elapsed / duration, 1);
-                        const eased = 1 - Math.pow(1 - progress, 3);
-                        const current = start + (end - start) * eased;
-                        setDisplay(decimals > 0 ? Math.round(current * Math.pow(10, decimals)) / Math.pow(10, decimals) : Math.round(current));
-                        if (progress < 1) requestAnimationFrame(animate);
-                    };
-                    requestAnimationFrame(animate);
+                if (entry.isIntersecting && !isVisible.current) {
+                    isVisible.current = true;
+                    animateTo(Math.abs(valueRef.current));
                 }
             },
             { threshold: 0.3 }
         );
         if (ref.current) observer.observe(ref.current);
-        return () => observer.disconnect();
+        return () => {
+            observer.disconnect();
+            if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        };
+    }, []);
+
+    useEffect(() => {
+        if (isVisible.current) {
+            animateTo(Math.abs(value));
+        }
     }, [value, duration, decimals]);
 
     const formatted = decimals > 0 ? display.toFixed(decimals) : new Intl.NumberFormat('en-IN').format(display);
@@ -91,7 +119,12 @@ const RevealSection = ({ children, className = '', delay = 0 }) => {
 const CircularGauge = ({ percent, size = 220, strokeWidth = 18 }) => {
     const [animatedPercent, setAnimatedPercent] = useState(0);
     const ref = useRef(null);
-    const hasAnimated = useRef(false);
+    const isVisible = useRef(false);
+    const percentDisplayRef = useRef(0);
+    const rafRef = useRef(null);
+    const percentRef = useRef(percent);
+
+    percentRef.current = percent;
 
     const radius = (size - strokeWidth) / 2;
     const circumference = 2 * Math.PI * radius;
@@ -110,26 +143,43 @@ const CircularGauge = ({ percent, size = 220, strokeWidth = 18 }) => {
         return 'rgba(239, 68, 68, 0.3)';
     };
 
+    const animateTo = (end) => {
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        const start = percentDisplayRef.current;
+        const startTime = performance.now();
+        const animate = (currentTime) => {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / 1500, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            const next = start + (end - start) * eased;
+            percentDisplayRef.current = next;
+            setAnimatedPercent(next);
+            if (progress < 1) rafRef.current = requestAnimationFrame(animate);
+        };
+        rafRef.current = requestAnimationFrame(animate);
+    };
+
     useEffect(() => {
         const observer = new IntersectionObserver(
             ([entry]) => {
-                if (entry.isIntersecting && !hasAnimated.current) {
-                    hasAnimated.current = true;
-                    const startTime = performance.now();
-                    const animate = (currentTime) => {
-                        const elapsed = currentTime - startTime;
-                        const progress = Math.min(elapsed / 1500, 1);
-                        const eased = 1 - Math.pow(1 - progress, 3);
-                        setAnimatedPercent(percent * eased);
-                        if (progress < 1) requestAnimationFrame(animate);
-                    };
-                    requestAnimationFrame(animate);
+                if (entry.isIntersecting && !isVisible.current) {
+                    isVisible.current = true;
+                    animateTo(percentRef.current);
                 }
             },
             { threshold: 0.3 }
         );
         if (ref.current) observer.observe(ref.current);
-        return () => observer.disconnect();
+        return () => {
+            observer.disconnect();
+            if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        };
+    }, []);
+
+    useEffect(() => {
+        if (isVisible.current) {
+            animateTo(percent);
+        }
     }, [percent]);
 
     const color = getColor(percent);
@@ -279,7 +329,7 @@ const SafetyNetSection = () => {
                             {userName}, Your Family's Safety Net Has Some Gaps
                         </h1>
                         <p className="sn-hook-sub">
-                            Wealth creation alone does not define financial security. Right now, your protection and emergency reserves need attention. If something happened to your income tomorrow, your family would feel the stress quickly. Addressing these gaps proactively will give you something money can't buy — <span className="sn-hook-emphasis">genuine peace of mind</span>.
+                            Wealth creation alone does not define financial security. Right now, your protection and emergency reserves need attention. Life cover pays out only on the insured member's death — if any earning member is underinsured, the household faces that crisis alone. Addressing these gaps proactively will give you something money can't buy — <span className="sn-hook-emphasis">genuine peace of mind</span>.
                         </p>
                     </>
                 ) : (
@@ -303,13 +353,18 @@ const SafetyNetSection = () => {
                 <div className="sn-divider-line" />
             </div>
 
-            {/* Hero: Coverage Gauge */}
+            {/* Hero: Coverage Gauge — weakest earning member */}
             <RevealSection className="sn-hero-block">
                 <CircularGauge percent={protectionData.coveredPercent} />
+                <p className="sn-gauge-caption">
+                    {protectionData.spouse
+                        ? `Based on ${protectionData.weakestName}'s cover — the household is only as protected as the least-covered earning member`
+                        : 'Your life cover vs household protection need'}
+                </p>
                 <div className="sn-hero-gradient-bar" />
             </RevealSection>
 
-            {/* Protection Stat Cards */}
+            {/* Shared household HLV target */}
             <RevealSection className="sn-stat-strip-3" delay={200}>
                 <div className="sn-stat-card-glass">
                     <div className="sn-stat-glass-icon" style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#6366F1' }}>
@@ -317,26 +372,106 @@ const SafetyNetSection = () => {
                     </div>
                     <span className="sn-stat-glass-label">Coverage Required</span>
                     <span className="sn-stat-glass-value">{formatCurrency(protectionData.coverageRequired)}</span>
-                    <span className="sn-stat-glass-note">Based on {protectionData.multiplier}× monthly expenses</span>
+                    <span className="sn-stat-glass-note">Per earning member · {protectionData.multiplier}× monthly expenses</span>
                 </div>
                 <div className="sn-stat-card-glass">
                     <div className="sn-stat-glass-icon" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10B981' }}>
                         <ShieldCheck size={22} />
                     </div>
-                    <span className="sn-stat-glass-label">Coverage You Have</span>
+                    <span className="sn-stat-glass-label">
+                        {protectionData.spouse ? `${protectionData.weakestName}'s Cover` : 'Coverage You Have'}
+                    </span>
                     <span className="sn-stat-glass-value">{formatCurrency(protectionData.coverageHave)}</span>
-                    <span className="sn-stat-glass-note">Total life cover across policies</span>
+                    <span className="sn-stat-glass-note">
+                        {protectionData.spouse
+                            ? 'Payout if this member dies (weakest link)'
+                            : 'Life cover on you'}
+                    </span>
                 </div>
                 <div className="sn-stat-card-glass" style={{ borderColor: protectionData.hasGap ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)' }}>
                     <div className="sn-stat-glass-icon" style={{ background: protectionData.hasGap ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)', color: protectionData.hasGap ? '#EF4444' : '#10B981' }}>
                         {protectionData.hasGap ? <TrendingDown size={22} /> : <CheckCircle2 size={22} />}
                     </div>
-                    <span className="sn-stat-glass-label">Protection Gap</span>
+                    <span className="sn-stat-glass-label">Total Term to Buy</span>
                     <span className="sn-stat-glass-value" style={{ color: protectionData.hasGap ? '#EF4444' : '#10B981' }}>
                         {protectionData.hasGap ? formatCurrency(protectionData.protectionGap) : 'Nil ✓'}
                     </span>
-                    <span className="sn-stat-glass-note">{protectionData.hasGap ? 'Needs immediate attention' : 'Fully covered'}</span>
+                    <span className="sn-stat-glass-note">
+                        {protectionData.hasGap
+                            ? (protectionData.spouse ? 'Sum of self + spouse gaps' : 'Needs immediate attention')
+                            : 'Fully covered'}
+                    </span>
                 </div>
+            </RevealSection>
+
+            {/* Per earning member breakdown */}
+            <RevealSection
+                className={`sn-member-gap-grid${protectionData.spouse ? '' : ' sn-member-gap-grid--single'}`}
+                delay={250}
+            >
+                {[protectionData.self, protectionData.spouse].filter(Boolean).map((member) => (
+                    <div
+                        key={member.role}
+                        className="sn-member-gap-card"
+                        style={{
+                            borderColor: member.isGap ? 'rgba(239, 68, 68, 0.25)' : 'rgba(16, 185, 129, 0.25)',
+                        }}
+                    >
+                        <div className="sn-member-gap-header">
+                            <div>
+                                <h3 className="sn-member-gap-title" style={{ color: member.isGap ? '#EF4444' : '#10B981' }}>
+                                    {member.isGap ? <ShieldAlert size={20} /> : <ShieldCheck size={20} />}
+                                    {member.role === 'self' ? 'Self' : 'Spouse'} Protection
+                                </h3>
+                                <p className="sn-member-gap-name">{member.name}</p>
+                            </div>
+                            <span
+                                className="sn-member-gap-badge"
+                                style={{
+                                    background: member.isGap ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                                    color: member.isGap ? '#EF4444' : '#10B981',
+                                }}
+                            >
+                                {member.isGap ? 'Gap Detected' : 'Covered'}
+                            </span>
+                        </div>
+                        <div className="sn-member-gap-stats">
+                            <div>
+                                <span className="sn-member-gap-stat-label">Life Cover</span>
+                                <span className="sn-member-gap-stat-value">{formatCurrency(member.coverage)}</span>
+                            </div>
+                            <div>
+                                <span className="sn-member-gap-stat-label">Need (HLV)</span>
+                                <span className="sn-member-gap-stat-value">{formatCurrency(member.need)}</span>
+                            </div>
+                            <div>
+                                <span className="sn-member-gap-stat-label">Gap</span>
+                                <span
+                                    className="sn-member-gap-stat-value"
+                                    style={{ color: member.isGap ? '#EF4444' : '#10B981' }}
+                                >
+                                    {member.isGap ? formatCurrency(member.gap) : 'Nil ✓'}
+                                </span>
+                            </div>
+                        </div>
+                        <div className="sn-member-gap-bar-track">
+                            <div
+                                className="sn-member-gap-bar-fill"
+                                style={{
+                                    width: `${member.coveredPercent}%`,
+                                    background: member.isGap
+                                        ? 'linear-gradient(90deg, #fb7185, #f43f5e)'
+                                        : 'linear-gradient(90deg, #34d399, #10b981)',
+                                }}
+                            />
+                        </div>
+                        <p className="sn-member-gap-note">
+                            {member.isGap
+                                ? `Buy term of ${formatCompactSN(member.gap)} on ${member.name} — only this cover pays if they die.`
+                                : `${member.name}'s cover meets the household protection need.`}
+                        </p>
+                    </div>
+                ))}
             </RevealSection>
 
             {/* Coverage Duration Insight */}
@@ -346,15 +481,33 @@ const SafetyNetSection = () => {
                 </div>
                 <div className="sn-insight-content">
                     <p className="sn-insight-text">
-                        Your current sum insured will cover{' '}
-                        <span className="sn-insight-highlight">
-                            {formatCompactSN(protectionData.annualNeed)}{' '}
-                            ({new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(protectionData.monthlyNeed)} X 12)
-                        </span>{' '}
-                        annual need for{' '}
-                        <span className="sn-insight-highlight">{protectionData.yearsCovered} years</span>{' '}
-                        <span className="sn-insight-months">({protectionData.monthsCovered} Months)</span>
+                        Life insurance pays the household only when the <em>insured</em> member dies.
+                        {protectionData.spouse ? (
+                            <>
+                                {' '}Cover on you does not help if your spouse dies, and vice versa — each earning member needs the full household target of{' '}
+                                <span className="sn-insight-highlight">{formatCurrency(protectionData.coverageRequired)}</span>.
+                            </>
+                        ) : (
+                            <>
+                                {' '}Your current sum insured will cover{' '}
+                                <span className="sn-insight-highlight">
+                                    {formatCompactSN(protectionData.annualNeed)}{' '}
+                                    ({new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(protectionData.monthlyNeed)} X 12)
+                                </span>{' '}
+                                annual need for{' '}
+                                <span className="sn-insight-highlight">{protectionData.yearsCovered} years</span>{' '}
+                                <span className="sn-insight-months">({protectionData.monthsCovered} Months)</span>.
+                            </>
+                        )}
                     </p>
+                    {protectionData.spouse && (
+                        <p className="sn-insight-text" style={{ marginTop: '0.75rem' }}>
+                            If <span className="sn-insight-highlight">{protectionData.weakestName}</span> passed away tomorrow,
+                            their cover of {formatCurrency(protectionData.coverageHave)} would support annual needs for about{' '}
+                            <span className="sn-insight-highlight">{protectionData.yearsCovered} years</span>{' '}
+                            <span className="sn-insight-months">({protectionData.monthsCovered} Months)</span>.
+                        </p>
+                    )}
                 </div>
             </RevealSection>
 
@@ -427,7 +580,9 @@ const SafetyNetSection = () => {
             <RevealSection className="sn-narrative-block" delay={200}>
                 <p className="sn-narrative-text">
                     With monthly expenses and EMIs totalling{' '}
-                    <strong>{formatCurrency(contingencyData.monthlyNeed)}</strong>, your current reserves may provide
+                    <strong>{formatCurrency(contingencyData.monthlyNeed)}</strong>
+                    {' '}and emergency reserves of{' '}
+                    <strong>{formatCurrency(contingencyData.emergencyFundHave)}</strong>, your current reserves may provide
                     financial support for about{' '}
                     <span className="sn-narrative-accent">{contingencyData.daysCovered} days</span>.
                     {contingencyData.daysCovered < 180 && (
@@ -436,7 +591,11 @@ const SafetyNetSection = () => {
                 </p>
                 <p className="sn-narrative-note">
                     <Info size={14} />
-                    <span>This calculation is based on the availability of {formatCurrency(contingencyData.emergencyFundHave)} as emergency fund.</span>
+                    <span>
+                        Runway = emergency fund ({formatCurrency(contingencyData.emergencyFundHave)})
+                        {' ÷ '}
+                        monthly expenses + EMIs ({formatCurrency(contingencyData.monthlyNeed)}).
+                    </span>
                 </p>
             </RevealSection>
 
@@ -905,6 +1064,104 @@ const SafetyNetSection = () => {
                     line-height: 1.4;
                 }
 
+                .sn-gauge-caption {
+                    max-width: 520px;
+                    margin: 1rem auto 0;
+                    text-align: center;
+                    font-size: 0.85rem;
+                    color: var(--text-muted);
+                    line-height: 1.5;
+                    padding: 0 1.5rem;
+                }
+
+                .sn-member-gap-grid {
+                    display: grid;
+                    grid-template-columns: repeat(2, 1fr);
+                    gap: 1.5rem;
+                    max-width: 900px;
+                    margin: 0 auto 2rem;
+                    padding: 0 2rem;
+                }
+                .sn-member-gap-grid--single {
+                    grid-template-columns: 1fr;
+                    max-width: 480px;
+                }
+                .sn-member-gap-card {
+                    background: #ffffff;
+                    border: 1px solid #f1f5f9;
+                    border-radius: 16px;
+                    padding: 1.5rem;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1rem;
+                }
+                .sn-member-gap-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    gap: 0.75rem;
+                }
+                .sn-member-gap-title {
+                    margin: 0;
+                    font-size: 1.05rem;
+                    font-weight: 700;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.4rem;
+                }
+                .sn-member-gap-name {
+                    margin: 0.35rem 0 0;
+                    font-size: 0.85rem;
+                    color: var(--text-muted);
+                    font-weight: 500;
+                }
+                .sn-member-gap-badge {
+                    padding: 0.35rem 0.75rem;
+                    border-radius: 999px;
+                    font-size: 0.7rem;
+                    font-weight: 700;
+                    text-transform: uppercase;
+                    letter-spacing: 0.04em;
+                    white-space: nowrap;
+                }
+                .sn-member-gap-stats {
+                    display: grid;
+                    grid-template-columns: repeat(3, 1fr);
+                    gap: 0.75rem;
+                }
+                .sn-member-gap-stat-label {
+                    display: block;
+                    font-size: 0.7rem;
+                    font-weight: 600;
+                    color: var(--text-muted);
+                    text-transform: uppercase;
+                    letter-spacing: 0.04em;
+                    margin-bottom: 0.25rem;
+                }
+                .sn-member-gap-stat-value {
+                    display: block;
+                    font-size: 0.95rem;
+                    font-weight: 700;
+                    color: var(--text-main);
+                }
+                .sn-member-gap-bar-track {
+                    height: 10px;
+                    border-radius: 8px;
+                    background: var(--muted, #f1f5f9);
+                    overflow: hidden;
+                }
+                .sn-member-gap-bar-fill {
+                    height: 100%;
+                    border-radius: 8px;
+                    transition: width 0.8s ease;
+                }
+                .sn-member-gap-note {
+                    margin: 0;
+                    font-size: 0.8rem;
+                    color: var(--text-muted);
+                    line-height: 1.45;
+                }
+
                 /* ── Insight Card ── */
                 .sn-insight-card {
                     display: flex;
@@ -1233,6 +1490,14 @@ const SafetyNetSection = () => {
                 @media (max-width: 768px) {
                     .sn-stat-strip-3 {
                         grid-template-columns: 1fr;
+                    }
+                    .sn-member-gap-grid {
+                        grid-template-columns: 1fr;
+                        padding: 0 1rem;
+                    }
+                    .sn-member-gap-stats {
+                        grid-template-columns: 1fr;
+                        gap: 0.5rem;
                     }
                     .sn-timeline-stage {
                         gap: 1rem;

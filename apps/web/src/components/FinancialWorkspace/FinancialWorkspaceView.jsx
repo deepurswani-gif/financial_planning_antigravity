@@ -597,6 +597,7 @@ export default function FinancialWorkspaceView() {
         onClose={() => setDrawerOpen(false)}
         capability={summaryMode ? 'summary' : 'full'}
         onLaunchExperience={handleLaunchExperience}
+        onLockedExperience={openUnlockDialog}
       />
 
       {!summaryMode ? <CalculatorModal /> : null}

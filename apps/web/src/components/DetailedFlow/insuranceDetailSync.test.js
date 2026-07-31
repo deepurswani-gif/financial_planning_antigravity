@@ -5,6 +5,7 @@ import {
     reconcileMemberLifePremium,
     reconcileMemberLifePremiumSummary,
     sumPolicySumAssured,
+    sumMemberLifeCover,
     sumHealthPolicyCover,
     getEffectiveLifeCover,
     getEffectiveHealthCover,
@@ -28,6 +29,15 @@ describe('insuranceDetailSync cover reconciliation', () => {
             { planType: 'Term Insurance', sumAssured: '5000000', isProposed: false },
             { planType: 'Term Insurance', sumAssured: '3000000', isProposed: false },
         ])).toBe(8000000);
+    });
+
+    it('sumMemberLifeCover totals only that insured member life policies', () => {
+        expect(sumMemberLifeCover([
+            { planType: 'Term Insurance', sumAssured: '5000000', insuredName: 'Alex', isProposed: false },
+            { planType: 'Term Insurance', sumAssured: '3000000', insuredName: 'Sam', isProposed: false },
+            { planType: 'Health Insurance', sumAssured: '1000000', insuredName: 'Alex', isProposed: false },
+            { planType: 'Term Insurance', sumAssured: '2000000', insuredName: 'Alex', isProposed: true },
+        ], 'Alex')).toBe(5000000);
     });
 
     it('reconcileLifeCover reports match when totals align', () => {

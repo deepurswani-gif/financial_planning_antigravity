@@ -11,6 +11,7 @@ export const DEFAULT_PRIMARY_ACTION_LABEL = 'Update Information';
 /** Stable recommendation id → label */
 export const PRIMARY_LABEL_BY_ID = Object.freeze({
   'protection.lifeGap': 'Update Insurance Details',
+  'protection.lifeGapSpouse': 'Update Insurance Details',
   'protection.investSurplusGap': 'Update Insurance Details',
   'protection.healthAbsent': 'Update Health Coverage',
   'protection.healthPartial': 'Update Health Coverage',

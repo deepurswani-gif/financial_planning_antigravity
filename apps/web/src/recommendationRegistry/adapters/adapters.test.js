@@ -7,22 +7,48 @@ import { buildExecutiveSummarySignals, PILLAR_TO_RECOMMENDATION_ID } from './exe
 describe('safetyNetAdapter', () => {
   it('maps engine outputs to signals without recalculating', () => {
     const signals = buildSafetyNetSignals({
-      protectionData: { hasGap: true, protectionGap: 2500000 },
+      protectionData: {
+        hasGap: true,
+        protectionGap: 2500000,
+        self: { name: 'Alex', isGap: true, gap: 2500000 },
+      },
       contingencyData: { gap: 300000, monthsCoveredByFund: 2.3, contingencyPeriod: 6 },
       healthData: { hasGap: true, status: 'partial', coverageHave: 500000, healthGap: 500000, minimumRequired: 1000000 },
     });
     expect(signals.protectionGapDisplay).toBe('₹25.00 L');
+    expect(signals.selfProtectionGapDisplay).toBe('₹25.00 L');
     expect(signals.healthGapDisplay).toBe('₹5.00 L');
     expect(signals.healthMinDisplay).toBe('₹10.00 L');
     expect(signals.emergencyGapDisplay).toBe('₹3.00 L');
   });
 
-  it('reproduces the original recovery-step copy byte-for-byte', () => {
+  it('reproduces separate self and spouse recovery-step copy', () => {
+    const signals = buildSafetyNetSignals({
+      protectionData: {
+        hasGap: true,
+        protectionGap: 5500000,
+        self: { name: 'Alex', isGap: true, gap: 2500000 },
+        spouse: { name: 'Sam', isGap: true, gap: 3000000 },
+      },
+    });
+    const resolved = resolveRecommendations(signals, { report: 'safety_net' });
+    const selfRec = resolved.find((r) => r.id === 'protection.lifeGap');
+    const spouseRec = resolved.find((r) => r.id === 'protection.lifeGapSpouse');
+    expect(selfRec.summary).toBe(
+      "Buy term cover of ₹25.00 L on Alex. Life cover pays only on that person's death — underinsurance here leaves the household exposed.",
+    );
+    expect(spouseRec.summary).toBe(
+      'Buy term cover of ₹30.00 L on Sam. If they pass away, only their sum insured supports household expenses — not cover held on other members.',
+    );
+  });
+
+  it('falls back to aggregate gap for legacy protectionData shape', () => {
     const signals = buildSafetyNetSignals({
       protectionData: { hasGap: true, protectionGap: 2500000 },
     });
     const [rec] = resolveRecommendations(signals, { report: 'safety_net' });
-    expect(rec.summary).toBe("Buy term cover of ₹25.00 L to secure your family's future.");
+    expect(rec.id).toBe('protection.lifeGap');
+    expect(rec.summary).toContain('₹25.00 L');
   });
 });
 

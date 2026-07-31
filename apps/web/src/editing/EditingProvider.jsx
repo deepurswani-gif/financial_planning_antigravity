@@ -20,6 +20,7 @@ import { runSavePipeline } from './savePipeline';
 import { validateFieldValues } from './validation';
 import { computeRootUpdate, readValueByPath } from './planAccessor';
 import { FINANCIAL_WORKSPACE_PATH } from '../components/FinancialWorkspace/workspaceNavConfig';
+import { applySmartEditWriteBack } from './smartEditWriteBack';
 
 /**
  * EditingProvider — Finbrella's reusable Editing Platform runtime.
@@ -185,6 +186,15 @@ export function EditingProvider({ children, onRecalculate }) {
       const { rootKey, rootValue } = computeRootUpdate(snapshot, path, value);
       snapshot = { ...snapshot, [rootKey]: rootValue };
       touchedRoots.add(rootKey);
+
+      // Summary → detail write-back so prefer-detail reports pick up smart edits.
+      const before = snapshot;
+      snapshot = applySmartEditWriteBack(snapshot, fieldId, value);
+      if (snapshot !== before) {
+        Object.keys(setters).forEach((key) => {
+          if (snapshot[key] !== before[key]) touchedRoots.add(key);
+        });
+      }
     }
 
     // Commit to context state. The existing debounced autosave effect performs

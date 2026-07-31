@@ -254,7 +254,7 @@ export const ASSET_FIELDS = [
     ],
     preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
     relatedFieldIds: ['assets.emergencyFund'],
-    impacts: ['engine.contingency', 'engine.netWorth'],
+    impacts: ['report.summary.safety_net', 'engine.contingency', 'engine.netWorth'],
   }),
 
   normalizeField({

@@ -7,6 +7,10 @@
 export const METRIC_LABELS = Object.freeze({
   protectionGap: 'Protection Gap',
   protectionGapDisplay: 'Protection Gap',
+  selfProtectionGap: 'Self Protection Gap',
+  selfProtectionGapDisplay: 'Self Protection Gap',
+  spouseProtectionGap: 'Spouse Protection Gap',
+  spouseProtectionGapDisplay: 'Spouse Protection Gap',
   healthGap: 'Health Cover Gap',
   healthGapDisplay: 'Health Cover Gap',
   healthCoverRequired: 'Health Cover Required',
@@ -27,8 +31,12 @@ export const METRIC_LABELS = Object.freeze({
 
 /** Prefer display-string keys when choosing a single primary metric. */
 const PRIMARY_METRIC_PREFERENCE = Object.freeze([
+  'selfProtectionGapDisplay',
+  'spouseProtectionGapDisplay',
   'protectionGapDisplay',
   'protectionGap',
+  'selfProtectionGap',
+  'spouseProtectionGap',
   'healthGapDisplay',
   'healthMinDisplay',
   'healthCoverRequired',

@@ -22,14 +22,67 @@ describe('calculateProtectionData', () => {
         const result = calculateProtectionData(expenses, '1000000', [], []);
         expect(result.coverageHave).toBe(1000000);
         expect(result.coverageRequired).toBe(60000 * 200);
+        expect(result.self.coverage).toBe(1000000);
+        expect(result.spouse).toBe(null);
     });
 
     it('prefers detailed policy sum assured over summary 0', () => {
-        const result = calculateProtectionData(expenses, '0', [], [
-            { planType: 'Term Insurance', sumAssured: '5000000', isProposed: false },
+        const result = calculateProtectionData(expenses, '0', [{ name: 'Alex', relation: 'Self' }], [
+            { planType: 'Term Insurance', sumAssured: '5000000', insuredName: 'Alex', isProposed: false },
         ]);
         expect(result.coverageHave).toBe(5000000);
+        expect(result.self.coverage).toBe(5000000);
         expect(result.coveredPercent).toBeGreaterThan(0);
+    });
+
+    it('assesses working spouse separately against shared household need', () => {
+        const family = [
+            { name: 'Alex', relation: 'Self' },
+            { name: 'Sam', relation: 'Spouse', isSpouseWorking: true },
+        ];
+        const policies = [
+            { planType: 'Term Insurance', sumAssured: '12000000', insuredName: 'Alex', isProposed: false },
+            { planType: 'Term Insurance', sumAssured: '1000000', insuredName: 'Sam', isProposed: false },
+        ];
+        const result = calculateProtectionData(expenses, '0', family, policies);
+        const need = 60000 * 200;
+
+        expect(result.coverageRequired).toBe(need);
+        expect(result.self.gap).toBe(0);
+        expect(result.self.isGap).toBe(false);
+        expect(result.spouse.name).toBe('Sam');
+        expect(result.spouse.coverage).toBe(1000000);
+        expect(result.spouse.gap).toBe(need - 1000000);
+        expect(result.hasGap).toBe(true);
+        // Weakest member drives headline cover — must not look "fine" from self alone
+        expect(result.weakestRole).toBe('spouse');
+        expect(result.coverageHave).toBe(1000000);
+        expect(result.protectionGap).toBe(need - 1000000);
+    });
+
+    it('skips spouse when isSpouseWorking is false', () => {
+        const family = [
+            { name: 'Alex', relation: 'Self' },
+            { name: 'Sam', relation: 'Spouse', isSpouseWorking: false },
+        ];
+        const policies = [
+            { planType: 'Term Insurance', sumAssured: '1000000', insuredName: 'Alex', isProposed: false },
+            { planType: 'Term Insurance', sumAssured: '500000', insuredName: 'Sam', isProposed: false },
+        ];
+        const result = calculateProtectionData(expenses, '0', family, policies);
+        expect(result.spouse).toBe(null);
+        expect(result.protectionGap).toBe(result.self.gap);
+    });
+
+    it('excludes proposed and health policies from member cover', () => {
+        const family = [{ name: 'Alex', relation: 'Self' }];
+        const policies = [
+            { planType: 'Term Insurance', sumAssured: '2000000', insuredName: 'Alex', isProposed: false },
+            { planType: 'Term Insurance', sumAssured: '9000000', insuredName: 'Alex', isProposed: true },
+            { planType: 'Health Insurance', sumAssured: '1000000', insuredName: 'Alex', isProposed: false },
+        ];
+        const result = calculateProtectionData(expenses, '0', family, policies);
+        expect(result.self.coverage).toBe(2000000);
     });
 });
 
@@ -84,17 +137,25 @@ describe('calculateHealthInsuranceData', () => {
 });
 
 describe('buildRecoverySteps', () => {
-    it('orders steps as life, health, then emergency fund', () => {
-        const protection = { hasGap: true, protectionGap: 2000000 };
+    it('orders steps as life (self then spouse), health, then emergency fund', () => {
+        const protection = {
+            hasGap: true,
+            protectionGap: 5000000,
+            self: { name: 'Alex', isGap: true, gap: 2000000 },
+            spouse: { name: 'Sam', isGap: true, gap: 3000000 },
+        };
         const health = calculateHealthInsuranceData('500000', true, []);
         const contingency = { gap: 300000 };
 
         const steps = buildRecoverySteps(protection, health, contingency);
 
-        expect(steps).toHaveLength(3);
-        expect(steps[0].id).toBe('step-protection');
-        expect(steps[1].id).toBe('step-health');
-        expect(steps[2].id).toBe('step-contingency');
+        expect(steps).toHaveLength(4);
+        expect(steps[0].id).toBe('step-protection-self');
+        expect(steps[0].amount).toBe(2000000);
+        expect(steps[1].id).toBe('step-protection-spouse');
+        expect(steps[1].amount).toBe(3000000);
+        expect(steps[2].id).toBe('step-health');
+        expect(steps[3].id).toBe('step-contingency');
     });
 
     it('suggests full minimum when no health cover exists', () => {

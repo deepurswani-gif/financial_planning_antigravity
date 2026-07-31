@@ -16,6 +16,8 @@ export const TRIGGER_IDS = Object.freeze([
 
   // Protection
   'HAS_PROTECTION_GAP',
+  'HAS_SELF_PROTECTION_GAP',
+  'HAS_SPOUSE_PROTECTION_GAP',
   'HEALTH_COVER_ABSENT',
   'HEALTH_COVER_PARTIAL',
 

@@ -1,20 +1,21 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Search, X, ChevronDown, ChevronRight, Pencil, Layers } from 'lucide-react';
+import { Search, X, ChevronDown, ChevronRight, Pencil, Layers, Lock } from 'lucide-react';
 import {
   buildFrequentlyUpdated,
   buildCategoryTree,
   searchSmartEdit,
+  resolveTargetAvailability,
 } from './smartEdit/smartEditModel';
 import { useDynamicEntities } from './smartEdit/useDynamicEntities';
 
 /**
  * Smart Edit Drawer — the primary place to update financial information.
  *
- * A command-palette style Editing Hub, driven by the Experience Registry.
- * It searches and displays *experiences* (what the user intends to edit), not
- * raw fields. Selecting an experience delegates to `onLaunchExperience`, which
- * dispatches the correct launch strategy (Focused Edit Session, configure
- * modal/screen, collection picker, etc.). No new routing is introduced here.
+ * A command-palette style Editing Hub, driven by the Experience Registry and
+ * gated by the Experience Availability Resolver. It searches and displays
+ * *experiences* (what the user intends to edit), not raw fields. Selecting an
+ * available experience delegates to `onLaunchExperience`. Selecting a locked
+ * experience invokes `onLockedExperience` and never launches editing.
  *
  * Report navigation is intentionally NOT shown.
  */
@@ -23,6 +24,7 @@ export default function SmartEditDrawer({
   onClose,
   capability = 'full',
   onLaunchExperience,
+  onLockedExperience,
 }) {
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState(() => new Set());
@@ -73,9 +75,22 @@ export default function SmartEditDrawer({
     });
   };
 
-  const launch = (target) => {
+  const select = (target) => {
     // `target` may be an experience id string (footer utilities) or a full
     // result descriptor (experience or dynamic entity row).
+    const availability = resolveTargetAvailability(target, { capability });
+
+    if (availability.locked || availability.action === 'upgrade') {
+      onLockedExperience?.(target, availability);
+      // Keep the drawer open so the user can continue browsing after the
+      // upgrade placeholder is dismissed.
+      return;
+    }
+
+    if (!availability.available || availability.action !== 'launch') {
+      return;
+    }
+
     const launched = onLaunchExperience?.(target);
     // Close unless the handler explicitly signals it kept the drawer open.
     if (launched !== false) onClose();
@@ -130,13 +145,13 @@ export default function SmartEditDrawer({
 
         <div className="se-body">
           {searching ? (
-            <SearchResults results={results} onSelect={launch} />
+            <SearchResults results={results} onSelect={select} />
           ) : (
             <>
               <Section title="Frequently Updated">
                 <ul className="se-list">
                   {frequentlyUpdated.map((item) => (
-                    <ExperienceRow key={item.key} item={item} onSelect={launch} />
+                    <ExperienceRow key={item.key} item={item} onSelect={select} />
                   ))}
                 </ul>
               </Section>
@@ -162,7 +177,7 @@ export default function SmartEditDrawer({
                               <ExperienceRow
                                 key={item.key}
                                 item={item}
-                                onSelect={launch}
+                                onSelect={select}
                                 compact
                               />
                             ))}
@@ -178,16 +193,16 @@ export default function SmartEditDrawer({
         </div>
 
         <div className="se-footer">
-          <button type="button" className="se-utility" onClick={() => launch('planning.incomeTax')}>
+          <button type="button" className="se-utility" onClick={() => select('planning.incomeTax')}>
             Income Tax Planner
           </button>
-          <button type="button" className="se-utility" onClick={() => launch('__settings__')}>
+          <button type="button" className="se-utility" onClick={() => select('__settings__')}>
             Settings
           </button>
           <button
             type="button"
             className="se-utility se-utility--danger"
-            onClick={() => launch('__logout__')}
+            onClick={() => select('__logout__')}
           >
             Logout
           </button>
@@ -208,20 +223,28 @@ function Section({ title, children }) {
 
 function ExperienceRow({ item, onSelect, compact = false }) {
   if (!item) return null;
+  const locked = Boolean(item.availability?.locked);
   return (
     <li>
       <button
         type="button"
-        className={`se-row ${compact ? 'se-row--compact' : ''}`}
+        className={`se-row ${compact ? 'se-row--compact' : ''} ${locked ? 'se-row--locked' : ''}`}
         onClick={() => onSelect(item)}
+        aria-label={locked ? `${item.name} (locked)` : undefined}
       >
-        <span className="se-row-icon" aria-hidden="true">
-          {item.isCollection ? <Layers size={15} /> : <Pencil size={14} />}
+        <span className={`se-row-icon ${locked ? 'se-row-icon--locked' : ''}`} aria-hidden="true">
+          {locked ? <Lock size={14} /> : item.isCollection ? <Layers size={15} /> : <Pencil size={14} />}
         </span>
         <span className="se-row-main">
-          <span className="se-row-name">{item.name}</span>
+          <span className="se-row-name">
+            {item.name}
+            {locked ? <Lock size={12} className="se-row-lock-inline" aria-hidden="true" /> : null}
+          </span>
           {!compact && item.description ? (
             <span className="se-row-desc">{item.description}</span>
+          ) : null}
+          {compact && locked && item.availability?.subtitle ? (
+            <span className="se-row-desc">{item.availability.subtitle}</span>
           ) : null}
         </span>
         {!compact ? <span className="se-row-category">{item.category}</span> : null}
@@ -241,23 +264,45 @@ function SearchResults({ results, onSelect }) {
   }
   return (
     <ul className="se-list se-results">
-      {results.map((item) => (
-        <li key={item.key}>
-          <button type="button" className="se-row se-row--result" onClick={() => onSelect(item)}>
-            <span className="se-row-icon" aria-hidden="true">
-              {item.isCollection ? <Layers size={15} /> : <Pencil size={14} />}
-            </span>
-            <span className="se-row-main">
-              <span className="se-row-name">{item.name}</span>
-              {item.description ? <span className="se-row-desc">{item.description}</span> : null}
-            </span>
-            <span className="se-row-meta">
-              <span className="se-row-category">{item.category}</span>
-              {item.location ? <span className="se-row-location">{item.location}</span> : null}
-            </span>
-          </button>
-        </li>
-      ))}
+      {results.map((item) => {
+        const locked = Boolean(item.availability?.locked);
+        return (
+          <li key={item.key}>
+            <button
+              type="button"
+              className={`se-row se-row--result ${locked ? 'se-row--locked' : ''}`}
+              onClick={() => onSelect(item)}
+              aria-label={locked ? `${item.name} (locked)` : undefined}
+            >
+              <span
+                className={`se-row-icon ${locked ? 'se-row-icon--locked' : ''}`}
+                aria-hidden="true"
+              >
+                {locked ? (
+                  <Lock size={14} />
+                ) : item.isCollection ? (
+                  <Layers size={15} />
+                ) : (
+                  <Pencil size={14} />
+                )}
+              </span>
+              <span className="se-row-main">
+                <span className="se-row-name">
+                  {item.name}
+                  {locked ? (
+                    <Lock size={12} className="se-row-lock-inline" aria-hidden="true" />
+                  ) : null}
+                </span>
+                {item.description ? <span className="se-row-desc">{item.description}</span> : null}
+              </span>
+              <span className="se-row-meta">
+                <span className="se-row-category">{item.category}</span>
+                {item.location ? <span className="se-row-location">{item.location}</span> : null}
+              </span>
+            </button>
+          </li>
+        );
+      })}
     </ul>
   );
 }

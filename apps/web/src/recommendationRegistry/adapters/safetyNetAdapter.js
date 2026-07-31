@@ -17,15 +17,35 @@ export function buildSafetyNetSignals({
   healthData = {},
 } = {}) {
   const protectionGap = protectionData.protectionGap ?? 0;
+  const selfGap = protectionData.self?.gap ?? protectionGap;
+  const spouseGap = protectionData.spouse?.gap ?? 0;
+  const hasSelfGap = Boolean(protectionData.self?.isGap)
+    || (Boolean(protectionData.hasGap) && !protectionData.spouse && selfGap > 0);
+  const hasSpouseGap = Boolean(protectionData.spouse?.isGap);
+  const selfName = protectionData.self?.name || 'you';
+  const spouseName = protectionData.spouse?.name || 'your spouse';
+
   const healthGap = healthData.healthGap ?? 0;
   const healthMin = healthData.minimumRequired ?? 0;
   const emergencyGap = contingencyData.gap ?? 0;
 
   return {
-    // Protection
-    hasProtectionGap: Boolean(protectionData.hasGap),
+    // Protection (household / combined)
+    hasProtectionGap: Boolean(protectionData.hasGap) || protectionGap > 0,
     protectionGap,
     protectionGapDisplay: formatCompactSN(protectionGap),
+
+    // Per earning member (self)
+    hasSelfProtectionGap: hasSelfGap,
+    selfProtectionGap: hasSelfGap ? selfGap : 0,
+    selfProtectionGapDisplay: formatCompactSN(hasSelfGap ? selfGap : 0),
+    selfName,
+
+    // Per earning member (spouse)
+    hasSpouseProtectionGap: hasSpouseGap,
+    spouseProtectionGap: hasSpouseGap ? spouseGap : 0,
+    spouseProtectionGapDisplay: formatCompactSN(hasSpouseGap ? spouseGap : 0),
+    spouseName,
 
     // Health
     hasHealthGap: Boolean(healthData.hasGap),

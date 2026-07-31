@@ -2,6 +2,7 @@ import React from 'react';
 import ProgressiveQuestionLayout, { useProgressiveAdvance } from './ProgressiveQuestionLayout';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 import { formatInrInWords } from '../../lib/formatInrInWords';
+import { syncEmergencyFundAmount } from '../DetailedFlow/wealthDetailSync';
 
 const CurrentAssetsScreen = ({ assetCategories, handleSnapshotChange }) => {
     const { advance } = useProgressiveAdvance();
@@ -114,10 +115,15 @@ const SummaryAssets = () => {
     const { assetCategories, setAssetCategories } = useFinancialPlan();
 
     const handleSnapshotChange = (field, value) => {
-        setAssetCategories(prev => ({
-            ...prev,
-            [field]: value,
-        }));
+        setAssetCategories((prev) => {
+            if (field === 'summaryLiquidCash') {
+                return syncEmergencyFundAmount(prev, value);
+            }
+            return {
+                ...prev,
+                [field]: value,
+            };
+        });
     };
 
     const narrative = "Almost there! Now let's capture your financial commitments.";
