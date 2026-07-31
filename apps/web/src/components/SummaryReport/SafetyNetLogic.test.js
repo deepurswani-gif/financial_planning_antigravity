@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     MIN_HEALTH_COVER,
+    calculateProtectionData,
     calculateHealthInsuranceData,
     buildRecoverySteps,
 } from './SafetyNetLogic';
@@ -13,6 +14,24 @@ const baseProtection = {
 const baseContingency = {
     gap: 0,
 };
+
+describe('calculateProtectionData', () => {
+    const expenses = { summaryHouseholdTotal: '50000', summaryEmiTotal: '10000' };
+
+    it('uses summary life cover when policies are empty', () => {
+        const result = calculateProtectionData(expenses, '1000000', [], []);
+        expect(result.coverageHave).toBe(1000000);
+        expect(result.coverageRequired).toBe(60000 * 200);
+    });
+
+    it('prefers detailed policy sum assured over summary 0', () => {
+        const result = calculateProtectionData(expenses, '0', [], [
+            { planType: 'Term Insurance', sumAssured: '5000000', isProposed: false },
+        ]);
+        expect(result.coverageHave).toBe(5000000);
+        expect(result.coveredPercent).toBeGreaterThan(0);
+    });
+});
 
 describe('calculateHealthInsuranceData', () => {
     it('reports none when user has no health insurance', () => {
@@ -52,6 +71,15 @@ describe('calculateHealthInsuranceData', () => {
         expect(result.coveredPercent).toBe(100);
         expect(result.hasGap).toBe(false);
         expect(result.status).toBe('adequate');
+    });
+
+    it('prefers detailed health policies even when summary said no cover', () => {
+        const result = calculateHealthInsuranceData('', false, [], [
+            { planType: 'Health Insurance', sumAssured: '1000000', isProposed: false },
+        ]);
+        expect(result.coverageHave).toBe(1000000);
+        expect(result.status).toBe('adequate');
+        expect(result.hasGap).toBe(false);
     });
 });
 

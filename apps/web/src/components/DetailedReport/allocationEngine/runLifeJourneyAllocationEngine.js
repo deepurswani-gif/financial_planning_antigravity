@@ -40,6 +40,7 @@ export function runLifeJourneyAllocationEngine({
     summaryLifeCover = '',
     summaryHealthCover = '',
     hasHealthInsurance = null,
+    policies = [],
     goals = [],
     cashFlowResults = null,
     inflationRates = {},
@@ -70,6 +71,7 @@ export function runLifeJourneyAllocationEngine({
         summaryLifeCover,
         summaryHealthCover,
         hasHealthInsurance,
+        policies,
     });
 
     // STEP 1 – Protection policy
@@ -81,6 +83,7 @@ export function runLifeJourneyAllocationEngine({
         summaryLifeCover,
         summaryHealthCover,
         hasHealthInsurance,
+        policies,
         deployableSurplus: surplus,
         policyOverrides,
     });

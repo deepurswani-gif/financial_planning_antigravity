@@ -5,6 +5,10 @@
  */
 
 import { getEffectiveMonthlyEmi, getEffectiveMonthlyHousehold } from '../DetailedFlow/expenseDetailSync';
+import {
+    getEffectiveHealthCover,
+    getEffectiveLifeCover,
+} from '../DetailedFlow/insuranceDetailSync';
 
 export const MIN_HEALTH_COVER = 1_000_000;
 
@@ -18,17 +22,26 @@ function getEffectiveMonthlyNeed(expenseCategories = {}, familyMembers = []) {
  * Uses the HLV (Human Life Value) method from ProtectionGapLogic:
  *   Protection Need = Monthly Expenditure × 200
  *
+ * Cover have prefers detailed policies[].sumAssured over summaryLifeCover.
+ *
  * @param {object} expenseCategories - Expense categories from context
  * @param {string|number} summaryLifeCover - Total life cover from summary flow
+ * @param {Array} familyMembers
+ * @param {Array} policies - Detailed insurance policies
  * @returns {object} Protection data
  */
-export const calculateProtectionData = (expenseCategories, summaryLifeCover, familyMembers = []) => {
+export const calculateProtectionData = (
+    expenseCategories,
+    summaryLifeCover,
+    familyMembers = [],
+    policies = [],
+) => {
     const monthlyNeed = getEffectiveMonthlyNeed(expenseCategories, familyMembers);
     const annualNeed = monthlyNeed * 12;
 
     const multiplier = 200;
     const coverageRequired = monthlyNeed * multiplier;
-    const coverageHave = parseFloat(summaryLifeCover) || 0;
+    const coverageHave = getEffectiveLifeCover(summaryLifeCover, policies);
     const protectionGap = Math.max(0, coverageRequired - coverageHave);
 
     const coveredPercent = coverageRequired > 0
@@ -91,15 +104,22 @@ export const calculateContingencyData = (expenseCategories, contingencyFund, fam
  * Calculate health insurance gap data.
  *
  * Uses a fixed minimum of ₹10 Lakh for family health protection.
+ * Cover have prefers detailed health policies over summary fields.
  *
  * @param {string|number} summaryHealthCover - Total health cover from summary flow
  * @param {boolean|null} hasHealthInsurance - Whether user reported having health cover
  * @param {Array} familyMembers - Family members (for copy context)
+ * @param {Array} policies - Detailed insurance policies
  * @returns {object} Health insurance data
  */
-export const calculateHealthInsuranceData = (summaryHealthCover, hasHealthInsurance, familyMembers = []) => {
+export const calculateHealthInsuranceData = (
+    summaryHealthCover,
+    hasHealthInsurance,
+    familyMembers = [],
+    policies = [],
+) => {
     const minimumRequired = MIN_HEALTH_COVER;
-    const coverageHave = hasHealthInsurance === false ? 0 : (parseFloat(summaryHealthCover) || 0);
+    const coverageHave = getEffectiveHealthCover(summaryHealthCover, hasHealthInsurance, policies);
     const healthGap = Math.max(0, minimumRequired - coverageHave);
 
     const coveredPercent = minimumRequired > 0
@@ -107,7 +127,7 @@ export const calculateHealthInsuranceData = (summaryHealthCover, hasHealthInsura
         : 0;
 
     let status = 'adequate';
-    if (hasHealthInsurance === false || coverageHave === 0) {
+    if (coverageHave === 0) {
         status = 'none';
     } else if (healthGap > 0) {
         status = 'partial';
@@ -118,7 +138,7 @@ export const calculateHealthInsuranceData = (summaryHealthCover, hasHealthInsura
         coverageHave,
         healthGap,
         coveredPercent,
-        hasGap: hasHealthInsurance === false || healthGap > 0,
+        hasGap: healthGap > 0,
         status,
         familySize: familyMembers.length
     };

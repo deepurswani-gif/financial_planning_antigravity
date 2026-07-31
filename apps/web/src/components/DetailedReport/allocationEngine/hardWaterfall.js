@@ -14,6 +14,7 @@ export function applyHardWaterfall(deployableSurplus, gapSnapshot = {}, options 
         summaryLifeCover: options.summaryLifeCover ?? gapSnapshot.meta?.summaryLifeCover ?? '',
         summaryHealthCover: options.summaryHealthCover ?? gapSnapshot.meta?.summaryHealthCover ?? '',
         hasHealthInsurance: options.hasHealthInsurance ?? gapSnapshot.meta?.hasHealthInsurance,
+        policies: options.policies ?? gapSnapshot.meta?.policies ?? [],
         deployableSurplus,
         policyOverrides: options.policyOverrides,
     });

@@ -187,6 +187,7 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
         summaryHealthCover,
         hasHealthInsurance,
         inflationRates,
+        policies,
     } = useFinancialPlan();
 
     const moneyFlowReport = useMemo(
@@ -253,6 +254,7 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
             goals,
             selectedMonthIndex: effectiveMonth,
             reportScope,
+            policies,
         }),
         [
             moneyFlowReport,
@@ -269,6 +271,7 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
             goals,
             effectiveMonth,
             reportScope,
+            policies,
         ],
     );
 
@@ -500,6 +503,7 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
             summaryLifeCover,
             summaryHealthCover,
             hasHealthInsurance,
+            policies,
             inflationRates,
             ppfMaxMonthly: ppfMaxByCap,
         }),
@@ -514,6 +518,7 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
             summaryLifeCover,
             summaryHealthCover,
             hasHealthInsurance,
+            policies,
             inflationRates,
             ppfMaxByCap,
         ],

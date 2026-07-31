@@ -36,7 +36,7 @@ export const SAVINGS_FIELDS = [
       {
         flow: 'summary',
         sectionId: SECTION_IDS.SAVINGS,
-        questionId: 'monthly-investments',
+        questionId: 'savings-investments',
         capability: 'summary',
         role: 'primary',
       },
@@ -88,7 +88,7 @@ export const SAVINGS_FIELDS = [
       {
         flow: 'summary',
         sectionId: SECTION_IDS.SAVINGS,
-        questionId: 'other-savings',
+        questionId: 'savings-investments',
         capability: 'summary',
         role: 'primary',
       },

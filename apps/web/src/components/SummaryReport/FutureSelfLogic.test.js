@@ -106,7 +106,28 @@ describe('FutureSelfLogic', () => {
             savings: { sip: { amount: '12000' } },
             summaryMonthlyInvestments: '15000',
         });
-        expect(result).toEqual({ amount: 12000, source: 'detailed_sip' });
+        expect(result).toEqual({ amount: 12000, source: 'detailed_growth' });
+    });
+
+    it('sums detailed SIP + PPF + NPS as growth investment', () => {
+        const result = getMonthlyInvestmentForProjection({
+            savings: {
+                sip: { amount: '10000' },
+                ppf: { amount: '2000' },
+                nps: { amount: '3000' },
+                rd: { amount: '5000' },
+            },
+            summaryMonthlyInvestments: '15000',
+        });
+        expect(result).toEqual({ amount: 15000, source: 'detailed_growth' });
+    });
+
+    it('uses PPF/NPS when SIP is empty instead of falling back only to summary', () => {
+        const result = getMonthlyInvestmentForProjection({
+            savings: { sip: '', ppf: { amount: '4000' }, nps: { amount: '2000' } },
+            summaryMonthlyInvestments: '15000',
+        });
+        expect(result).toEqual({ amount: 6000, source: 'detailed_growth' });
     });
 
     it('projects current investments for summary-flow near-term goals', () => {

@@ -110,7 +110,7 @@ describe('questionRegistry Phase 1', () => {
     const field = getFieldById('savings.monthlyInvestments');
     const target = resolveEditTarget(field, { capability: 'summary' });
     expect(target.sectionId).toBe(SECTION_IDS.SAVINGS);
-    expect(target.questionId).toBe('monthly-investments');
+    expect(target.questionId).toBe('savings-investments');
     expect(target.flow).toBe('summary');
   });
 

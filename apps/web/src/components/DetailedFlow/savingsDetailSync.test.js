@@ -3,6 +3,7 @@ import {
     initializeSavingsSnapshots,
     syncSummarySavingsSnapshots,
     getEffectiveMonthlySavings,
+    getGrowthSavingsMonthly,
     getSavingsMonthlyAmount,
     sumConfiguredSavings,
     buildSavingsBreakdownAnnual,
@@ -69,6 +70,18 @@ describe('savingsDetailSync', () => {
                 otherSaving: '2000',
             },
         })).toBe(10000);
+    });
+
+    it('getGrowthSavingsMonthly sums SIP + PPF + NPS and excludes RD/other', () => {
+        expect(getGrowthSavingsMonthly({
+            savings: {
+                sip: { amount: '10000' },
+                ppf: { amount: '2000' },
+                nps: { amount: '3000' },
+                rd: { amount: '5000' },
+                otherSaving: { amount: '1000' },
+            },
+        })).toBe(15000);
     });
 
     it('sums RD array amounts', () => {

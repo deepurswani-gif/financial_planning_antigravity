@@ -313,22 +313,31 @@ export function membersWithLifeDetails(policies = [], familyMembers = []) {
 export function sumPolicySumAssured(policies = [], { lifeOnly = true } = {}) {
     return policies
         .filter((p) => !p.isProposed)
-        .filter((p) => {
-            if (!lifeOnly) return true;
-            const type = (p.planType || '').toLowerCase();
-            return type.includes('life') || type.includes('term') || !p.planType;
-        })
+        .filter((p) => (lifeOnly ? isLifeCoverPolicy(p) : true))
         .reduce((sum, p) => sum + (parseFloat(p.sumAssured) || 0), 0);
 }
 
 export function sumHealthPolicyCover(policies = []) {
     return policies
         .filter((p) => !p.isProposed)
-        .filter((p) => {
-            const type = (p.planType || '').toLowerCase();
-            return type.includes('health') || type.includes('medical');
-        })
+        .filter((p) => isHealthCoverPolicy(p))
         .reduce((sum, p) => sum + (parseFloat(p.sumAssured) || 0), 0);
+}
+
+/**
+ * Life cover products in this app: Term, Saving Plan, ULIP, and untitled slots.
+ * Health/medical policies are excluded.
+ */
+export function isLifeCoverPolicy(policy = {}) {
+    const type = (policy.planType || '').toLowerCase();
+    if (!type) return true;
+    if (type.includes('health') || type.includes('medical')) return false;
+    return true;
+}
+
+export function isHealthCoverPolicy(policy = {}) {
+    const type = (policy.planType || '').toLowerCase();
+    return type.includes('health') || type.includes('medical');
 }
 
 export function reconcileLifeCover(summaryLifeCover, policies = []) {
@@ -337,6 +346,46 @@ export function reconcileLifeCover(summaryLifeCover, policies = []) {
 
 export function reconcileHealthCover(summaryHealthCover, policies = []) {
     return reconcileAmounts(summaryHealthCover, sumHealthPolicyCover(policies));
+}
+
+/**
+ * Prefer detailed life sum assured when entered; otherwise use summary snapshot.
+ * Mirrors getEffectiveMonthlyEmi / getEffectiveMonthlyInsurance.
+ */
+export function getEffectiveLifeCover(summaryLifeCover, policies = []) {
+    const detailed = sumPolicySumAssured(policies);
+    if (detailed > 0) return detailed;
+    return parseFloat(summaryLifeCover) || 0;
+}
+
+/**
+ * Prefer detailed health policy cover when entered; otherwise use summary snapshot.
+ * Detailed cover overrides a summary "no health insurance" answer.
+ */
+export function getEffectiveHealthCover(summaryHealthCover, hasHealthInsurance = null, policies = []) {
+    const detailed = sumHealthPolicyCover(policies);
+    if (detailed > 0) return detailed;
+    if (hasHealthInsurance === false) return 0;
+    return parseFloat(summaryHealthCover) || 0;
+}
+
+/**
+ * Write-back patch for summary cover fields when detailed policies carry sum assured.
+ * Does not clear summary fields when detailed cover is empty (summary-only users).
+ */
+export function deriveSummaryCoverWriteBack(policies = []) {
+    const patch = {};
+    const life = sumPolicySumAssured(policies);
+    if (life > 0) {
+        patch.summaryLifeCover = String(Math.round(life));
+        patch.hasLifeInsurance = true;
+    }
+    const health = sumHealthPolicyCover(policies);
+    if (health > 0) {
+        patch.summaryHealthCover = String(Math.round(health));
+        patch.hasHealthInsurance = true;
+    }
+    return patch;
 }
 
 /** Compare cash-flow life premium entry vs policy-details premium for one member (monthly). */

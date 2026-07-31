@@ -46,6 +46,17 @@ export function getSummarySavingsTotal(expenseCategories = {}) {
         + (parseFloat(expenseCategories.summaryOtherSavings) || 0);
 }
 
+/**
+ * Growth-oriented monthly investments (SIP + PPF + NPS).
+ * Excludes safer buckets such as RD / otherSaving used for emergency-style saving.
+ */
+export function getGrowthSavingsMonthly(expenseCategories = {}) {
+    const savings = expenseCategories.savings || {};
+    return getSavingsMonthlyAmount(savings.sip)
+        + getSavingsMonthlyAmount(savings.ppf)
+        + getSavingsMonthlyAmount(savings.nps);
+}
+
 export function getEffectiveMonthlySavings(expenseCategories = {}) {
     const configured = sumConfiguredSavings(expenseCategories.savings);
     if (configured > 0) return configured;

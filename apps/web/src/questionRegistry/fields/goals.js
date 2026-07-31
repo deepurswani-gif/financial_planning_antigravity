@@ -124,7 +124,7 @@ export const GOAL_FIELDS = [
       {
         flow: 'summary',
         sectionId: SECTION_IDS.GOALS,
-        questionId: 'YEARS',
+        questionId: 'DETAILS',
         capability: 'summary',
         role: 'primary',
       },
@@ -166,7 +166,7 @@ export const GOAL_FIELDS = [
       {
         flow: 'summary',
         sectionId: SECTION_IDS.GOALS,
-        questionId: 'VALUE',
+        questionId: 'DETAILS',
         capability: 'summary',
         role: 'primary',
       },

@@ -206,6 +206,11 @@ const BlankLayout = () => {
 
     const summaryNav = isSummaryFlow && (
         <nav className="summary-horizontal-nav">
+            {currentStepIndex >= 0 && (
+                <span className="summary-step-counter" aria-live="polite">
+                    Step {currentStepIndex + 1} of {steps.length}
+                </span>
+            )}
             {steps.map((step, idx) => {
                 const isActive = idx === currentStepIndex;
                 const isCompleted = isStepCompleted(idx);

@@ -26,7 +26,7 @@ export const PROTECTION_FIELDS = [
       {
         flow: 'summary',
         sectionId: SECTION_IDS.SAVINGS,
-        questionId: 'life-insurance-cover',
+        questionId: 'insurance-protection',
         capability: 'summary',
         role: 'primary',
       },
@@ -62,7 +62,7 @@ export const PROTECTION_FIELDS = [
       {
         flow: 'summary',
         sectionId: SECTION_IDS.SAVINGS,
-        questionId: 'life-insurance-cover',
+        questionId: 'insurance-protection',
         capability: 'summary',
         role: 'primary',
       },
@@ -95,7 +95,7 @@ export const PROTECTION_FIELDS = [
       {
         flow: 'summary',
         sectionId: SECTION_IDS.SAVINGS,
-        questionId: 'health-insurance-cover',
+        questionId: 'insurance-protection',
         capability: 'summary',
         role: 'primary',
       },
@@ -131,7 +131,7 @@ export const PROTECTION_FIELDS = [
       {
         flow: 'summary',
         sectionId: SECTION_IDS.SAVINGS,
-        questionId: 'health-insurance-cover',
+        questionId: 'insurance-protection',
         capability: 'summary',
         role: 'primary',
       },

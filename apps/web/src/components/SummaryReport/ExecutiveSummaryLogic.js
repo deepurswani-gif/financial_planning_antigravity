@@ -1,5 +1,5 @@
 import { calculateCashFlow } from '../CashFlowModule/CashFlowLogic';
-import { calculateProtectionData, calculateContingencyData } from './SafetyNetLogic';
+import { calculateProtectionData, calculateContingencyData, calculateHealthInsuranceData } from './SafetyNetLogic';
 import { buildFutureSelfReport, buildGoalReadiness } from './FutureSelfLogic';
 import { getEmergencyFundAmount } from '../DetailedFlow/wealthDetailSync';
 
@@ -330,11 +330,19 @@ export const buildExecutiveSummaryReport = ({
     inflationRates,
     familyMembers = [],
     hasSpouseIncome,
+    policies = [],
+    hasHealthInsurance = null,
 }) => {
     const cashFlow = calculateCashFlow(income, expenseCategories, familyMembers, hasSpouseIncome);
-    const protectionData = calculateProtectionData(expenseCategories, summaryLifeCover, familyMembers);
+    const protectionData = calculateProtectionData(expenseCategories, summaryLifeCover, familyMembers, policies);
     const emergencyCash = getEmergencyFundAmount(assetCategories, contingencyFund);
     const contingencyData = calculateContingencyData(expenseCategories, emergencyCash, familyMembers);
+    const healthData = calculateHealthInsuranceData(
+        summaryHealthCover,
+        hasHealthInsurance,
+        familyMembers,
+        policies,
+    );
     const futureSelfReport = buildFutureSelfReport({
         goals,
         cashFlowResults: cashFlow,
@@ -357,7 +365,7 @@ export const buildExecutiveSummaryReport = ({
         ? protectionData.coverageHave / protectionData.coverageRequired
         : 0;
     const lifeScore = protectionData.coverageRequired > 0 ? scoreLifeRatio(Math.max(0, lifeCoverageRatio)) : 0;
-    const healthCoverLakh = toLakh(summaryHealthCover);
+    const healthCoverLakh = toLakh(healthData.coverageHave);
     const healthScore = scoreHealthCover(healthCoverLakh);
     const familyScore = Math.min(20, lifeScore + healthScore);
 
@@ -463,7 +471,7 @@ export const buildExecutiveSummaryReport = ({
         monthlyNeed: contingencyData.monthlyNeed,
         coverageRequired: protectionData.coverageRequired,
         goalsCount: goalReadinessRows.length,
-        healthCover: toNum(summaryHealthCover)
+        healthCover: toNum(healthData.coverageHave)
     });
 
     const roadmap = buildRoadmap(pillars);

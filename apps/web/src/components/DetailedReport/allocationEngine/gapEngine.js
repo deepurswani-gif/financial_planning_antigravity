@@ -45,11 +45,12 @@ export function buildLifeObjectiveGaps({
     summaryLifeCover = '',
     summaryHealthCover = '',
     hasHealthInsurance = null,
+    policies = [],
 } = {}) {
     const emergencyHave = getEmergencyFundAmount(assetCategories, contingencyFund);
     const contingencyData = calculateContingencyData(expenseCategories, emergencyHave, familyMembers);
-    const protectionData = calculateProtectionData(expenseCategories, summaryLifeCover, familyMembers);
-    const healthData = calculateHealthInsuranceData(summaryHealthCover, hasHealthInsurance, familyMembers);
+    const protectionData = calculateProtectionData(expenseCategories, summaryLifeCover, familyMembers, policies);
+    const healthData = calculateHealthInsuranceData(summaryHealthCover, hasHealthInsurance, familyMembers, policies);
     const existingMonthly = getExistingMonthlyByInstrument(expenseCategories);
 
     const self = familyMembers.find((m) => String(m.relation || '').toLowerCase() === 'self');
@@ -108,6 +109,7 @@ export function buildLifeObjectiveGaps({
             summaryLifeCover,
             summaryHealthCover,
             hasHealthInsurance,
+            policies,
         },
     };
 }

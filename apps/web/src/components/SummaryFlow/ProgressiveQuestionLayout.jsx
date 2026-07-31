@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, createContext, useContext } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, ArrowRight, ArrowLeft, Sparkles } from 'lucide-react';
@@ -14,6 +14,36 @@ import {
 } from '../FinancialWorkspace/workspaceNavConfig';
 import { resolveSectionId } from '../FinancialWorkspace/sectionIds';
 import { useLandingQuestion, focusLandingControl } from '../FinancialWorkspace/smartEdit/useLandingQuestion';
+
+/** Old per-screen question ids → merged screen ids (Smart Edit landing). */
+export const SUMMARY_QUESTION_ID_ALIASES = Object.freeze({
+    'name-mobile': 'personal-details',
+    'dob-retirement': 'personal-details',
+    'monthly-expenses': 'monthly-outflows',
+    'insurance-premiums': 'monthly-outflows',
+    'emi-commitments': 'monthly-outflows',
+    'monthly-investments': 'savings-investments',
+    'other-savings': 'savings-investments',
+    'life-insurance-cover': 'insurance-protection',
+    'health-insurance-cover': 'insurance-protection',
+    'portfolio-value': 'current-assets',
+    'emergency-fund': 'current-assets',
+    'real-estate-assets': 'current-assets',
+    'outstanding-loans': 'current-liabilities',
+    'credit-card': 'current-liabilities',
+    'other-payables': 'current-liabilities',
+});
+
+const AUTO_ADVANCE_DELAY_MS = 350;
+
+const ProgressiveAdvanceContext = createContext({
+    advance: () => {},
+    scheduleAdvance: () => {},
+});
+
+export function useProgressiveAdvance() {
+    return useContext(ProgressiveAdvanceContext);
+}
 
 const steps = [
     { id: 'profile', label: 'Profile', path: '/summary-flow/profile' },
@@ -80,6 +110,9 @@ const NarrativeScreen = ({ text, onContinue }) => {
     );
 };
 
+const resolveLandingQuestionId = (questionId) =>
+    SUMMARY_QUESTION_ID_ALIASES[questionId] || questionId;
+
 const ProgressiveQuestionLayout = ({ 
     currentStepId, 
     questions = [], 
@@ -105,6 +138,8 @@ const ProgressiveQuestionLayout = ({
     const [direction, setDirection] = useState(1);
     const [showNarrative, setShowNarrative] = useState(false);
     const { landingQuestionId, control: landingControl, clearLanding } = useLandingQuestion(questions);
+    const skipAutoAdvanceRef = useRef(false);
+    const advanceTimerRef = useRef(null);
 
     const currentGlobalIndex = steps.findIndex(s => s.id === currentStepId);
 
@@ -128,16 +163,24 @@ const ProgressiveQuestionLayout = ({
         });
     }, [currentIndex, currentStepId, location.pathname, userId]);
 
+    useEffect(() => () => {
+        if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+    }, []);
+
     // Smart Edit landing: jump directly to the requested question (no chevrons),
     // focus/scroll the first control, then clear the one-shot landing params.
     useEffect(() => {
         if (!landingQuestionId) return;
-        const idx = questions.findIndex((q) => q && q.id === landingQuestionId);
+        const resolvedId = resolveLandingQuestionId(landingQuestionId);
+        const idx = questions.findIndex((q) => q && (q.id === resolvedId || q.id === landingQuestionId));
         if (idx < 0) return;
+        skipAutoAdvanceRef.current = true;
         setDirection(1);
         setCurrentIndex(idx);
         focusLandingControl(landingControl);
         clearLanding();
+        const t = setTimeout(() => { skipAutoAdvanceRef.current = false; }, 600);
+        return () => clearTimeout(t);
     }, [landingQuestionId, landingControl, clearLanding, questions]);
 
     // Handle intra-step navigation (chevron arrows)
@@ -154,6 +197,24 @@ const ProgressiveQuestionLayout = ({
             setCurrentIndex(prev => prev - 1);
         }
     }, [currentIndex]);
+
+    const advance = useCallback(() => {
+        if (skipAutoAdvanceRef.current || showNarrative) return;
+        if (advanceTimerRef.current) {
+            clearTimeout(advanceTimerRef.current);
+            advanceTimerRef.current = null;
+        }
+        handleNextQuestion();
+    }, [handleNextQuestion, showNarrative]);
+
+    const scheduleAdvance = useCallback(() => {
+        if (skipAutoAdvanceRef.current || showNarrative) return;
+        if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+        advanceTimerRef.current = setTimeout(() => {
+            advanceTimerRef.current = null;
+            handleNextQuestion();
+        }, AUTO_ADVANCE_DELAY_MS);
+    }, [handleNextQuestion, showNarrative]);
 
     // Handle inter-step navigation (Next Section / Previous Section buttons)
     const handleNextStep = () => {
@@ -253,8 +314,10 @@ const ProgressiveQuestionLayout = ({
     const isFirstStep = currentGlobalIndex === 0;
     const isLastStep = currentGlobalIndex === steps.length - 1;
 
+    const advanceApi = { advance, scheduleAdvance };
+
     return (
-        <>
+        <ProgressiveAdvanceContext.Provider value={advanceApi}>
             {/* Narrative overlay */}
             <AnimatePresence>
                 {showNarrative && narrative && (
@@ -324,7 +387,7 @@ const ProgressiveQuestionLayout = ({
                     </div>
                 </div>
             </div>
-        </>
+        </ProgressiveAdvanceContext.Provider>
     );
 };
 

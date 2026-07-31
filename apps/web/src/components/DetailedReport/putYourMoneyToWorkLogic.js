@@ -996,6 +996,7 @@ export function buildRecommendedBundles({
     summaryLifeCover = '',
     summaryHealthCover = '',
     hasHealthInsurance = null,
+    policies = [],
     cashFlowResults = null,
     inflationRates = {},
     surplusRate = 0,
@@ -1019,6 +1020,7 @@ export function buildRecommendedBundles({
             || '',
         summaryHealthCover,
         hasHealthInsurance,
+        policies,
         goals,
         cashFlowResults,
         inflationRates,
@@ -1193,6 +1195,7 @@ export function buildAllocationStudioContext({
     selectedMonthIndex,
     /** 'gaps' | 'pymtw' | null (all categories) */
     reportScope = null,
+    policies = [],
 }) {
     if (!moneyFlowReport?.meta) {
         return { meta: { hasData: false } };
@@ -1228,7 +1231,7 @@ export function buildAllocationStudioContext({
         })
         : { deployableSurplus: 0, carriedForward: 0 };
 
-    const protectionData = calculateProtectionData(expenseCategories, summaryLifeCover, familyMembers);
+    const protectionData = calculateProtectionData(expenseCategories, summaryLifeCover, familyMembers, policies);
     const contingencyData = calculateContingencyData(
         expenseCategories,
         getEmergencyFundAmount(assetCategories, contingencyFund),

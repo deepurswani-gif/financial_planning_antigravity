@@ -647,6 +647,18 @@ input:focus, select:focus, textarea:focus {
   display: none;
 }
 
+.summary-step-counter {
+  flex-shrink: 0;
+  margin-right: 0.75rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 50px;
+  background: rgba(23, 45, 157, 0.06);
+  color: var(--primary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .summary-step-item {
   display: flex;
   align-items: center;

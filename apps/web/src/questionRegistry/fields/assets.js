@@ -30,7 +30,7 @@ export const ASSET_FIELDS = [
       {
         flow: 'summary',
         sectionId: SECTION_IDS.ASSETS,
-        questionId: 'portfolio-value',
+        questionId: 'current-assets',
         capability: 'summary',
         role: 'primary',
       },
@@ -76,7 +76,7 @@ export const ASSET_FIELDS = [
       {
         flow: 'summary',
         sectionId: SECTION_IDS.ASSETS,
-        questionId: 'emergency-fund',
+        questionId: 'current-assets',
         capability: 'summary',
         role: 'primary',
       },
@@ -124,7 +124,7 @@ export const ASSET_FIELDS = [
       {
         flow: 'summary',
         sectionId: SECTION_IDS.ASSETS,
-        questionId: 'real-estate-assets',
+        questionId: 'current-assets',
         capability: 'summary',
         role: 'primary',
       },

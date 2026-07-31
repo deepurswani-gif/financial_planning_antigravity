@@ -16,14 +16,28 @@ import {
     DEFAULT_SUMMARY_REPORT_ID,
     financialWorkspacePath,
 } from '../FinancialWorkspace/workspaceNavConfig';
+import { formatInrInWords } from '../../lib/formatInrInWords';
 
-/* ─── Screen constants ─── */
-const INTRO   = 0;
-const SELECT  = 1;
-const YEARS   = 2;
-const VALUE   = 3;
-const SUMMARY = 4;
-const SCREEN_COUNT = 5;
+/* ─── Screen constants (3 screens) ─── */
+const SELECT  = 0;
+const DETAILS = 1;
+const SUMMARY = 2;
+const SCREEN_COUNT = 3;
+
+/** Migrate persisted wizard screen indices from the old 5-screen flow. */
+const migrateGoalsScreen = (savedGoalsUi, validGoalsCount) => {
+    const savedScreen = savedGoalsUi?.screen;
+    if (typeof savedScreen !== 'number') {
+        return validGoalsCount > 0 ? SUMMARY : SELECT;
+    }
+    if (savedGoalsUi?.wizardVersion >= 2) {
+        return Math.min(Math.max(savedScreen, 0), SUMMARY);
+    }
+    // Old: INTRO=0, SELECT=1, YEARS=2, VALUE=3, SUMMARY=4
+    if (savedScreen >= 4) return SUMMARY;
+    if (savedScreen >= 2) return DETAILS;
+    return SELECT;
+};
 
 /* ─── Goal templates ─── */
 const goalTemplates = [
@@ -44,11 +58,6 @@ const getGoalIcon = (name) => {
     if (lower.includes('home') || lower.includes('flat') || lower.includes('house')) return Home;
     if (lower.includes('marriage') || lower.includes('wed')) return Heart;
     return Target;
-};
-
-const formatInr = (val) => {
-    if (!val || isNaN(val)) return '₹0';
-    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val);
 };
 
 const isValidGoal = (g) => g.presentValue && g.yearsToGoal;
@@ -116,10 +125,9 @@ const SummaryGoals = () => {
     const validGoals = goals.filter(isValidGoal);
     const savedGoalsUi = loadSummaryUiDraft(userId)?.goalsWizard;
 
-    const [screen, setScreen] = useState(() => {
-        if (typeof savedGoalsUi?.screen === 'number') return savedGoalsUi.screen;
-        return validGoals.length > 0 ? SUMMARY : INTRO;
-    });
+    const [screen, setScreen] = useState(() =>
+        migrateGoalsScreen(savedGoalsUi, validGoals.length),
+    );
     const [direction, setDirection] = useState(1);
     const [selectedTemplateIds, setSelectedTemplateIds] = useState(() => migrateSelectedTemplateIds(savedGoalsUi));
     const [selectedCustomGoalIds, setSelectedCustomGoalIds] = useState(
@@ -135,6 +143,7 @@ const SummaryGoals = () => {
     useEffect(() => {
         patchSummaryUiDraft(userId, {
             goalsWizard: {
+                wizardVersion: 2,
                 screen,
                 selectedTemplateIds,
                 selectedCustomGoalIds,
@@ -274,15 +283,14 @@ const SummaryGoals = () => {
 
     /* ── Chevron logic ── */
     const hasSelection = selectedTemplateIds.length > 0 || selectedCustomGoalIds.length > 0;
-    const allYearsFilled = pendingGoals.length > 0 && pendingGoals.every((g) => g.yearsToGoal);
-    const allValuesFilled = pendingGoals.length > 0 && pendingGoals.every((g) => g.presentValue);
+    const allDetailsFilled = pendingGoals.length > 0
+        && pendingGoals.every((g) => g.yearsToGoal && g.presentValue);
 
-    const canGoLeft = screen > INTRO;
+    const canGoLeft = screen > SELECT;
     const canGoRight = (() => {
         if (screen >= SUMMARY) return false;
         if (screen === SELECT) return hasSelection;
-        if (screen === YEARS) return allYearsFilled;
-        if (screen === VALUE) return allValuesFilled;
+        if (screen === DETAILS) return allDetailsFilled;
         return true;
     })();
 
@@ -290,7 +298,7 @@ const SummaryGoals = () => {
         if (!canGoLeft) return;
         if (screen === SUMMARY) {
             if (pendingGoalIds.length > 0) {
-                goTo(VALUE, -1);
+                goTo(DETAILS, -1);
             } else {
                 setSelectedTemplateIds(
                     validGoals.map((g) => g.templateId).filter(Boolean),
@@ -300,25 +308,17 @@ const SummaryGoals = () => {
                 );
                 goTo(SELECT, -1);
             }
-        } else if (screen === VALUE) {
-            goTo(YEARS, -1);
-        } else if (screen === YEARS) {
+        } else if (screen === DETAILS) {
             goTo(SELECT, -1);
-        } else {
-            goTo(screen - 1, -1);
         }
     };
 
     const handleRight = () => {
         if (!canGoRight) return;
-        if (screen === INTRO) {
-            goTo(SELECT);
-        } else if (screen === SELECT) {
+        if (screen === SELECT) {
             materializeSelectedGoals();
-            goTo(YEARS);
-        } else if (screen === YEARS) {
-            goTo(VALUE);
-        } else if (screen === VALUE) {
+            goTo(DETAILS);
+        } else if (screen === DETAILS) {
             setPendingGoalIds([]);
             goTo(SUMMARY);
         }
@@ -335,7 +335,7 @@ const SummaryGoals = () => {
         return () => window.removeEventListener('keydown', onKey);
     });
 
-    const narrativeText = "Perfect. I now have enough clarity to build your complete financial reality map and identify opportunities to improve your future financial outcomes.";
+    const narrativeText = "Awesome! Your financial snapshot is ready. Let's generate your WealthMap.";
 
     /* ═══════════ RENDER ═══════════ */
     return (
@@ -373,17 +373,12 @@ const SummaryGoals = () => {
                         transition={panTransition}
                         style={{ width: '100%' }}
                     >
-                        {screen === INTRO && (
+                        {screen === SELECT && (
                             <div className="question-container">
                                 <p className="question-narrative">
                                     Every financial decision becomes meaningful when connected to a life goal.
                                     Now let&apos;s map the dreams and milestones you want your money to support.
                                 </p>
-                            </div>
-                        )}
-
-                        {screen === SELECT && (
-                            <div className="question-container">
                                 <h2 className="question-title">
                                     Which goals would you like to plan?
                                 </h2>
@@ -482,18 +477,28 @@ const SummaryGoals = () => {
                             </div>
                         )}
 
-                        {screen === YEARS && pendingGoals.length > 0 && (
+                        {screen === DETAILS && pendingGoals.length > 0 && (
                             <div className="question-container">
                                 <h2 className="question-title">
-                                    After how many years would you like to achieve this goal?
+                                    Tell us the timing and present cost for each goal
                                 </h2>
+                                <p className="question-helper" style={{ marginBottom: '1.5rem' }}>
+                                    Years Remaining and Present Value are both required for accurate future value calculations.
+                                </p>
 
                                 <div className="question-fields" style={{ maxWidth: '520px', margin: '0 auto' }}>
                                     {pendingGoals.map((goal) => {
                                         const Icon = getGoalIcon(goal.name);
                                         return (
-                                            <div key={goal.id} style={{ marginBottom: '1.25rem' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                                            <div
+                                                key={goal.id}
+                                                style={{
+                                                    marginBottom: '1.5rem',
+                                                    paddingBottom: '1.25rem',
+                                                    borderBottom: '1px solid var(--border)',
+                                                }}
+                                            >
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
                                                     <Icon size={18} style={{ color: 'var(--primary)' }} />
                                                     <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{goal.name}</span>
                                                 </div>
@@ -506,30 +511,9 @@ const SummaryGoals = () => {
                                                     placeholder="e.g. 10"
                                                     value={goal.yearsToGoal || ''}
                                                     onChange={(e) => updateGoal(goal.id, 'yearsToGoal', e.target.value)}
-                                                    style={{ textAlign: 'center', fontSize: '1.1rem', fontWeight: 600 }}
+                                                    style={{ textAlign: 'center', fontSize: '1.1rem', fontWeight: 600, marginBottom: '0.75rem' }}
+                                                    enterKeyHint="next"
                                                 />
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        )}
-
-                        {screen === VALUE && pendingGoals.length > 0 && (
-                            <div className="question-container">
-                                <h2 className="question-title">
-                                    If you were to achieve this goal today, how much would it cost approximately?
-                                </h2>
-
-                                <div className="question-fields" style={{ maxWidth: '520px', margin: '0 auto' }}>
-                                    {pendingGoals.map((goal) => {
-                                        const Icon = getGoalIcon(goal.name);
-                                        return (
-                                            <div key={goal.id} style={{ marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: '1px solid var(--border)' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                                                    <Icon size={18} style={{ color: 'var(--primary)' }} />
-                                                    <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{goal.name}</span>
-                                                </div>
                                                 <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.2rem', display: 'block' }}>
                                                     Present Value of Goal
                                                 </label>
@@ -541,6 +525,7 @@ const SummaryGoals = () => {
                                                         placeholder="e.g. 500000"
                                                         value={goal.presentValue || ''}
                                                         onChange={(e) => updateGoal(goal.id, 'presentValue', e.target.value)}
+                                                        enterKeyHint="done"
                                                     />
                                                 </div>
                                                 <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
@@ -576,11 +561,11 @@ const SummaryGoals = () => {
                                                             <div className="goal-summary-name">{goal.name}</div>
                                                             <div className="goal-summary-meta">
                                                                 {goal.yearsToGoal ? `${goal.yearsToGoal} years` : ''}
-                                                                {goal.presentValue ? ` • ${formatInr(goal.presentValue)}` : ''}
+                                                                {goal.presentValue ? ` • ${formatInrInWords(goal.presentValue)}` : ''}
                                                             </div>
                                                             {futureCost > 0 && (
                                                                 <div style={{ fontSize: '0.8rem', color: 'var(--positive)', marginTop: '0.2rem' }}>
-                                                                    Estimated Future Cost: {formatInr(futureCost)}
+                                                                    Estimated Future Cost: {formatInrInWords(futureCost)}
                                                                 </div>
                                                             )}
                                                         </div>
@@ -604,7 +589,7 @@ const SummaryGoals = () => {
 
                 <div className="step-nav-bar">
                     <div>
-                        {(screen === INTRO || screen === SUMMARY) && (
+                        {(screen === SELECT || screen === SUMMARY) && (
                             <button className="step-nav-btn" onClick={async () => {
                                 if (savePlanData) {
                                     try { await savePlanData(); } catch (e) { console.error('Save failed on nav', e); }

@@ -29,6 +29,7 @@ const InvestSurplusReportContent = () => {
         contingencyFund,
         summaryLifeCover,
         investmentAllocations,
+        policies,
     } = useFinancialPlan();
 
     const moneyFlowReport = useMemo(
@@ -62,6 +63,7 @@ const InvestSurplusReportContent = () => {
             contingencyFund,
             summaryLifeCover,
             investmentAllocations,
+            policies,
         }),
         [
             moneyFlowReport,
@@ -71,6 +73,7 @@ const InvestSurplusReportContent = () => {
             contingencyFund,
             summaryLifeCover,
             investmentAllocations,
+            policies,
         ],
     );
 

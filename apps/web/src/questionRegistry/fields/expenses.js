@@ -30,7 +30,7 @@ export const EXPENSE_FIELDS = [
       {
         flow: 'summary',
         sectionId: SECTION_IDS.CASH_FLOW,
-        questionId: 'monthly-expenses',
+        questionId: 'monthly-outflows',
         capability: 'summary',
         role: 'primary',
       },
@@ -82,7 +82,7 @@ export const EXPENSE_FIELDS = [
       {
         flow: 'summary',
         sectionId: SECTION_IDS.CASH_FLOW,
-        questionId: 'insurance-premiums',
+        questionId: 'monthly-outflows',
         capability: 'summary',
         role: 'primary',
       },

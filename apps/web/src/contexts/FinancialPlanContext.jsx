@@ -17,7 +17,7 @@ import { getEffectiveMonthlyEmi } from '../components/DetailedFlow/expenseDetail
 import { getEffectiveMonthlySavings } from '../components/DetailedFlow/savingsDetailSync';
 import { initializeExpenseSnapshots, hasAnyEmiCommitment } from '../components/DetailedFlow/expenseDetailSync';
 import { initializeSavingsSnapshots } from '../components/DetailedFlow/savingsDetailSync';
-import { migrateInsuranceBlock } from '../components/DetailedFlow/insuranceDetailSync';
+import { migrateInsuranceBlock, deriveSummaryCoverWriteBack, sumPolicySumAssured, sumHealthPolicyCover } from '../components/DetailedFlow/insuranceDetailSync';
 import {
   WORKSPACE_CAPABILITY_FULL,
   WORKSPACE_CAPABILITY_SUMMARY,
@@ -148,6 +148,19 @@ export const FinancialPlanProvider = ({ children }) => {
       });
     }
   }, [familyMembers, hasSpouseIncome]);
+
+  // Keep summary life/health cover aligned when detailed policies carry sum assured.
+  useEffect(() => {
+    const patch = deriveSummaryCoverWriteBack(policies);
+    if (patch.summaryLifeCover !== undefined) {
+      setSummaryLifeCover((prev) => (prev === patch.summaryLifeCover ? prev : patch.summaryLifeCover));
+      setHasLifeInsurance(true);
+    }
+    if (patch.summaryHealthCover !== undefined) {
+      setSummaryHealthCover((prev) => (prev === patch.summaryHealthCover ? prev : patch.summaryHealthCover));
+      setHasHealthInsurance(true);
+    }
+  }, [policies]);
 
   // Keep ledger in sync with detailed net inflow, household (incl. education), and tax adjustment.
   useEffect(() => {
@@ -490,7 +503,19 @@ export const FinancialPlanProvider = ({ children }) => {
     const localUpdatedMs = getDraftSavedAtMs(localDraft);
 
     if (!data || localUpdatedMs > supabaseUpdatedMs) {
-      applySummaryDraft(localDraft);
+      // Local summary draft must not wipe cover once detailed policies have sum assured.
+      const draft = { ...localDraft };
+      const lifeCover = sumPolicySumAssured(data?.policies || []);
+      if (lifeCover > 0) {
+        delete draft.summaryLifeCover;
+        delete draft.hasLifeInsurance;
+      }
+      const healthCover = sumHealthPolicyCover(data?.policies || []);
+      if (healthCover > 0) {
+        delete draft.summaryHealthCover;
+        delete draft.hasHealthInsurance;
+      }
+      applySummaryDraft(draft);
     }
   }, [applySummaryDraft]);
 

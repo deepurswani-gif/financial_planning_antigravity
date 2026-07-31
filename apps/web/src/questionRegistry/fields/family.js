@@ -26,7 +26,7 @@ export const FAMILY_FIELDS = [
       {
         flow: 'summary',
         sectionId: SECTION_IDS.PROFILE,
-        questionId: 'name-mobile',
+        questionId: 'personal-details',
         capability: 'summary',
         role: 'primary',
       },
@@ -66,7 +66,7 @@ export const FAMILY_FIELDS = [
       {
         flow: 'summary',
         sectionId: SECTION_IDS.PROFILE,
-        questionId: 'name-mobile',
+        questionId: 'personal-details',
         capability: 'summary',
         role: 'primary',
       },
@@ -106,7 +106,7 @@ export const FAMILY_FIELDS = [
       {
         flow: 'summary',
         sectionId: SECTION_IDS.PROFILE,
-        questionId: 'dob-retirement',
+        questionId: 'personal-details',
         capability: 'summary',
         role: 'primary',
       },
@@ -152,7 +152,7 @@ export const FAMILY_FIELDS = [
       {
         flow: 'summary',
         sectionId: SECTION_IDS.PROFILE,
-        questionId: 'dob-retirement',
+        questionId: 'personal-details',
         capability: 'summary',
         role: 'primary',
       },

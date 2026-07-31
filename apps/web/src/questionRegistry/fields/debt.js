@@ -26,7 +26,7 @@ export const DEBT_FIELDS = [
       {
         flow: 'summary',
         sectionId: SECTION_IDS.CASH_FLOW,
-        questionId: 'emi-commitments',
+        questionId: 'monthly-outflows',
         capability: 'summary',
         role: 'primary',
       },
@@ -79,7 +79,7 @@ export const DEBT_FIELDS = [
       {
         flow: 'summary',
         sectionId: SECTION_IDS.CASH_FLOW,
-        questionId: 'emi-commitments',
+        questionId: 'monthly-outflows',
         capability: 'summary',
         role: 'primary',
       },

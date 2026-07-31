@@ -209,13 +209,14 @@ const SafetyNetSection = () => {
         summaryHealthCover,
         hasHealthInsurance,
         contingencyFund,
-        assetCategories
+        assetCategories,
+        policies,
     } = useFinancialPlan();
 
     // ── Derived Calculations ──
     const protectionData = useMemo(
-        () => calculateProtectionData(expenseCategories, summaryLifeCover, familyMembers),
-        [expenseCategories, summaryLifeCover, familyMembers]
+        () => calculateProtectionData(expenseCategories, summaryLifeCover, familyMembers, policies),
+        [expenseCategories, summaryLifeCover, familyMembers, policies]
     );
 
     const contingencyData = useMemo(() => {
@@ -224,8 +225,8 @@ const SafetyNetSection = () => {
     }, [expenseCategories, contingencyFund, assetCategories, familyMembers]);
 
     const healthData = useMemo(
-        () => calculateHealthInsuranceData(summaryHealthCover, hasHealthInsurance, familyMembers),
-        [summaryHealthCover, hasHealthInsurance, familyMembers]
+        () => calculateHealthInsuranceData(summaryHealthCover, hasHealthInsurance, familyMembers, policies),
+        [summaryHealthCover, hasHealthInsurance, familyMembers, policies]
     );
 
     const crisisTimeline = useMemo(

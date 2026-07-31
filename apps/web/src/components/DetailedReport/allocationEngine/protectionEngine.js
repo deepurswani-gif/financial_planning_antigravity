@@ -55,6 +55,7 @@ export function runProtectionEngine({
     summaryLifeCover = '',
     summaryHealthCover = '',
     hasHealthInsurance = null,
+    policies = [],
     deployableSurplus = 0,
     policyOverrides = {},
 } = {}) {
@@ -64,8 +65,8 @@ export function runProtectionEngine({
     const steps = [];
     const mandatoryAllocations = {};
 
-    const protectionData = calculateProtectionData(expenseCategories, summaryLifeCover, familyMembers);
-    const healthData = calculateHealthInsuranceData(summaryHealthCover, hasHealthInsurance, familyMembers);
+    const protectionData = calculateProtectionData(expenseCategories, summaryLifeCover, familyMembers, policies);
+    const healthData = calculateHealthInsuranceData(summaryHealthCover, hasHealthInsurance, familyMembers, policies);
     const emergencyHave = getEmergencyFundAmount(assetCategories, contingencyFund);
     const contingencyData = calculateContingencyData(expenseCategories, emergencyHave, familyMembers);
 

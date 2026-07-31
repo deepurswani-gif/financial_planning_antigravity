@@ -5,17 +5,12 @@
  */
 
 export const SUMMARY_QUESTION_IDS_BY_SECTION = Object.freeze({
-  profile: ['name-mobile', 'dob-retirement', 'occupation'],
-  cashFlow: ['household-income', 'monthly-expenses', 'insurance-premiums', 'emi-commitments'],
-  savings: [
-    'monthly-investments',
-    'other-savings',
-    'life-insurance-cover',
-    'health-insurance-cover',
-  ],
-  assets: ['portfolio-value', 'emergency-fund', 'real-estate-assets'],
-  liabilities: ['outstanding-loans', 'credit-card', 'other-payables'],
-  goals: ['SELECT', 'YEARS', 'VALUE', 'SUMMARY', 'INTRO'],
+  profile: ['personal-details', 'occupation'],
+  cashFlow: ['household-income', 'monthly-outflows'],
+  savings: ['savings-investments', 'insurance-protection'],
+  assets: ['current-assets'],
+  liabilities: ['current-liabilities'],
+  goals: ['SELECT', 'DETAILS', 'SUMMARY'],
 });
 
 /**
@@ -68,6 +63,13 @@ export const DETAILED_QUESTION_IDS_BY_SECTION = Object.freeze({
  * getFieldIdsForLegacyQuestion(questionId, sectionId).
  */
 export const LEGACY_QUESTION_TO_FIELDS = Object.freeze({
+  'personal-details': [
+    'family.self.name',
+    'family.self.mobile',
+    'family.self.dob',
+    'family.self.retirementAge',
+  ],
+  // Aliases for pre-merge question ids
   'name-mobile': ['family.self.name', 'family.self.mobile'],
   'dob-retirement': ['family.self.dob', 'family.self.retirementAge'],
   occupation: ['family.self.employmentType'],
@@ -76,20 +78,44 @@ export const LEGACY_QUESTION_TO_FIELDS = Object.freeze({
     'income.hasSpouseIncome',
     'income.spouse.monthlyTakeHome',
   ],
+  'monthly-outflows': [
+    'expenses.household.monthlyTotal',
+    'expenses.insurance.monthlyPremiumTotal',
+    'debt.hasEmi',
+    'debt.emi.monthlyTotal',
+  ],
   'monthly-expenses': ['expenses.household.monthlyTotal'],
   'insurance-premiums': ['expenses.insurance.monthlyPremiumTotal'],
   'emi-commitments': ['debt.hasEmi', 'debt.emi.monthlyTotal'],
+  'savings-investments': ['savings.monthlyInvestments', 'savings.otherMonthlySavings'],
   'monthly-investments': ['savings.monthlyInvestments'],
   'other-savings': ['savings.otherMonthlySavings'],
+  'insurance-protection': [
+    'protection.life.hasCoverage',
+    'protection.life.totalCover',
+    'protection.health.hasCoverage',
+    'protection.health.totalCover',
+  ],
   'life-insurance-cover': ['protection.life.hasCoverage', 'protection.life.totalCover'],
   'health-insurance-cover': ['protection.health.hasCoverage', 'protection.health.totalCover'],
+  'current-assets': [
+    'assets.portfolioValue',
+    'assets.emergencyFund',
+    'assets.realEstateValue',
+  ],
   'portfolio-value': ['assets.portfolioValue'],
   'emergency-fund': ['assets.emergencyFund'],
   'real-estate-assets': ['assets.realEstateValue'],
+  'current-liabilities': [
+    'liabilities.outstandingLoans',
+    'liabilities.creditCardDues',
+    'liabilities.otherPayables',
+  ],
   'outstanding-loans': ['liabilities.outstandingLoans'],
   'credit-card': ['liabilities.creditCardDues'],
   'other-payables': ['liabilities.otherPayables'],
   SELECT: ['goals.items', 'goals.item.name'],
+  DETAILS: ['goals.item.yearsToGoal', 'goals.item.presentValue'],
   YEARS: ['goals.item.yearsToGoal'],
   VALUE: ['goals.item.presentValue'],
 

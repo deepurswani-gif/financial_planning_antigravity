@@ -32,7 +32,7 @@ export const LIABILITY_FIELDS = [
       {
         flow: 'summary',
         sectionId: SECTION_IDS.LIABILITIES,
-        questionId: 'outstanding-loans',
+        questionId: 'current-liabilities',
         capability: 'summary',
         role: 'primary',
       },
@@ -78,7 +78,7 @@ export const LIABILITY_FIELDS = [
       {
         flow: 'summary',
         sectionId: SECTION_IDS.LIABILITIES,
-        questionId: 'credit-card',
+        questionId: 'current-liabilities',
         capability: 'summary',
         role: 'primary',
       },
@@ -114,7 +114,7 @@ export const LIABILITY_FIELDS = [
       {
         flow: 'summary',
         sectionId: SECTION_IDS.LIABILITIES,
-        questionId: 'other-payables',
+        questionId: 'current-liabilities',
         capability: 'summary',
         role: 'primary',
       },

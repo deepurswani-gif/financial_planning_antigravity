@@ -23,7 +23,7 @@ const InsuranceInput = ({ familyMembers, policies, setPolicies, isProposed = fal
         const newPolicy = {
             id: newId,
             insuredName: memberName,
-            company: '', planName: '', planType: 'Saving Plan',
+            company: '', planName: '', planType: 'Term Insurance',
             premium: '', frequency: 'Annually', paymentTerm: '',
             policyTerm: '', startDate: '', endDate: '',
             sumAssured: '', maturityAmount: '', isProposed
@@ -38,8 +38,9 @@ const InsuranceInput = ({ familyMembers, policies, setPolicies, isProposed = fal
     return (
         <div className="insurance-input">
             {familyMembers.map((member, mIdx) => {
-                const memberPolicies = policies.filter(p => p.insuredName === member.name && !!p.isProposed === isProposed);
-                const initials = member.name?.split(' ').map(n=>n[0]).join('').substring(0,2) || 'FM';
+                const memberKey = member.name || member.relation;
+                const memberPolicies = policies.filter(p => p.insuredName === memberKey && !!p.isProposed === isProposed);
+                const initials = (member.name || member.relation || 'FM')?.split(' ').map(n=>n[0]).join('').substring(0,2) || 'FM';
                 const isSelf = member.relation?.toLowerCase() === 'self';
                 const isChild = member.relation?.toLowerCase() === 'child';
                 
@@ -54,11 +55,11 @@ const InsuranceInput = ({ familyMembers, policies, setPolicies, isProposed = fal
                             <div className="member-identity">
                                 <div className="avatar" style={{ background: avatarColor }}>{initials.toUpperCase()}</div>
                                 <div>
-                                    <div className="member-name">{member.name || 'Unnamed'}</div>
+                                    <div className="member-name">{member.name || member.relation || 'Unnamed'}</div>
                                     <div className="member-role" style={{ background: roleBg, color: roleColor }}>{member.relation}</div>
                                 </div>
                             </div>
-                            <button className="add-btn" onClick={() => addPolicy(member.name)}>
+                            <button className="add-btn" onClick={() => addPolicy(memberKey)}>
                                 <Plus size={18} /> Add Policy
                             </button>
                         </div>
@@ -69,7 +70,7 @@ const InsuranceInput = ({ familyMembers, policies, setPolicies, isProposed = fal
                                     <div style={{ marginBottom: '1rem', opacity: 0.3, display: 'flex', justifyContent: 'center' }}>
                                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                                     </div>
-                                    <p>No policies recorded for {member.name.split(' ')[0]} yet.</p>
+                                    <p>No policies recorded for {(member.name || member.relation || 'this member').split(' ')[0]} yet.</p>
                                 </div>
                             ) : (
                                 memberPolicies.map((p) => (

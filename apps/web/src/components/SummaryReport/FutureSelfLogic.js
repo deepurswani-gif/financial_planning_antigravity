@@ -4,7 +4,7 @@
  */
 
 import { calculateFutureCost } from '../GoalModule/GoalLogic';
-import { getSavingsMonthlyAmount } from '../DetailedFlow/savingsDetailSync';
+import { getGrowthSavingsMonthly } from '../DetailedFlow/savingsDetailSync';
 import { computeSIPProjection } from './MoneyStoryLogic';
 
 export const HORIZON_YEARS = 5;
@@ -32,13 +32,13 @@ export const getValidGoals = (goals) =>
 
 /**
  * Monthly investment amount used for goal-readiness projections.
- * Prefers detailed-flow SIP; falls back to summary-flow consolidated investments.
+ * Prefers detailed growth savings (SIP + PPF + NPS); falls back to summary investments.
  * Excludes safer "other savings" (FDs, RDs, etc.).
  */
 export const getMonthlyInvestmentForProjection = (expenseCategories = {}) => {
-    const sipAmount = getSavingsMonthlyAmount(expenseCategories.savings?.sip);
-    if (sipAmount > 0) {
-        return { amount: sipAmount, source: 'detailed_sip' };
+    const growthAmount = getGrowthSavingsMonthly(expenseCategories);
+    if (growthAmount > 0) {
+        return { amount: growthAmount, source: 'detailed_growth' };
     }
 
     const summaryInvest = parseFloat(expenseCategories.summaryMonthlyInvestments) || 0;

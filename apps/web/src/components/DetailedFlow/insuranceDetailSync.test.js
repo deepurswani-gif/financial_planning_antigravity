@@ -6,6 +6,9 @@ import {
     reconcileMemberLifePremiumSummary,
     sumPolicySumAssured,
     sumHealthPolicyCover,
+    getEffectiveLifeCover,
+    getEffectiveHealthCover,
+    deriveSummaryCoverWriteBack,
     deriveLifeMemberTotals,
     applyLifeEntryUpdate,
     getLifeMemberMonthlyTotal,
@@ -47,6 +50,72 @@ describe('insuranceDetailSync cover reconciliation', () => {
             { planType: 'Health Insurance', sumAssured: '500000', isProposed: false },
             { planType: 'Term Insurance', sumAssured: '10000000', isProposed: false },
         ])).toBe(500000);
+    });
+
+    it('getEffectiveLifeCover prefers detailed sum assured over summary', () => {
+        expect(getEffectiveLifeCover('0', [
+            { planType: 'Term Insurance', sumAssured: '10000000', isProposed: false },
+        ])).toBe(10000000);
+    });
+
+    it('getEffectiveLifeCover counts Saving Plan and ULIP sum assured', () => {
+        expect(getEffectiveLifeCover('0', [
+            { planType: 'Saving Plan', sumAssured: '7500000', isProposed: false },
+        ])).toBe(7500000);
+        expect(getEffectiveLifeCover('0', [
+            { planType: 'ULIP', sumAssured: '2000000', isProposed: false },
+        ])).toBe(2000000);
+    });
+
+    it('getEffectiveLifeCover ignores health policies when summing life cover', () => {
+        expect(getEffectiveLifeCover('0', [
+            { planType: 'Health Insurance', sumAssured: '500000', isProposed: false },
+            { planType: 'Saving Plan', sumAssured: '7500000', isProposed: false },
+        ])).toBe(7500000);
+    });
+
+    it('getEffectiveLifeCover falls back to summary when policies have no cover', () => {
+        expect(getEffectiveLifeCover('5000000', [
+            { planType: 'Term Insurance', sumAssured: '', isProposed: false },
+        ])).toBe(5000000);
+    });
+
+    it('getEffectiveLifeCover ignores proposed policies', () => {
+        expect(getEffectiveLifeCover('0', [
+            { planType: 'Term Insurance', sumAssured: '10000000', isProposed: true },
+        ])).toBe(0);
+    });
+
+    it('getEffectiveHealthCover prefers detailed cover and overrides hasHealthInsurance false', () => {
+        expect(getEffectiveHealthCover('', false, [
+            { planType: 'Health Insurance', sumAssured: '1500000', isProposed: false },
+        ])).toBe(1500000);
+    });
+
+    it('getEffectiveHealthCover returns 0 when summary said no and no detailed cover', () => {
+        expect(getEffectiveHealthCover('500000', false, [])).toBe(0);
+    });
+
+    it('getEffectiveHealthCover uses summary when detail empty and has cover', () => {
+        expect(getEffectiveHealthCover('800000', true, [])).toBe(800000);
+    });
+
+    it('deriveSummaryCoverWriteBack writes life and health when detailed cover exists', () => {
+        expect(deriveSummaryCoverWriteBack([
+            { planType: 'Term Insurance', sumAssured: '10000000', isProposed: false },
+            { planType: 'Health Insurance', sumAssured: '500000', isProposed: false },
+        ])).toEqual({
+            summaryLifeCover: '10000000',
+            hasLifeInsurance: true,
+            summaryHealthCover: '500000',
+            hasHealthInsurance: true,
+        });
+    });
+
+    it('deriveSummaryCoverWriteBack returns empty patch when no detailed cover', () => {
+        expect(deriveSummaryCoverWriteBack([
+            { planType: 'Term Insurance', sumAssured: '', isProposed: false },
+        ])).toEqual({});
     });
 
     it('reconcileMemberLifePremium compares cash-flow vs policy-details premium per member', () => {
