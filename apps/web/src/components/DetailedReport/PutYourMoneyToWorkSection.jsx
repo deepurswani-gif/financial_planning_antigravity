@@ -1900,8 +1900,9 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
 
                 .dr-reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.65s cubic-bezier(0.16,1,0.3,1), transform 0.65s cubic-bezier(0.16,1,0.3,1); }
                 .dr-reveal.dr-visible { opacity: 1; transform: translateY(0); }
-                .dr-chart-tooltip { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.75rem; font-size: 0.82rem; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-                .dr-chart-tooltip-label { font-weight: 700; margin-bottom: 0.25rem; }
+                /* Scope under .pymtw-section so keep-alive sibling report styles cannot clash with YMF dark tooltips */
+                .pymtw-section .dr-chart-tooltip { background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.75rem; font-size: 0.82rem; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+                .pymtw-section .dr-chart-tooltip-label { font-weight: 700; margin-bottom: 0.25rem; }
 
                 .pymtw-zone-a {
                     padding: 1.5rem;

@@ -1,5 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Trash2, TrendingUp, Wallet, Calendar, Calculator, Clock } from 'lucide-react';
+import React, { useEffect, useMemo, useCallback } from 'react';
+import { TrendingUp, Wallet, Calculator, Clock } from 'lucide-react';
+import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
+import WhatIfExplorer from './WhatIfExplorer';
 
 export const computeSIPData = (currentYear, monthlySIP, expectedReturns, tenureYears, currentValue, events, proposedSIPs, goalMappings = {}, goals = []) => {
     let results = [];
@@ -24,10 +26,10 @@ export const computeSIPData = (currentYear, monthlySIP, expectedReturns, tenureY
         });
 
         for (let month = 1; month <= 12; month++) {
-            // 1. Manual Increments
+            // 1. Manual / what-if increments (permanent monthly SIP step-up)
             const increments = events.filter(e => e.type === 'increment' && parseInt(e.month) === month && parseInt(e.year) === actualYear);
             increments.forEach(inc => {
-                runningSIP += inc.amount;
+                runningSIP += parseFloat(inc.amount) || 0;
             });
 
             // 2. Proposed SIPs from Allocation Module
@@ -36,21 +38,21 @@ export const computeSIPData = (currentYear, monthlySIP, expectedReturns, tenureY
                 runningSIP += (parseFloat(s.amount) / 12) || 0;
             });
 
-            // 3. Withdrawals (Manual + Auto Roadmap mapped in January)
+            // 3. Withdrawals (Manual/what-if + Auto Roadmap mapped in January)
             const withdrawals = events.filter(e => e.type === 'withdrawal' && parseInt(e.month) === month && parseInt(e.year) === actualYear);
-            let currentMonthWithdrawal = withdrawals.reduce((sum, w) => sum + w.amount, 0);
+            let currentMonthWithdrawal = withdrawals.reduce((sum, w) => sum + (parseFloat(w.amount) || 0), 0);
             if (month === 1) {
                 currentMonthWithdrawal += totalRoadmapWithdrawalThisYear;
             }
 
             const monthlyInvestment = runningSIP;
             yearlyInvestment += monthlyInvestment;
-            
+
             const monthlyRate = expectedReturns / 1200;
             const valueBeforeGrowth = runningBalance + monthlyInvestment;
             const growth = valueBeforeGrowth * monthlyRate;
             const valueBeforeWithdrawal = valueBeforeGrowth + growth;
-            
+
             runningBalance = valueBeforeWithdrawal - currentMonthWithdrawal;
             yearlyWithdrawal += currentMonthWithdrawal;
         }
@@ -67,20 +69,18 @@ export const computeSIPData = (currentYear, monthlySIP, expectedReturns, tenureY
     return results;
 };
 
-import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
-
 const SIPCalculator = ({ calculatorKey = "sip" }) => {
     const { expenseCategories, assetCategories, familyMembers = [], investmentAllocations = [], goalMappings = {}, goals = [], calculatorInputs, setCalculatorInputs } = useFinancialPlan();
     const data = calculatorInputs[calculatorKey] || {};
     const setData = (newData) => setCalculatorInputs(prev => ({ ...prev, [calculatorKey]: typeof newData === 'function' ? newData(prev[calculatorKey] || {}) : newData }));
     const proposedSIPs = investmentAllocations.filter(a => a.type === 'SIP');
     const currentYear = new Date().getFullYear();
-    
-    // ... logic to get years to retire ...
+    const currentMonth = new Date().getMonth() + 1;
+
     const getYearsToRetire = () => {
         const self = familyMembers.find(m => m.relation?.toLowerCase() === 'self');
-        if (!self || !self.dob) return 10; 
-        
+        if (!self || !self.dob) return 10;
+
         const birthDate = new Date(self.dob);
         const today = new Date();
         let age = today.getFullYear() - birthDate.getFullYear();
@@ -88,77 +88,60 @@ const SIPCalculator = ({ calculatorKey = "sip" }) => {
         if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
             age--;
         }
-        
+
         const retirementAge = parseInt(self.retirementAge) || 60;
         const yearsRemaining = retirementAge - age;
         return yearsRemaining > 0 ? yearsRemaining : 0;
     };
 
-    // Initial values from props
     const defaultSIP = parseFloat(expenseCategories?.savings?.sip?.amount !== undefined ? expenseCategories.savings.sip.amount : expenseCategories?.savings?.sip) || 0;
     const defaultCorpus = parseFloat(assetCategories?.investments?.mutualFunds) || parseFloat(assetCategories?.equity?.mfEquity) || parseFloat(assetCategories?.equity?.stocks) || 0;
     const defaultTenure = getYearsToRetire() || 10;
 
-    // Use props if available, otherwise defaults
     const monthlySIP = defaultSIP;
     const expectedReturns = data?.rate ?? 12;
     const tenureYears = data?.tenure ?? defaultTenure;
     const currentValue = defaultCorpus;
-    const events = data?.increments ?? [];
 
     useEffect(() => {
         let updated = false;
         let newData = { ...data };
-        
+
         if ((!data?.amount) && defaultSIP > 0) {
             newData.amount = defaultSIP;
             updated = true;
         }
-        
+
         if ((!data?.currentValue) && defaultCorpus > 0) {
             newData.currentValue = defaultCorpus;
             updated = true;
         }
-        
+
         if (updated && setData) {
             setData(newData);
         }
     }, [defaultSIP, defaultCorpus]);
 
-    const setMonthlySIP = (val) => setData({ ...data, amount: val });
     const setExpectedReturns = (val) => setData({ ...data, rate: val });
     const setTenureYears = (val) => setData({ ...data, tenure: val });
-    const setCurrentValue = (val) => setData({ ...data, currentValue: val });
-    const setEvents = (val) => setData({ ...data, increments: typeof val === 'function' ? val(events) : val });
 
-    // Month Names Helper
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    
-    // Year Options (Current Year to + 50)
-    const yearOptions = Array.from({ length: 51 }, (_, i) => currentYear + i);
 
-    const addEvent = (type) => {
-        setEvents([...events, { 
-            id: Date.now(),
-            type, 
-            amount: 0, 
-            month: 1, 
-            year: currentYear 
-        }]);
-    };
-
-    const removeEvent = (id) => {
-        setEvents(events.filter(e => e.id !== id));
-    };
-
-    const updateEvent = (id, field, value) => {
-        setEvents(events.map(e => e.id === id ? { ...e, [field]: parseFloat(value) || 0 } : e));
-    };
-
-    // Calculation Logic
+    // Baseline projection: modules + PYMTW only (ignore saved free-form increments)
     const calculationData = useMemo(() => {
+        return computeSIPData(currentYear, monthlySIP, expectedReturns, tenureYears, currentValue, [], proposedSIPs, goalMappings, goals);
+    }, [monthlySIP, expectedReturns, tenureYears, currentValue, currentYear, proposedSIPs, goalMappings, goals]);
+
+    const runProjection = useCallback((events) => {
         return computeSIPData(currentYear, monthlySIP, expectedReturns, tenureYears, currentValue, events, proposedSIPs, goalMappings, goals);
-    }, [monthlySIP, expectedReturns, tenureYears, currentValue, events, currentYear, proposedSIPs, goalMappings, goals]);
+    }, [currentYear, monthlySIP, expectedReturns, tenureYears, currentValue, proposedSIPs, goalMappings, goals]);
+
+    const maxYear = currentYear + Math.max(tenureYears, 1) - 1;
+    const hasLinkedItems = proposedSIPs.length > 0 || goals.some(g => {
+        const mappedAmt = (goalMappings[g.id] || {})['sip'] || 0;
+        const gYear = currentYear + Math.round(parseFloat(g.yearsToGoal) || 0);
+        return mappedAmt > 0 && gYear >= currentYear && gYear <= maxYear;
+    });
 
     return (
         <div className="fade-in" style={{ padding: '1rem' }}>
@@ -171,181 +154,127 @@ const SIPCalculator = ({ calculatorKey = "sip" }) => {
                     </div>
                 </div>
 
-                {/* Main Grid: Inputs on left (Narrow), Results on right (Wide) */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
-                    
+
                     {/* SECTION 1: PRIMARY INPUTS */}
                     <div style={{ background: 'var(--bg-card)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border)' }}>
                         <h3 style={{ margin: '0 0 1.25rem 0', fontSize: '1.1rem', color: 'var(--text-main)' }}>Primary Parameters</h3>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
-                        <div className="form-group">
-                            <label><Wallet size={16} /> Monthly Amount of SIP (₹)</label>
-                            <input 
-                                type="number" 
-                                value={monthlySIP} 
-                                readOnly
-                                className="form-input bg-muted" 
-                                style={{ opacity: 0.7, cursor: 'not-allowed' }}
-                            />
-                        </div>
+                            <div className="form-group">
+                                <label><Wallet size={16} /> Monthly Amount of SIP (₹)</label>
+                                <input
+                                    type="number"
+                                    value={monthlySIP}
+                                    readOnly
+                                    className="form-input bg-muted"
+                                    style={{ opacity: 0.7, cursor: 'not-allowed' }}
+                                />
+                            </div>
 
-                        <div className="form-group">
-                            <label><TrendingUp size={16} /> Expected Returns (%)</label>
-                            <input 
-                                type="number" 
-                                value={expectedReturns} 
-                                onChange={(e) => setExpectedReturns(parseFloat(e.target.value) || 0)} 
-                                className="form-input" 
-                            />
-                        </div>
+                            <div className="form-group">
+                                <label><TrendingUp size={16} /> Expected Returns (%)</label>
+                                <input
+                                    type="number"
+                                    value={expectedReturns}
+                                    onChange={(e) => setExpectedReturns(parseFloat(e.target.value) || 0)}
+                                    className="form-input"
+                                />
+                            </div>
 
-                        <div className="form-group">
-                            <label><Clock size={16} /> Tenure in Years</label>
-                            <input 
-                                type="number" 
-                                value={tenureYears} 
-                                onChange={(e) => setTenureYears(parseInt(e.target.value) || 0)} 
-                                className="form-input" 
-                            />
-                        </div>
+                            <div className="form-group">
+                                <label><Clock size={16} /> Tenure in Years</label>
+                                <input
+                                    type="number"
+                                    value={tenureYears}
+                                    onChange={(e) => setTenureYears(parseInt(e.target.value) || 0)}
+                                    className="form-input"
+                                />
+                            </div>
 
-                        <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-                            <label>Current Portfolio Value (₹)</label>
-                            <input 
-                                type="number" 
-                                value={currentValue} 
-                                readOnly
-                                className="form-input bg-muted" 
-                                style={{ opacity: 0.7, cursor: 'not-allowed' }}
-                            />
-                        </div>
-
+                            <div className="form-group">
+                                <label>Current Portfolio Value (₹)</label>
+                                <input
+                                    type="number"
+                                    value={currentValue}
+                                    readOnly
+                                    className="form-input bg-muted"
+                                    style={{ opacity: 0.7, cursor: 'not-allowed' }}
+                                />
+                            </div>
                         </div>
                     </div>
 
-                    {/* SECTION 2: INCREMENTAL ADJUSTMENTS */}
+                    {/* SECTION 2: LINKED PLAN ITEMS (read-only) */}
                     <div style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border)', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                                <h3 style={{ margin: 0, fontSize: '1rem' }}>Incremental Adjustments</h3>
-                                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                    <button className="btn" onClick={() => addEvent('increment')} title="Add Increment" style={{ width: '32px', height: '32px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ecfdf5', color: '#059669', border: '1px solid #10b981' }}>
-                                        <Plus size={18} />
-                                    </button>
-                                    <button className="btn" onClick={() => addEvent('withdrawal')} title="Add Withdrawal" style={{ width: '32px', height: '32px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff1f2', color: '#e11d48', border: '1px solid #f43f5e' }}>
-                                        <Trash2 size={18} />
-                                    </button>
-                                </div>
-                            </div>
-
+                        <h3 style={{ margin: '0 0 1.25rem 0', fontSize: '1rem' }}>Linked from your plan</h3>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
-                                {proposedSIPs.map((s) => (
-                                    <div key={`proposed-${s.id}`} className="card" style={{ padding: '1rem', border: '1px solid var(--primary)', background: '#f0f9ff', position: 'relative' }}>
-                                        <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--primary)', marginBottom: '0.5rem' }}>
-                                            ALLOCATION MODULE: {s.type}
+                            {proposedSIPs.map((s) => (
+                                <div key={`proposed-${s.id}`} className="card" style={{ padding: '1rem', border: '1px solid var(--primary)', background: '#f0f9ff', position: 'relative' }}>
+                                    <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--primary)', marginBottom: '0.5rem' }}>
+                                        ALLOCATION MODULE: {s.type}
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                            <label style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase' }}>Amount (₹)</label>
+                                            <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>₹{(parseFloat(s.amount) / 12).toLocaleString('en-IN')} / mo</div>
                                         </div>
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                                <label style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase' }}>Amount (₹)</label>
-                                                <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>₹{(parseFloat(s.amount) / 12).toLocaleString('en-IN')} / mo</div>
-                                            </div>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                                <label style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase' }}>Starts</label>
-                                                <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{monthNames[s.startMonth - 1]} {s.startYear}</div>
-                                            </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                            <label style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase' }}>Starts</label>
+                                            <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{monthNames[s.startMonth - 1]} {s.startYear}</div>
                                         </div>
                                     </div>
-                                ))}
+                                </div>
+                            ))}
 
-                                {/* Roadmap Module Auto-Withdrawals */}
-                                {goals.flatMap(g => {
-                                    const mappedAmt = (goalMappings[g.id] || {})['sip'] || 0;
-                                    const gYear = currentYear + Math.round(parseFloat(g.yearsToGoal) || 0);
-                                    if (mappedAmt > 0 && gYear >= currentYear && gYear <= currentYear + tenureYears) {
-                                        return [(
-                                            <div key={`roadmap-sip-${g.id}`} className="card" style={{ padding: '1rem', border: '1px solid #f59e0b', background: '#fffbeb', position: 'relative' }}>
-                                                <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', color: '#d97706', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                    <Calculator size={12} /> FULFILLMENT ROADMAP
+                            {goals.flatMap(g => {
+                                const mappedAmt = (goalMappings[g.id] || {})['sip'] || 0;
+                                const gYear = currentYear + Math.round(parseFloat(g.yearsToGoal) || 0);
+                                if (mappedAmt > 0 && gYear >= currentYear && gYear <= maxYear) {
+                                    return [(
+                                        <div key={`roadmap-sip-${g.id}`} className="card" style={{ padding: '1rem', border: '1px solid #f59e0b', background: '#fffbeb', position: 'relative' }}>
+                                            <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', color: '#d97706', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                <Calculator size={12} /> FULFILLMENT ROADMAP
+                                            </div>
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                                    <label style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase' }}>Auto Withdrawal (₹)</label>
+                                                    <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>₹{parseFloat(mappedAmt).toLocaleString('en-IN')}</div>
                                                 </div>
-                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                                        <label style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase' }}>Auto Withdrawal (₹)</label>
-                                                        <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>₹{parseFloat(mappedAmt).toLocaleString('en-IN')}</div>
-                                                    </div>
-                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                                        <label style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase' }}>Goal Year</label>
-                                                        <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{gYear} ({g.name || 'Goal'})</div>
-                                                    </div>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                                    <label style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase' }}>Goal Year</label>
+                                                    <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{gYear} ({g.name || 'Goal'})</div>
                                                 </div>
-                                            </div>
-                                        )];
-                                    }
-                                    return [];
-                                })}
-
-                                {events.map((event) => (
-                                    <div key={event.id} className="card" style={{ padding: '1rem', border: `1px solid ${event.type === 'increment' ? '#10b981' : '#f43f5e'}`, background: 'var(--bg-main)', position: 'relative' }}>
-                                        <button 
-                                            onClick={() => removeEvent(event.id)} 
-                                            style={{ position: 'absolute', top: '4px', right: '4px', color: '#ef4444', background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px' }}
-                                        >
-                                            <Trash2 size={14} />
-                                        </button>
-                                        
-                                        {/* 2x2 Table Layout for Event Form */}
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                                            {/* Row 1: Type and Amount */}
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                                <label style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', color: event.type === 'increment' ? '#059669' : '#e11d48' }}>Type</label>
-                                                <div style={{ fontSize: '0.8rem', fontWeight: 600 }}>{event.type === 'increment' ? 'INCREMENT' : 'WITHDRAWAL'}</div>
-                                            </div>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                                <label style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase' }}>Amount (₹)</label>
-                                                <input 
-                                                    type="number" 
-                                                    value={event.amount} 
-                                                    onChange={(e) => updateEvent(event.id, 'amount', e.target.value)}
-                                                    style={{ padding: '0.4rem', fontSize: '0.85rem', width: '100%', borderRadius: '4px', border: '1px solid var(--border)' }}
-                                                    placeholder="Enter amount"
-                                                />
-                                            </div>
-
-                                            {/* Row 2: Month and Year */}
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                                <label style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase' }}>Month</label>
-                                                <select 
-                                                    value={event.month} 
-                                                    onChange={(e) => updateEvent(event.id, 'month', e.target.value)}
-                                                    style={{ padding: '0.4rem', fontSize: '0.85rem', borderRadius: '4px', border: '1px solid var(--border)' }}
-                                                >
-                                                    {monthNames.map((m, i) => <option key={m} value={i+1}>{m}</option>)}
-                                                </select>
-                                            </div>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                                <label style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase' }}>Year</label>
-                                                <select 
-                                                    value={event.year} 
-                                                    onChange={(e) => updateEvent(event.id, 'year', e.target.value)}
-                                                    style={{ padding: '0.4rem', fontSize: '0.85rem', borderRadius: '4px', border: '1px solid var(--border)' }}
-                                                >
-                                                    {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
-                                                </select>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
-                                {events.length === 0 && proposedSIPs.length === 0 && <p className="text-muted" style={{ fontSize: '0.85rem', textAlign: 'center', border: '1px dashed var(--border)', padding: '1rem', borderRadius: '8px' }}>No incremental adjustments added.</p>}
-                            </div>
-                            </div>
+                                    )];
+                                }
+                                return [];
+                            })}
+
+                            {!hasLinkedItems && (
+                                <p className="text-muted" style={{ fontSize: '0.85rem', textAlign: 'center', width: '100%', border: '1px dashed var(--border)', padding: '1rem', borderRadius: '8px', margin: 0 }}>
+                                    No allocation or roadmap items linked yet.
+                                </p>
+                            )}
+                        </div>
                     </div>
 
-                    {/* SECTION 3: OUTPUT (Wide) */}
+                    {/* SECTION 3: WHAT-IF EXPLORER */}
+                    <WhatIfExplorer
+                        mode="sip"
+                        runProjection={runProjection}
+                        minYear={currentYear}
+                        maxYear={maxYear}
+                        defaultMonth={currentMonth}
+                        defaultYear={currentYear}
+                    />
+
+                    {/* SECTION 4: OUTPUT */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                        
-                        {/* Summary Header */}
-                        <div style={{ 
-                            padding: '2rem', 
-                            background: 'linear-gradient(135deg, var(--primary) 0%, #1e40af 100%)', 
-                            borderRadius: '16px', 
+                        <div style={{
+                            padding: '2rem',
+                            background: 'linear-gradient(135deg, var(--primary) 0%, #1e40af 100%)',
+                            borderRadius: '16px',
                             color: 'white',
                             boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
                         }}>
@@ -365,11 +294,10 @@ const SIPCalculator = ({ calculatorKey = "sip" }) => {
                             </div>
                         </div>
 
-                        {/* Detailed Table (Large Width) */}
-                        <div style={{ 
-                            background: 'var(--bg-card)', 
-                            borderRadius: '12px', 
-                            border: '1px solid var(--border)', 
+                        <div style={{
+                            background: 'var(--bg-card)',
+                            borderRadius: '12px',
+                            border: '1px solid var(--border)',
                             overflow: 'hidden',
                             boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
                         }}>
@@ -387,7 +315,7 @@ const SIPCalculator = ({ calculatorKey = "sip" }) => {
                                     </thead>
                                     <tbody>
                                         {calculationData.map((row, idx) => (
-                                            <tr key={row.year} style={{ 
+                                            <tr key={row.year} style={{
                                                 borderBottom: '1px solid var(--border)',
                                                 background: idx % 2 === 0 ? 'transparent' : '#fcfcfc'
                                             }}>
@@ -410,6 +338,7 @@ const SIPCalculator = ({ calculatorKey = "sip" }) => {
                     </div>
                 </div>
             </div>
+        </div>
     );
 };
 

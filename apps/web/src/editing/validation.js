@@ -7,6 +7,7 @@
  */
 
 import { getFieldById } from '../questionRegistry';
+import { validateISODate } from '../utils/dateFormat';
 
 /**
  * @typedef {object} FieldValidationResult
@@ -35,10 +36,14 @@ export function coerceValue(valueType, raw) {
       if (raw === 'true') return true;
       if (raw === 'false') return false;
       return Boolean(raw);
+    case 'date': {
+      if (raw === '') return '';
+      const result = validateISODate(String(raw).trim());
+      return result.valid ? result.iso : String(raw).trim();
+    }
     case 'text':
     case 'tel':
     case 'enum':
-    case 'date':
     default:
       return raw;
   }
@@ -79,6 +84,15 @@ export function validateFieldValue(field, raw) {
       if (typeof rules.max === 'number' && value > rules.max) {
         errors.push(`${field.shortLabel ?? field.label} must be at most ${rules.max}`);
       }
+    }
+  }
+
+  if (!isEmpty && field.valueType === 'date') {
+    const min = typeof rules.min === 'string' ? rules.min : '';
+    const max = typeof rules.max === 'string' ? rules.max : '';
+    const dateResult = validateISODate(value, { min, max });
+    if (!dateResult.valid) {
+      errors.push(`${field.shortLabel ?? field.label}: ${dateResult.error}`);
     }
   }
 

@@ -2,6 +2,8 @@ import React from 'react';
 import { Plus, User, Trash2, HelpCircle } from 'lucide-react';
 import { calculatePolicyEndDate } from './InsuranceLogic';
 import CurrencyInput from '../common/CurrencyInput';
+import DateInput from '../common/DateInput';
+import { todayISO } from '../../utils/dateFormat';
 
 const InsuranceInput = ({ familyMembers, policies, setPolicies, isProposed = false, investmentAllocations = [] }) => {
 
@@ -166,14 +168,30 @@ const InsuranceInput = ({ familyMembers, policies, setPolicies, isProposed = fal
                                             <div className="input-group">
                                                 <label>{isProposed ? 'Proposed Start Date' : 'Policy Start Date'}</label>
                                                 {isProposed ? (
-                                                    <input type="month" value={p.startDate ? p.startDate.substring(0, 7) : ''} readOnly className="input-field calc" />
+                                                    <DateInput
+                                                        value={p.startDate || ''}
+                                                        readOnly
+                                                        showCalendarButton={false}
+                                                        className="input-field calc"
+                                                    />
                                                 ) : (
-                                                    <input type="date" value={p.startDate} max={new Date().toISOString().split('T')[0]} onChange={e => updatePolicy(p.id, 'startDate', e.target.value)} onBlur={e => { const val = e.target.value; if (!val) return; const today = new Date().toISOString().split('T')[0]; if (val > today) { updatePolicy(p.id, 'startDate', today); } }} className="input-field" />
+                                                    <DateInput
+                                                        value={p.startDate || ''}
+                                                        max={todayISO()}
+                                                        clampOnBlur
+                                                        className="input-field"
+                                                        onChange={(iso) => updatePolicy(p.id, 'startDate', iso)}
+                                                    />
                                                 )}
                                             </div>
                                             <div className="input-group">
                                                 <label>Policy End Date</label>
-                                                <input type="date" value={p.endDate} readOnly className="input-field calc" />
+                                                <DateInput
+                                                    value={p.endDate || ''}
+                                                    readOnly
+                                                    showCalendarButton={false}
+                                                    className="input-field calc"
+                                                />
                                             </div>
                                             
                                         </div>

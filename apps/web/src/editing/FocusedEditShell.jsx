@@ -1,6 +1,7 @@
 import React from 'react';
 import { useEditing } from './EditingProvider';
 import { EDIT_STATES } from './editSessionMachine';
+import DateInput from '../components/common/DateInput';
 import './focusedEdit.css';
 
 /**
@@ -32,13 +33,17 @@ function FieldControl({ field, value, onChange, disabled }) {
   }
 
   if (valueType === 'date') {
+    const min = typeof field?.validation?.min === 'string' ? field.validation.min : '';
+    const max = typeof field?.validation?.max === 'string' ? field.validation.max : '';
     return (
-      <input
+      <DateInput
         className="fe-input"
-        type="date"
         value={value ?? ''}
         disabled={disabled}
-        onChange={(e) => onChange(e.target.value)}
+        min={min}
+        max={max}
+        onChange={onChange}
+        aria-label={field?.label ?? 'Date'}
       />
     );
   }

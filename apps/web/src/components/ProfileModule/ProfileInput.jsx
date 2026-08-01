@@ -2,6 +2,7 @@ import { User, Calendar, Target, Briefcase, Plus, Trash2, GraduationCap, Phone }
 import { calculateRetirementYear, calculateAge } from './ProfileLogic';
 import { EDUCATION_STANDARDS } from '../JourneyModule/ProjectionLogic';
 import CurrencyInput from '../common/CurrencyInput';
+import DateInput from '../common/DateInput';
 
 const ProfileInput = ({ members, setMembers, onCalculate }) => {
     const handleMemberChange = (index, e) => {
@@ -91,11 +92,11 @@ const ProfileInput = ({ members, setMembers, onCalculate }) => {
 
                         <div className="input-group">
                             <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Calendar size={14} /> Date of Birth <span style={{ color: '#ef4444' }}>*</span></label>
-                            <input
-                                type="date"
+                            <DateInput
                                 name="dob"
                                 value={member.dob}
-                                onChange={(e) => handleMemberChange(index, e)}
+                                required
+                                onChange={(iso) => handleMemberChange(index, { target: { name: 'dob', value: iso } })}
                             />
                             {member.dob && (
                                 <div style={{ fontSize: '0.85rem', color: 'var(--primary)', marginTop: '0.5rem', fontWeight: 600 }}>

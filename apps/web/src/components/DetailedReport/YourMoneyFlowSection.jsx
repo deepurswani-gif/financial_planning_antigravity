@@ -470,8 +470,9 @@ const YourMoneyFlowSection = () => {
                 .dr-chart-sub { margin: 0 0 1rem; font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; }
                 .dr-chart-wrap { width: 100%; min-height: 200px; }
                 .dr-chart-wrap-sm { min-height: 240px; }
-                .dr-chart-tooltip { background: var(--text-main); color: #fff; padding: 0.55rem 0.85rem; border-radius: 8px; font-size: 0.82rem; line-height: 1.5; }
-                .dr-chart-tooltip-label { font-weight: 700; margin-bottom: 0.25rem; }
+                /* Scope under .ymf-section so keep-alive sibling report styles cannot override tooltip colors */
+                .ymf-section .dr-chart-tooltip { background: var(--text-main); color: #fff; padding: 0.55rem 0.85rem; border-radius: 8px; font-size: 0.82rem; line-height: 1.5; }
+                .ymf-section .dr-chart-tooltip-label { font-weight: 700; margin-bottom: 0.25rem; }
                 .dr-chart-legend { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 0.75rem; font-size: 0.78rem; color: var(--text-muted); }
                 .dr-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.35rem; vertical-align: middle; }
                 .dr-dot-income { background: #2563EB; }

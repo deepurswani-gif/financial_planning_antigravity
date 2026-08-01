@@ -3,6 +3,7 @@ import ProgressiveQuestionLayout, { useProgressiveAdvance } from './ProgressiveQ
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 import { calculateAge } from '../ProfileModule/ProfileLogic';
 import { Briefcase } from 'lucide-react';
+import DateInput from '../common/DateInput';
 
 const PersonalDetailsWithAdvance = ({ selfMember, handleSelfChange, retireAge, sliderPercent }) => {
     const { advance } = useProgressiveAdvance();
@@ -46,11 +47,11 @@ const PersonalDetailsWithAdvance = ({ selfMember, handleSelfChange, retireAge, s
                     <h2 className="question-title" style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>
                         What is your Date of Birth?
                     </h2>
-                    <input
-                        type="date"
+                    <DateInput
                         className="conversational-input"
                         value={selfMember.dob || ''}
-                        onChange={(e) => handleSelfChange('dob', e.target.value)}
+                        onChange={(iso) => handleSelfChange('dob', iso)}
+                        aria-label="Date of birth"
                     />
                     {selfMember.dob && (
                         <div style={{ fontSize: '0.85rem', color: 'var(--primary)', marginTop: '0.5rem', fontWeight: 600 }}>
