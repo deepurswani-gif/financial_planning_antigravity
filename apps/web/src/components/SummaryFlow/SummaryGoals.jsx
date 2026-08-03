@@ -17,6 +17,7 @@ import {
     financialWorkspacePath,
 } from '../FinancialWorkspace/workspaceNavConfig';
 import { formatInrInWords } from '../../lib/formatInrInWords';
+import { scrollProgressiveFlowToTop } from './scrollProgressiveFlowToTop';
 
 /* ─── Screen constants (3 screens) ─── */
 const SELECT  = 0;
@@ -169,6 +170,7 @@ const SummaryGoals = () => {
     const goTo = useCallback((target, dir = 1) => {
         setDirection(dir);
         setScreen(target);
+        scrollProgressiveFlowToTop();
     }, []);
 
     /* ── Goal CRUD ── */
@@ -594,6 +596,7 @@ const SummaryGoals = () => {
                                 if (savePlanData) {
                                     try { await savePlanData(); } catch (e) { console.error('Save failed on nav', e); }
                                 }
+                                scrollProgressiveFlowToTop();
                                 navigate('/summary-flow/liabilities');
                             }}>
                                 <ArrowLeft size={16} /> Previous Section

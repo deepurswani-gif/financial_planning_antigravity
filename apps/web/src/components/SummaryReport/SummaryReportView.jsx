@@ -150,13 +150,6 @@ const SummaryReportView = () => {
                             >
                                 Take me to Detailed Report
                             </button>
-                            <button
-                                type="button"
-                                className="btn btn-secondary summary-report-action-btn summary-report-cta-secondary"
-                                onClick={() => navigate('/detailed-flow/existing-app')}
-                            >
-                                Legacy Existing App Flow (Temporary)
-                            </button>
                         </div>
                     )}
                 </div>

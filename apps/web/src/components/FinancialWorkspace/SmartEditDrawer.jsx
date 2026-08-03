@@ -7,52 +7,28 @@ import {
   resolveTargetAvailability,
 } from './smartEdit/smartEditModel';
 import { useDynamicEntities } from './smartEdit/useDynamicEntities';
+import { useDrawerFocusRestore } from './useDrawerFocusRestore';
 
 /**
- * Smart Edit Drawer — the primary place to update financial information.
- *
- * A command-palette style Editing Hub, driven by the Experience Registry and
- * gated by the Experience Availability Resolver. It searches and displays
- * *experiences* (what the user intends to edit), not raw fields. Selecting an
- * available experience delegates to `onLaunchExperience`. Selecting a locked
- * experience invokes `onLockedExperience` and never launches editing.
- *
- * Report navigation is intentionally NOT shown.
+ * Smart Edit body — reusable inside the standalone drawer or the mobile hub Edit tab.
  */
-export default function SmartEditDrawer({
-  open,
-  onClose,
+export function SmartEditPanel({
   capability = 'full',
   onLaunchExperience,
   onLockedExperience,
+  onClose,
+  showHeaderClose = true,
+  resetKey = true,
 }) {
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState(() => new Set());
 
   useEffect(() => {
-    if (!open) return undefined;
-    const onKeyDown = (e) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [open, onClose]);
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (open) {
+    if (resetKey) {
       setQuery('');
       setExpanded(new Set());
     }
-  }, [open]);
+  }, [resetKey]);
 
   const entities = useDynamicEntities();
 
@@ -76,14 +52,10 @@ export default function SmartEditDrawer({
   };
 
   const select = (target) => {
-    // `target` may be an experience id string (footer utilities) or a full
-    // result descriptor (experience or dynamic entity row).
     const availability = resolveTargetAvailability(target, { capability });
 
     if (availability.locked || availability.action === 'upgrade') {
       onLockedExperience?.(target, availability);
-      // Keep the drawer open so the user can continue browsing after the
-      // upgrade placeholder is dismissed.
       return;
     }
 
@@ -92,17 +64,159 @@ export default function SmartEditDrawer({
     }
 
     const launched = onLaunchExperience?.(target);
-    // Close unless the handler explicitly signals it kept the drawer open.
-    if (launched !== false) onClose();
+    if (launched !== false) onClose?.();
   };
 
   const searching = query.trim().length > 0;
 
   return (
     <>
+      <div className="se-header" data-tour="workspace-smart-edit">
+        <div className="se-header-titles">
+          <span className="se-eyebrow">Smart Edit</span>
+          <span className="se-subtitle">Update your financial information</span>
+        </div>
+        {showHeaderClose ? (
+          <button type="button" className="fw-icon-btn" onClick={onClose} aria-label="Close Smart Edit">
+            <X size={20} />
+          </button>
+        ) : null}
+      </div>
+
+      <div className="se-search">
+        <Search size={16} className="se-search-icon" aria-hidden="true" />
+        <input
+          type="text"
+          className="se-search-input"
+          placeholder="Search your financial information…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          aria-label="Search your financial information"
+          autoComplete="off"
+        />
+        {searching ? (
+          <button
+            type="button"
+            className="se-search-clear"
+            onClick={() => setQuery('')}
+            aria-label="Clear search"
+          >
+            <X size={14} />
+          </button>
+        ) : null}
+      </div>
+
+      <div className="se-body">
+        {searching ? (
+          <SearchResults results={results} onSelect={select} />
+        ) : (
+          <>
+            <Section title="Frequently Updated">
+              <ul className="se-list">
+                {frequentlyUpdated.map((item) => (
+                  <ExperienceRow key={item.key} item={item} onSelect={select} />
+                ))}
+              </ul>
+            </Section>
+
+            <Section title="Browse Categories">
+              <ul className="se-category-list">
+                {categories.map((category) => {
+                  const isOpen = expanded.has(category.id);
+                  return (
+                    <li key={category.id} className="se-category">
+                      <button
+                        type="button"
+                        className="se-category-toggle"
+                        onClick={() => toggleCategory(category.id)}
+                        aria-expanded={isOpen}
+                      >
+                        <span>{category.label}</span>
+                        {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                      </button>
+                      {isOpen ? (
+                        <ul className="se-list se-list--nested">
+                          {category.items.map((item) => (
+                            <ExperienceRow
+                              key={item.key}
+                              item={item}
+                              onSelect={select}
+                              compact
+                            />
+                          ))}
+                        </ul>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            </Section>
+          </>
+        )}
+      </div>
+
+      <div className="se-footer">
+        <button type="button" className="se-utility" onClick={() => select('planning.incomeTax')}>
+          Income Tax Planner
+        </button>
+        <button type="button" className="se-utility" onClick={() => select('__settings__')}>
+          Settings
+        </button>
+        <button
+          type="button"
+          className="se-utility se-utility--danger"
+          onClick={() => select('__logout__')}
+        >
+          Logout
+        </button>
+      </div>
+    </>
+  );
+}
+
+/**
+ * Smart Edit Drawer — the primary place to update financial information.
+ *
+ * A command-palette style Editing Hub, driven by the Experience Registry and
+ * gated by the Experience Availability Resolver. It searches and displays
+ * *experiences* (what the user intends to edit), not raw fields. Selecting an
+ * available experience delegates to `onLaunchExperience`. Selecting a locked
+ * experience invokes `onLockedExperience` and never launches editing.
+ *
+ * Report navigation is intentionally NOT shown.
+ */
+export default function SmartEditDrawer({
+  open,
+  onClose,
+  capability = 'full',
+  onLaunchExperience,
+  onLockedExperience,
+}) {
+  const closeDrawer = useDrawerFocusRestore(open, onClose);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') closeDrawer();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [open, closeDrawer]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  return (
+    <>
       <div
         className={`fw-drawer-backdrop ${open ? 'open' : ''}`}
-        onClick={onClose}
+        onClick={closeDrawer}
         aria-hidden={!open}
       />
       <aside
@@ -110,103 +224,13 @@ export default function SmartEditDrawer({
         aria-hidden={!open}
         aria-label="Smart Edit"
       >
-        <div className="se-header">
-          <div className="se-header-titles">
-            <span className="se-eyebrow">Smart Edit</span>
-            <span className="se-subtitle">Update your financial information</span>
-          </div>
-          <button type="button" className="fw-icon-btn" onClick={onClose} aria-label="Close Smart Edit">
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="se-search">
-          <Search size={16} className="se-search-icon" aria-hidden="true" />
-          <input
-            type="text"
-            className="se-search-input"
-            placeholder="Search your financial information…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            aria-label="Search your financial information"
-            autoComplete="off"
-          />
-          {searching ? (
-            <button
-              type="button"
-              className="se-search-clear"
-              onClick={() => setQuery('')}
-              aria-label="Clear search"
-            >
-              <X size={14} />
-            </button>
-          ) : null}
-        </div>
-
-        <div className="se-body">
-          {searching ? (
-            <SearchResults results={results} onSelect={select} />
-          ) : (
-            <>
-              <Section title="Frequently Updated">
-                <ul className="se-list">
-                  {frequentlyUpdated.map((item) => (
-                    <ExperienceRow key={item.key} item={item} onSelect={select} />
-                  ))}
-                </ul>
-              </Section>
-
-              <Section title="Browse Categories">
-                <ul className="se-category-list">
-                  {categories.map((category) => {
-                    const isOpen = expanded.has(category.id);
-                    return (
-                      <li key={category.id} className="se-category">
-                        <button
-                          type="button"
-                          className="se-category-toggle"
-                          onClick={() => toggleCategory(category.id)}
-                          aria-expanded={isOpen}
-                        >
-                          <span>{category.label}</span>
-                          {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                        </button>
-                        {isOpen ? (
-                          <ul className="se-list se-list--nested">
-                            {category.items.map((item) => (
-                              <ExperienceRow
-                                key={item.key}
-                                item={item}
-                                onSelect={select}
-                                compact
-                              />
-                            ))}
-                          </ul>
-                        ) : null}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </Section>
-            </>
-          )}
-        </div>
-
-        <div className="se-footer">
-          <button type="button" className="se-utility" onClick={() => select('planning.incomeTax')}>
-            Income Tax Planner
-          </button>
-          <button type="button" className="se-utility" onClick={() => select('__settings__')}>
-            Settings
-          </button>
-          <button
-            type="button"
-            className="se-utility se-utility--danger"
-            onClick={() => select('__logout__')}
-          >
-            Logout
-          </button>
-        </div>
+        <SmartEditPanel
+          capability={capability}
+          onLaunchExperience={onLaunchExperience}
+          onLockedExperience={onLockedExperience}
+          onClose={closeDrawer}
+          resetKey={open}
+        />
       </aside>
     </>
   );

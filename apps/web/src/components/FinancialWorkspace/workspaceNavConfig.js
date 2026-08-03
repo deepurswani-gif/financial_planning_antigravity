@@ -3,6 +3,8 @@
 import { SECTION_IDS, resolveSectionId } from './sectionIds';
 
 export const WORKSPACE_TITLE = 'Growth & Loan Trackers';
+/** Product place-name shown next to the logo in the workspace shell. */
+export const WORKSPACE_DASHBOARD_LABEL = 'Financial Dashboard';
 export const WORKSPACE_STORAGE_KEY = 'finbrella.financialWorkspace.v1';
 
 /** Product entry for the Financial Workspace shell. */
@@ -242,4 +244,14 @@ export function getDetailReportLabel(id) {
 export function getDetailReportIndex(id) {
   const canonical = resolveCanonicalId(id);
   return DETAIL_REPORT_TAB_ITEMS.findIndex((item) => item.id === canonical);
+}
+
+export function getDetailReportStage(id) {
+  const canonical = resolveCanonicalId(id);
+  return DETAIL_REPORT_TAB_ITEMS.find((item) => item.id === canonical)?.stage ?? null;
+}
+
+export function getSummaryReportIndex(id) {
+  const canonical = resolveCanonicalId(id);
+  return SUMMARY_REPORT_NAV_ITEMS.findIndex((item) => item.id === canonical);
 }

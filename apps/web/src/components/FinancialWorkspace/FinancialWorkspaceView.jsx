@@ -1,22 +1,23 @@
-import React, { useState, useRef, useLayoutEffect, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 import { signOut } from '../../services/authService';
+import useBreakpoints from '../../hooks/use-breakpoints';
 import { useFinancialWorkspace } from './FinancialWorkspaceContext';
-import StickyTopAppBar from './StickyTopAppBar';
-import SecondaryNavigation from './SecondaryNavigation';
-import SummaryReportNavigation from './SummaryReportNavigation';
-import DetailReportTabs from './DetailReportTabs';
-import ReportContextBar from './ReportContextBar';
+import DesktopChrome from './DesktopChrome';
+import MobileChrome from './MobileChrome';
 import ActiveWorkspace from './ActiveWorkspace';
 import WorkspaceContent from './WorkspaceContent';
 import ReservedQuickActions from './ReservedQuickActions';
 import ReservedWidgets from './ReservedWidgets';
 import WorkflowNavigationBar from './WorkflowNavigationBar';
 import SmartEditDrawer from './SmartEditDrawer';
+import WorkspaceHubDrawer from './WorkspaceHubDrawer';
 import CalculatorModal from './CalculatorModal';
 import UnlockPlanningDialog from './UnlockPlanningDialog';
+import ScrollToTopButton from './ScrollToTopButton';
+import WorkspaceProductTour from './WorkspaceProductTour';
 import {
   DETAILED_FLOW_ENTRY_PATH,
   DEFAULT_DETAIL_TAB_ID,
@@ -24,6 +25,7 @@ import {
   FINANCIAL_WORKSPACE_PATH,
   LEGACY_EXISTING_APP_PATH,
   getDetailReportLabel,
+  getDetailReportStage,
   getSummaryReportLabel,
   financialWorkspacePath,
 } from './workspaceNavConfig';
@@ -38,6 +40,12 @@ import WorkspaceSectionEditor from './WorkspaceSectionEditor';
 import { isKnownSectionId } from './sectionRegistry';
 import { resolveSectionId } from './sectionIds';
 import { loadWorkspaceCapability } from './workspaceCapabilityStorage';
+import {
+  loadWorkspaceTourState,
+  markTourCompleted,
+  resolveAutoTourTrigger,
+  saveWorkspaceTourState,
+} from './workspaceTourStorage';
 import { useEditing } from '../../editing/EditingProvider';
 import { getExperienceById, resolveLaunch, buildActivationRequest } from '../../experienceRegistry';
 import { SmartEditActivationContext } from './smartEdit/activationChannel';
@@ -65,6 +73,7 @@ function scrollWorkspaceSectionIntoView(sectionId) {
 export default function FinancialWorkspaceView() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { lg } = useBreakpoints();
   const { user } = useAuth();
   const {
     familyMembers,
@@ -78,7 +87,6 @@ export default function FinancialWorkspaceView() {
   const {
     state,
     setMode,
-    selectPrimary,
     openCalculator,
     selectSummaryReport,
     selectDetailReport,
@@ -89,10 +97,19 @@ export default function FinancialWorkspaceView() {
     getDrawerAction,
     canWorkflowPrevious,
     canWorkflowNext,
+    workflowPreviousLabel,
+    workflowNextLabel,
+    workflowStepItems,
+    workflowActiveId,
+    workflowIndex,
+    isSummaryWorkflow,
     setWorkspaceScroll,
   } = useFinancialWorkspace();
 
   const { startEditSession } = useEditing();
+  const [hubTab, setHubTab] = useState('edit');
+  const [tourOpen, setTourOpen] = useState(false);
+  const [tourTrigger, setTourTrigger] = useState('intro');
 
   // Smart Edit activation channel — publishes an activation request that the
   // mounted section consumes via useSmartEditActivation (no DOM / click hacks).
@@ -108,8 +125,6 @@ export default function FinancialWorkspaceView() {
 
   const {
     mode,
-    activePrimaryId,
-    activeSecondaryId,
     activeSummaryReportId,
     activeDetailReportId,
     workspaceFocus,
@@ -138,9 +153,49 @@ export default function FinancialWorkspaceView() {
 
   const [unlockOpen, setUnlockOpen] = useState(false);
 
-  const primaryTabRefs = useRef({});
-  const toolbarTrackRef = useRef(null);
-  const [toolbarCenterPx, setToolbarCenterPx] = useState(null);
+  const startTour = useCallback((trigger = 'manual') => {
+    setDrawerOpen(false);
+    setUnlockOpen(false);
+    setTourTrigger(trigger);
+    setTourOpen(true);
+  }, [setDrawerOpen]);
+
+  const finishTour = useCallback(() => {
+    setTourOpen(false);
+    setDrawerOpen(false);
+    const next = markTourCompleted(
+      loadWorkspaceTourState(user?.id),
+      tourTrigger,
+      effectiveWorkspaceCapability,
+    );
+    saveWorkspaceTourState(user?.id, next);
+  }, [tourTrigger, user?.id, effectiveWorkspaceCapability, setDrawerOpen]);
+
+  const prepareTourStep = useCallback((step) => {
+    if (step?.openHub) {
+      setHubTab(step.openHub);
+      setDrawerOpen(true);
+      return;
+    }
+    setDrawerOpen(false);
+  }, [setDrawerOpen]);
+
+  // Mobile coach marks: first dashboard visit, and again after Detailed unlock.
+  useEffect(() => {
+    if (lg || tourOpen) return undefined;
+    if (!effectiveWorkspaceCapability) return undefined;
+
+    const trigger = resolveAutoTourTrigger(
+      loadWorkspaceTourState(user?.id),
+      effectiveWorkspaceCapability,
+    );
+    if (!trigger) return undefined;
+
+    const timer = window.setTimeout(() => {
+      startTour(trigger);
+    }, 450);
+    return () => window.clearTimeout(timer);
+  }, [lg, tourOpen, effectiveWorkspaceCapability, user?.id, startTour]);
 
   const selfMember = familyMembers?.find((m) => m.relation === 'Self');
   const userInitials = selfMember?.name
@@ -194,35 +249,6 @@ export default function FinancialWorkspaceView() {
     setWorkspaceScroll,
     effectiveWorkspaceCapability,
   ]);
-
-  const registerPrimaryTabRef = useCallback((id, el) => {
-    if (el) primaryTabRefs.current[id] = el;
-    else delete primaryTabRefs.current[id];
-  }, []);
-
-  const syncToolbarAnchor = useCallback(() => {
-    if (!activePrimaryId) {
-      setToolbarCenterPx(null);
-      return;
-    }
-    const tab = primaryTabRefs.current[activePrimaryId];
-    const track = toolbarTrackRef.current;
-    if (!tab || !track) return;
-    const tabRect = tab.getBoundingClientRect();
-    const trackRect = track.getBoundingClientRect();
-    setToolbarCenterPx(tabRect.left + tabRect.width / 2 - trackRect.left);
-  }, [activePrimaryId]);
-
-  useLayoutEffect(() => {
-    syncToolbarAnchor();
-    const onResize = () => syncToolbarAnchor();
-    window.addEventListener('resize', onResize);
-    const raf = requestAnimationFrame(() => syncToolbarAnchor());
-    return () => {
-      window.removeEventListener('resize', onResize);
-      cancelAnimationFrame(raf);
-    };
-  }, [syncToolbarAnchor]);
 
   const openUnlockDialog = useCallback(() => {
     setUnlockOpen(true);
@@ -489,16 +515,41 @@ export default function FinancialWorkspaceView() {
     navigate(`${FINANCIAL_WORKSPACE_PATH}?${nextQuery.toString()}`);
   }, [editingSection, navigate, searchParams]);
 
-  const handleBackToSummaryReports = () => {
-    handleSummaryReportSelect(activeSummaryReportId || DEFAULT_SUMMARY_REPORT_ID);
-  };
-
   const showLegacyDevButton =
+    import.meta.env.DEV &&
     !summaryMode &&
     workspaceFocus === 'detail' &&
     activeDetailReportId === 'your_moneys_magic';
 
-  const detailWorkflowVisible = !summaryMode && workspaceFocus === 'detail';
+  const workflowVisible = true;
+  const reportTitle = isSummaryWorkflow
+    ? getSummaryReportLabel(activeSummaryReportId)
+    : getDetailReportLabel(activeDetailReportId);
+  const detailStage = !isSummaryWorkflow ? getDetailReportStage(activeDetailReportId) : null;
+  const stepCount = workflowStepItems.length;
+  const stepLabel =
+    workflowIndex >= 0 && stepCount > 0
+      ? `Step ${workflowIndex + 1} of ${stepCount}`
+      : null;
+  const stageLabel = detailStage
+    ? detailStage.toUpperCase()
+    : isSummaryWorkflow
+      ? 'SUMMARY'
+      : null;
+
+  const openHub = (tab = 'edit') => {
+    setHubTab(tab);
+    setDrawerOpen(true);
+  };
+
+  const handleWorkflowStepSelect = (reportId) => {
+    if (isSummaryWorkflow) {
+      handleSummaryReportSelect(reportId);
+    } else {
+      handleDetailTabSelect(reportId);
+    }
+    exitEditingToReports();
+  };
 
   return (
     <SmartEditActivationContext.Provider value={activationContextValue}>
@@ -509,40 +560,56 @@ export default function FinancialWorkspaceView() {
           : workspaceFocus === 'summary'
             ? 'fw-shell--summary-focus'
             : 'fw-shell--detail-focus'
-      }`}
+      } ${lg ? 'fw-shell--desktop' : 'fw-shell--mobile'}`}
     >
-      <div className="fw-chrome">
-        <StickyTopAppBar
-          activePrimaryId={activePrimaryId}
-          onPrimarySelect={selectPrimary}
+      {lg ? (
+        <DesktopChrome
           onOpenDrawer={() => setDrawerOpen(true)}
           userInitials={userInitials}
-          registerPrimaryTabRef={registerPrimaryTabRef}
-        />
-        <SecondaryNavigation
-          open={Boolean(activePrimaryId)}
-          activePrimaryId={activePrimaryId}
-          activeSecondaryId={activeSecondaryId}
-          onSecondarySelect={openCalculator}
+          userEmail={user?.email || ''}
+          onLogout={() => handleDrawerItem('logout')}
           calculatorsLocked={calculatorsLocked}
+          onOpenCalculator={openCalculator}
           onLockedSelect={openUnlockDialog}
-          anchorCenterPx={toolbarCenterPx}
-          trackRef={toolbarTrackRef}
-        />
-        <SummaryReportNavigation
-          activeSummaryReportId={activeSummaryReportId}
-          onSummaryReportSelect={handleSummaryReportSelect}
-          workspaceFocus={summaryMode ? 'summary' : workspaceFocus}
-        />
-        <DetailReportTabs
-          activeDetailTabId={activeDetailReportId}
-          onDetailTabSelect={handleDetailTabSelect}
           workspaceFocus={workspaceFocus}
-          locked={detailReportsLocked}
+          summaryMode={summaryMode}
+          activeSummaryReportId={activeSummaryReportId}
+          activeDetailReportId={activeDetailReportId}
+          onFocusSummary={() =>
+            handleSummaryReportSelect(activeSummaryReportId || DEFAULT_SUMMARY_REPORT_ID)
+          }
+          onFocusDetail={() =>
+            handleDetailTabSelect(activeDetailReportId || DEFAULT_DETAIL_TAB_ID)
+          }
+          onSelectSummaryReport={handleSummaryReportSelect}
+          onSelectDetailReport={handleDetailTabSelect}
+          detailLocked={detailReportsLocked}
+          contextFields={contextFields}
+        />
+      ) : (
+        <MobileChrome
+          onOpenHub={() => openHub('edit')}
+          onOpenTools={() => openHub('tools')}
+          userInitials={userInitials}
+          userEmail={user?.email || ''}
+          onLogout={() => handleDrawerItem('logout')}
+          onTakeTour={() => startTour('manual')}
+          reportTitle={reportTitle}
+          stageLabel={stageLabel}
+          stepLabel={stepLabel}
+          contextFields={contextFields}
+          workspaceFocus={summaryMode ? 'summary' : workspaceFocus}
+          summaryMode={summaryMode}
+          onFocusSummary={() =>
+            handleSummaryReportSelect(activeSummaryReportId || DEFAULT_SUMMARY_REPORT_ID)
+          }
+          onFocusDetail={() =>
+            handleDetailTabSelect(activeDetailReportId || DEFAULT_DETAIL_TAB_ID)
+          }
+          detailLocked={detailReportsLocked}
           onLockedSelect={openUnlockDialog}
         />
-        <ReportContextBar fields={contextFields} />
-      </div>
+      )}
 
       <main className="fw-main">
         <ActiveWorkspace>
@@ -570,35 +637,58 @@ export default function FinancialWorkspaceView() {
         ) : null}
       </main>
 
-      {summaryMode ? (
-        <WorkflowNavigationBar
-          variant="summary"
-          onBackToSummary={handleBackToSummaryReports}
-          onContinueDetailed={goToDetailedPlanning}
+      {!lg ? <ScrollToTopButton enabled /> : null}
+
+      <WorkflowNavigationBar
+        onPrevious={() => {
+          workflowPrevious();
+          exitEditingToReports();
+        }}
+        onNext={() => {
+          workflowNext();
+          exitEditingToReports();
+        }}
+        previousDisabled={!canWorkflowPrevious}
+        nextDisabled={!canWorkflowNext}
+        previousLabel={workflowPreviousLabel}
+        nextLabel={workflowNextLabel}
+        visible={workflowVisible}
+        showSteps={!lg}
+        stepItems={workflowStepItems}
+        activeStepId={workflowActiveId}
+        onStepSelect={handleWorkflowStepSelect}
+        showContinueDetailed={summaryMode}
+        onContinueDetailed={goToDetailedPlanning}
+      />
+
+      {lg ? (
+        <SmartEditDrawer
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          capability={summaryMode ? 'summary' : 'full'}
+          onLaunchExperience={handleLaunchExperience}
+          onLockedExperience={openUnlockDialog}
         />
       ) : (
-        <WorkflowNavigationBar
-          onPrevious={() => {
-            workflowPrevious();
-            exitEditingToReports();
-          }}
-          onNext={() => {
-            workflowNext();
-            exitEditingToReports();
-          }}
-          previousDisabled={!canWorkflowPrevious}
-          nextDisabled={!canWorkflowNext}
-          visible={detailWorkflowVisible}
+        <WorkspaceHubDrawer
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          activeTab={hubTab}
+          onTabChange={setHubTab}
+          capability={summaryMode ? 'summary' : 'full'}
+          activeSummaryReportId={activeSummaryReportId}
+          activeDetailReportId={activeDetailReportId}
+          workspaceFocus={summaryMode ? 'summary' : workspaceFocus}
+          detailReportsLocked={detailReportsLocked}
+          calculatorsLocked={calculatorsLocked}
+          onSelectSummaryReport={handleSummaryReportSelect}
+          onSelectDetailReport={handleDetailTabSelect}
+          onOpenCalculator={openCalculator}
+          onLockedSelect={openUnlockDialog}
+          onLaunchExperience={handleLaunchExperience}
+          onLockedExperience={openUnlockDialog}
         />
       )}
-
-      <SmartEditDrawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        capability={summaryMode ? 'summary' : 'full'}
-        onLaunchExperience={handleLaunchExperience}
-        onLockedExperience={openUnlockDialog}
-      />
 
       {!summaryMode ? <CalculatorModal /> : null}
 
@@ -607,6 +697,15 @@ export default function FinancialWorkspaceView() {
         onClose={closeUnlockDialog}
         onContinue={goToDetailedPlanning}
       />
+
+      {!lg ? (
+        <WorkspaceProductTour
+          open={tourOpen}
+          trigger={tourTrigger}
+          onClose={finishTour}
+          onPrepareStep={prepareTourStep}
+        />
+      ) : null}
     </div>
     </SmartEditActivationContext.Provider>
   );

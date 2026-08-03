@@ -2,12 +2,24 @@ import React from 'react';
 import ForgotPassword from '../components/Auth/ForgotPassword';
 import Login from '../components/Auth/Login';
 import Signup from '../components/Auth/Signup';
+import WelcomeScreen from '../components/Welcome/WelcomeScreen';
 import { useAuth } from '../contexts/AuthContext';
-import { consumeInviteParamsFromUrl } from '@/lib/couponInviteStorage';
+import {
+  consumeInviteParamsFromUrl,
+  getPendingCouponInvite,
+} from '@/lib/couponInviteStorage';
+import { hasSeenWelcome } from '@/lib/welcomeStorage';
+
+function resolveInitialAuthView() {
+  consumeInviteParamsFromUrl();
+  if (getPendingCouponInvite()) return 'login';
+  if (hasSeenWelcome()) return 'login';
+  return 'welcome';
+}
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
-  const [authView, setAuthView] = React.useState('login'); // 'login', 'signup', 'forgot-password'
+  const [authView, setAuthView] = React.useState(resolveInitialAuthView);
 
   React.useEffect(() => {
     consumeInviteParamsFromUrl();
@@ -18,7 +30,7 @@ const ProtectedRoute = ({ children }) => {
       <div className="loading-container">
         <div className="spinner"></div>
         <p>Loading your financial plan...</p>
-        
+
         <style jsx>{`
           .loading-container {
             min-height: 100vh;
@@ -54,13 +66,15 @@ const ProtectedRoute = ({ children }) => {
 
   if (!user) {
     switch (authView) {
+      case 'welcome':
+        return <WelcomeScreen onNavigate={setAuthView} />;
       case 'signup':
         return <Signup onSwitchToLogin={() => setAuthView('login')} />;
       case 'forgot-password':
         return <ForgotPassword onBack={() => setAuthView('login')} />;
       default:
         return (
-          <Login 
+          <Login
             onSwitchToSignup={() => setAuthView('signup')}
             onForgotPassword={() => setAuthView('forgot-password')}
           />

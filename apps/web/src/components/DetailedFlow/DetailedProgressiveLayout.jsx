@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, ArrowRight, ArrowLeft, Sparkles } from 'lucide-react';
@@ -8,6 +8,7 @@ import { useProgressiveShellWidth } from '../SummaryFlow/useProgressiveShellWidt
 import { financialWorkspacePath, DEFAULT_DETAIL_TAB_ID, DEFAULT_SUMMARY_REPORT_ID } from '../FinancialWorkspace/workspaceNavConfig';
 import { resolveSectionId } from '../FinancialWorkspace/sectionIds';
 import { useLandingQuestion, focusLandingControl } from '../FinancialWorkspace/smartEdit/useLandingQuestion';
+import { scrollProgressiveFlowToTop } from '../SummaryFlow/scrollProgressiveFlowToTop';
 
 const useTypewriter = (text, speed = 30) => {
     const [displayed, setDisplayed] = useState('');
@@ -85,12 +86,20 @@ const DetailedProgressiveLayout = ({
     const [direction, setDirection] = useState(1);
     const [showNarrative, setShowNarrative] = useState(false);
     const { landingQuestionId, control: landingControl, clearLanding } = useLandingQuestion(questions);
+    const suppressScrollUntilRef = useRef(0);
 
     const currentGlobalIndex = detailedFlowSteps.findIndex(s => s.id === currentStepId);
 
     const currentIndex = Math.max(0, questions.findIndex(q => q.id === currentQuestionId));
     const resolvedIndex = currentIndex >= 0 ? currentIndex : 0;
     const currentQuestion = questions[resolvedIndex] ?? questions[0];
+
+    // Keep the next question/section starting at the top of the viewport.
+    // Smart Edit landing temporarily suppresses this so focusLandingControl can scroll to the control.
+    useEffect(() => {
+        if (Date.now() < suppressScrollUntilRef.current) return;
+        scrollProgressiveFlowToTop();
+    }, [currentQuestionId, currentStepId]);
 
     const handleNextQuestion = useCallback(() => {
         const idx = questions.findIndex(q => q.id === currentQuestionId);
@@ -114,6 +123,7 @@ const DetailedProgressiveLayout = ({
         if (savePlanData) {
             try { await savePlanData(); } catch (e) { console.error('Save failed on nav', e); }
         }
+        scrollProgressiveFlowToTop();
         if (onComplete) {
             onComplete();
             return;
@@ -151,6 +161,7 @@ const DetailedProgressiveLayout = ({
         if (savePlanData) {
             try { await savePlanData(); } catch (e) { console.error('Save failed on nav', e); }
         }
+        scrollProgressiveFlowToTop();
         if (currentGlobalIndex <= 0) {
             if (inWorkspaceEdit) {
                 const mode = query.get('mode') === 'summary' ? 'summary' : 'full';
@@ -196,6 +207,7 @@ const DetailedProgressiveLayout = ({
     // focus/scroll the first control, then clear the one-shot landing params.
     useEffect(() => {
         if (!landingQuestionId) return;
+        suppressScrollUntilRef.current = Date.now() + 700;
         setDirection(1);
         setCurrentQuestionId(landingQuestionId);
         focusLandingControl(landingControl);

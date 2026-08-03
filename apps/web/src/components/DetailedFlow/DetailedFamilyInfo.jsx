@@ -13,6 +13,7 @@ import {
 } from './employmentTypeSync';
 import { EDUCATION_STANDARDS } from '../JourneyModule/ProjectionLogic';
 import { applyHouseholdEducationFromChildren } from './educationExpenseSync';
+import DateInput from '../common/DateInput';
 
 const formatDate = (value) => {
     if (!value) return '—';
@@ -239,8 +240,12 @@ const DetailedFamilyInfo = () => {
                                             <input type="tel" className="conversational-input" maxLength="10" value={selfMember.mobile || ''} onChange={(e) => updateSelf('mobile', e.target.value.replace(/\D/g, '').slice(0, 10))} />
                                         </div>
                                         <div>
-                                            <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.4rem', display: 'block' }}>Date of birth</label>
-                                            <input type="date" className="conversational-input" value={selfMember.dob || ''} onChange={(e) => updateSelf('dob', e.target.value)} />
+                                            <DateInput
+                                                label="Date of birth"
+                                                className="conversational-input"
+                                                value={selfMember.dob || ''}
+                                                onChange={(iso) => updateSelf('dob', iso)}
+                                            />
                                         </div>
                                         <div>
                                             <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.4rem', display: 'block' }}>Retirement age: {retireAge}</label>
@@ -312,8 +317,12 @@ const DetailedFamilyInfo = () => {
                                 <input type="text" className="conversational-input" value={spouseMember?.name || ''} onChange={(e) => updateSpouse('name', e.target.value)} />
                             </div>
                             <div>
-                                <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.4rem', display: 'block' }}>Date of birth</label>
-                                <input type="date" className="conversational-input" value={spouseMember?.dob || ''} onChange={(e) => updateSpouse('dob', e.target.value)} />
+                                <DateInput
+                                    label="Date of birth"
+                                    className="conversational-input"
+                                    value={spouseMember?.dob || ''}
+                                    onChange={(iso) => updateSpouse('dob', iso)}
+                                />
                                 {spouseMember?.dob && (
                                     <div style={{ fontSize: '0.85rem', color: 'var(--primary)', marginTop: '0.5rem', fontWeight: 600 }}>
                                         Age: {calculateAge(spouseMember.dob)} Years
@@ -403,8 +412,12 @@ const DetailedFamilyInfo = () => {
                                             <input type="text" className="conversational-input" value={child.name || ''} onChange={(e) => updateChild(index, 'name', e.target.value)} />
                                         </div>
                                         <div>
-                                            <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.4rem', display: 'block' }}>Date of birth</label>
-                                            <input type="date" className="conversational-input" value={child.dob || ''} onChange={(e) => updateChild(index, 'dob', e.target.value)} />
+                                            <DateInput
+                                                label="Date of birth"
+                                                className="conversational-input"
+                                                value={child.dob || ''}
+                                                onChange={(iso) => updateChild(index, 'dob', iso)}
+                                            />
                                         </div>
                                         <div>
                                             <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.4rem', display: 'block' }}>Studying at</label>

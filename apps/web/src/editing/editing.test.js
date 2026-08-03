@@ -221,6 +221,19 @@ describe('validation', () => {
     expect(validateFieldValue(field, -5).errors[0]).toContain('at least');
   });
 
+  it('rejects impossible dates for date valueType', () => {
+    const field = {
+      id: 'family.self.dob',
+      label: 'Date of birth',
+      shortLabel: 'DOB',
+      valueType: 'date',
+      validation: { required: true },
+    };
+    expect(validateFieldValue(field, '1990-05-20').valid).toBe(true);
+    expect(validateFieldValue(field, '2026-02-31').valid).toBe(false);
+    expect(validateFieldValue(field, '2025-02-29').valid).toBe(false);
+  });
+
   it('validates a real registry field', () => {
     const result = validateFieldValues({ 'family.self.dob': '1990-05-20' });
     expect(result.valid).toBe(true);

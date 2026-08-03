@@ -17,13 +17,15 @@ const DetailedPlaceholder = () => {
                     <button className="btn btn-secondary" onClick={() => navigate('/summary-report/money_story')}>Back to Summary Report</button>
                     <button className="btn btn-primary" onClick={() => navigate('/detailed-flow/next-step')}>Next Step</button>
                 </div>
-                <button 
-                    className="btn btn-secondary" 
-                    onClick={() => navigate('/detailed-flow/existing-app')}
-                    style={{ padding: '0.8rem 2rem', fontSize: '1rem', borderRadius: '50px', background: 'transparent', border: '1px solid var(--primary)', color: 'var(--primary)' }}
-                >
-                    Legacy Existing App Flow (Temporary)
-                </button>
+                {import.meta.env.DEV && (
+                    <button
+                        className="btn btn-secondary"
+                        onClick={() => navigate('/detailed-flow/existing-app')}
+                        style={{ padding: '0.8rem 2rem', fontSize: '1rem', borderRadius: '50px', background: 'transparent', border: '1px solid var(--primary)', color: 'var(--primary)' }}
+                    >
+                        Legacy Existing App Flow (Dev Only)
+                    </button>
+                )}
             </div>
         </div>
     );

@@ -1,0 +1,179 @@
+.date-input {
+  width: 100%;
+  position: relative;
+}
+
+.date-input__label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+  color: var(--text-main);
+}
+
+.date-input__required {
+  color: var(--negative);
+}
+
+.date-input__control {
+  position: relative;
+  width: 100%;
+}
+
+.date-input__field {
+  width: 100%;
+  padding-right: 2.75rem !important;
+}
+
+.date-input__field--no-icon {
+  padding-right: 1rem !important;
+}
+
+.date-input--error .date-input__field {
+  border-color: var(--negative);
+}
+
+.date-input--error .date-input__field:focus {
+  border-color: var(--negative);
+  box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.12), inset 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.date-input__calendar-btn {
+  position: absolute;
+  top: 50%;
+  right: 0.55rem;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.date-input__calendar-btn:hover:not(:disabled) {
+  color: var(--primary);
+  background: var(--primary-light);
+}
+
+.date-input__calendar-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.date-input__error {
+  margin: 0.4rem 0 0;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--negative);
+}
+
+.date-input__popup {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  left: 0;
+  width: min(100%, 280px);
+  padding: 0.75rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+}
+
+.date-input__popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+
+.date-input__popup-title {
+  font-size: 0.9rem;
+  font-weight: 650;
+  color: var(--text-main);
+}
+
+.date-input__nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.date-input__nav:hover {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.date-input__weekdays,
+.date-input__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.date-input__weekday {
+  text-align: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 0.25rem 0;
+}
+
+.date-input__day {
+  aspect-ratio: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-main);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+}
+
+.date-input__day--empty {
+  pointer-events: none;
+}
+
+.date-input__day:hover:not(:disabled):not(.date-input__day--empty) {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.date-input__day--today {
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+.date-input__day--selected {
+  background: var(--primary);
+  color: #fff;
+}
+
+.date-input__day--selected:hover:not(:disabled) {
+  background: var(--primary-hover);
+  color: #fff;
+}
+
+.date-input__day--disabled,
+.date-input__day:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}

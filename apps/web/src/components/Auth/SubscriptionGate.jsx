@@ -1,19 +1,80 @@
-/* FLAG_PAYMENT_DISABLED:
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { CreditCard, CheckCircle2, Ticket, Lock, Zap } from 'lucide-react';
+import { CreditCard, CheckCircle2, Ticket, Lock, ArrowLeft } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { signOut } from '../../services/authService';
 import finbrellaLogo from '../../assets/finbrella_logo.png';
 import { clearPendingCouponInvite, getPendingCouponInvite } from '@/lib/couponInviteStorage';
+import { createRazorpayOrder, verifyRazorpaySignature } from '../../services/razorpayEdgeService';
+import { createCheckoutTransaction } from '../../services/checkoutService';
+import {
+  getAnnualPlanPriceInr,
+  getPlanYearLabel,
+  getSubscriptionValidUntilDate,
+  isIntroPricing,
+} from '../../lib/subscriptionAccess';
 
-const SubscriptionGate = ({ onActivate }) => {
+const RAZORPAY_SCRIPT_ID = 'razorpay-checkout-js';
+const ANNUAL_PLAN_INR = getAnnualPlanPriceInr();
+const PLAN_YEAR = getPlanYearLabel();
+const VALID_UNTIL = getSubscriptionValidUntilDate();
+const INTRO_PRICING = isIntroPricing();
+
+const loadRazorpayScript = () => {
+  if (window.Razorpay) return Promise.resolve(true);
+
+  return new Promise((resolve) => {
+    const existing = document.getElementById(RAZORPAY_SCRIPT_ID);
+    if (existing) {
+      existing.addEventListener('load', () => resolve(true), { once: true });
+      existing.addEventListener('error', () => resolve(false), { once: true });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.id = RAZORPAY_SCRIPT_ID;
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
+
+const activateSubscription = async (userId) => {
+  const { error } = await supabase
+    .from('user_profiles')
+    .update({
+      subscription_active: true,
+      subscription_valid_until: getSubscriptionValidUntilDate(),
+    })
+    .eq('id', userId);
+
+  if (error) {
+    console.warn('Could not update profile subscription status.', error);
+    throw new Error('Payment succeeded, but we could not unlock access. Please contact support.');
+  }
+};
+
+/**
+ * Payment / coupon gate shown before Detailed Flow entry.
+ * Summary flow and summary reports remain free and are not gated here.
+ */
+const SubscriptionGate = ({ onActivate, onBack }) => {
   const { user } = useAuth();
   const [couponCode, setCouponCode] = useState('');
   const [loading, setLoading] = useState(false);
+  const [paying, setPaying] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const autoRedeemAttempted = useRef(false);
+
+  const finishActivation = useCallback(() => {
+    setSuccess(true);
+    setTimeout(() => {
+      onActivate?.();
+    }, 1200);
+  }, [onActivate]);
 
   const redeemCoupon = useCallback(
     async (rawCode) => {
@@ -53,23 +114,28 @@ const SubscriptionGate = ({ onActivate }) => {
           throw new Error('Failed to redeem coupon. Please contact support.');
         }
 
-        const { error: profileError } = await supabase
-          .from('user_profiles')
-          .update({ subscription_active: true })
-          .eq('id', user.id);
+        await activateSubscription(user.id);
 
-        if (profileError) {
-          console.warn(
-            'Could not update profile subscription status. It may not exist in the DB schema yet.',
-            profileError,
-          );
+        const { error: txnError } = await createCheckoutTransaction({
+          amountInr: 0,
+          currency: 'INR',
+          status: 'SUCCESS',
+          paymentProvider: 'COUPON',
+          paymentMethod: 'COUPON_BYPASS',
+          couponCode: couponData.code,
+          metadata: {
+            source: 'detailed_flow_gate',
+            mode: 'coupon_bypass',
+            plan_year: PLAN_YEAR,
+            valid_until: VALID_UNTIL,
+          },
+        });
+        if (txnError) {
+          console.warn('Checkout transaction record failed after coupon redeem:', txnError);
         }
 
         clearPendingCouponInvite();
-        setSuccess(true);
-        setTimeout(() => {
-          onActivate();
-        }, 1500);
+        finishActivation();
       } catch (err) {
         console.error(err);
         setError(err.message || 'Something went wrong.');
@@ -77,7 +143,7 @@ const SubscriptionGate = ({ onActivate }) => {
         setLoading(false);
       }
     },
-    [user?.id, user?.email, onActivate],
+    [user?.id, user?.email, finishActivation],
   );
 
   const handleApplyCoupon = async (e) => {
@@ -100,93 +166,235 @@ const SubscriptionGate = ({ onActivate }) => {
     void redeemCoupon(inv.code);
   }, [user?.email, success, redeemCoupon]);
 
-  const handleMockPayment = (plan) => {
-    alert(`Redirecting to RazorPay for the ${plan} plan...\n\n(Mock Payment Gateway Integration)`);
+  const handlePayWithRazorpay = async () => {
+    if (!user?.id || paying || success) return;
+
+    setPaying(true);
+    setError(null);
+
+    try {
+      const sdkReady = await loadRazorpayScript();
+      if (!sdkReady || !window.Razorpay) {
+        throw new Error('Unable to load Razorpay Checkout. Please try again.');
+      }
+
+      const { data: orderData, error: orderError } = await createRazorpayOrder({
+        amountInr: ANNUAL_PLAN_INR,
+        currency: 'INR',
+        notes: {
+          userId: user.id,
+          flow: 'detailed_flow_unlock',
+          plan: 'calendar_year',
+          plan_year: PLAN_YEAR,
+          intro_price: INTRO_PRICING ? 'true' : 'false',
+        },
+      });
+
+      if (orderError || !orderData?.keyId || !orderData?.orderId) {
+        throw new Error(orderError?.message || 'Unable to create Razorpay order.');
+      }
+
+      const userLabel = user.email?.split('@')[0] || 'Client';
+
+      const options = {
+        key: orderData.keyId,
+        amount: orderData.amount,
+        currency: orderData.currency || 'INR',
+        order_id: orderData.orderId,
+        name: 'Finbrella',
+        description: `Detailed Planning — Calendar Year ${PLAN_YEAR}`,
+        handler: async (response) => {
+          try {
+            const { data: verifyData, error: verifyError } = await verifyRazorpaySignature({
+              razorpay_payment_id: response?.razorpay_payment_id || '',
+              razorpay_order_id: response?.razorpay_order_id || '',
+              razorpay_signature: response?.razorpay_signature || '',
+            });
+
+            if (verifyError || !verifyData?.verified) {
+              throw new Error('Payment received, but signature verification failed.');
+            }
+
+            await activateSubscription(user.id);
+
+            const { error: txnError } = await createCheckoutTransaction({
+              amountInr: ANNUAL_PLAN_INR,
+              currency: 'INR',
+              status: 'SUCCESS',
+              paymentProvider: 'RAZORPAY',
+              paymentMethod: 'ONLINE',
+              providerPaymentId: response?.razorpay_payment_id || null,
+              providerOrderId: response?.razorpay_order_id || null,
+              metadata: {
+                source: 'detailed_flow_gate',
+                mode: INTRO_PRICING ? 'paid_intro_calendar_year' : 'paid_calendar_year',
+                plan_year: PLAN_YEAR,
+                valid_until: VALID_UNTIL,
+              },
+            });
+
+            if (txnError) {
+              console.warn('Checkout transaction record failed after payment:', txnError);
+            }
+
+            finishActivation();
+          } catch (err) {
+            console.error(err);
+            setError(err.message || 'Payment verification failed.');
+          } finally {
+            setPaying(false);
+          }
+        },
+        prefill: {
+          name: userLabel,
+          email: user.email || '',
+        },
+        notes: {
+          userId: user.id,
+          flow: 'detailed_flow_unlock',
+        },
+        theme: {
+          color: '#0073e6',
+        },
+        modal: {
+          ondismiss: () => {
+            setPaying(false);
+          },
+        },
+      };
+
+      const paymentObject = new window.Razorpay(options);
+      paymentObject.on('payment.failed', () => {
+        setError('Payment failed. Please retry or use a coupon code.');
+        setPaying(false);
+      });
+      paymentObject.open();
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Unable to start payment.');
+      setPaying(false);
+    }
   };
 
   return (
     <div className="subscription-gate">
       <div className="gate-header">
-        <img src={finbrellaLogo} alt="Finbrella Logo" style={{ height: '80px', objectFit: 'contain' }} className="gate-icon" />
-        <h1>Activate Your Account</h1>
-        <p>Choose a subscription plan to unlock full access to the Finbrella Financial Planning Suite.</p>
+        <img
+          src={finbrellaLogo}
+          alt="Finbrella Logo"
+          style={{ height: '80px', objectFit: 'contain' }}
+          className="gate-icon"
+        />
+        <h1>Unlock Detailed Planning</h1>
+        <p>
+          Summary planning stays free. Pay for calendar year {PLAN_YEAR} (or enter a bypass code) to
+          unlock the detailed planning flow and advanced tools.
+        </p>
       </div>
 
       <div className="pricing-grid">
-        // Annual Plan Card
         <div className="pricing-card premium">
-          <div className="popular-badge">Most Popular</div>
+          <div className="popular-badge">
+            {INTRO_PRICING ? 'Introductory' : 'Calendar Year'}
+          </div>
           <div className="card-header">
-            <h3>Annual Plan</h3>
+            <h3>Calendar Year {PLAN_YEAR}</h3>
             <div className="price">
-              <span className="currency">₹</span>2,000<span className="period">/yr</span>
+              <span className="currency">₹</span>
+              {ANNUAL_PLAN_INR.toLocaleString('en-IN')}
+              <span className="period"> till Dec {PLAN_YEAR}</span>
             </div>
-            <p>Full suite access for 12 months.</p>
+            <p>
+              {INTRO_PRICING
+                ? `Introductory price for calendar year ${PLAN_YEAR}. Access through 31 Dec ${PLAN_YEAR}.`
+                : `Unlock detailed planning for calendar year ${PLAN_YEAR} (through 31 Dec ${PLAN_YEAR}).`}
+            </p>
           </div>
           <div className="card-actions">
-            <button onClick={() => handleMockPayment('Annual')} className="btn-pay primary">
-              <CreditCard size={18} /> Pay with Razorpay
+            <button
+              type="button"
+              onClick={handlePayWithRazorpay}
+              className="btn-pay primary"
+              disabled={paying || success || loading}
+            >
+              <CreditCard size={18} />
+              {paying ? 'Opening Razorpay…' : success ? 'Unlocked!' : 'Pay with Razorpay'}
             </button>
           </div>
           <ul className="features-list">
-            <li><CheckCircle2 size={16} /> Complete Diagnostic Suite</li>
-            <li><CheckCircle2 size={16} /> Data Export & Reports</li>
-            <li><CheckCircle2 size={16} /> Free Priority Support</li>
-          </ul>
-        </div>
-
-        // Renewal Plan Card
-        <div className="pricing-card standard">
-          <div className="card-header">
-            <h3>Renewal Plan</h3>
-            <div className="price">
-              <span className="currency">₹</span>1,000<span className="period">/yr</span>
-            </div>
-            <p>For existing members renewing access.</p>
-          </div>
-          <div className="card-actions">
-            <button onClick={() => handleMockPayment('Renewal')} className="btn-pay secondary">
-              <Zap size={18} /> Renew Access
-            </button>
-          </div>
-          <ul className="features-list">
-            <li><CheckCircle2 size={16} /> Continuous Account Access</li>
-            <li><CheckCircle2 size={16} /> Preserve Legacy Data</li>
+            <li>
+              <CheckCircle2 size={16} /> Detailed planning questionnaire
+            </li>
+            <li>
+              <CheckCircle2 size={16} /> Advanced reports & calculators
+            </li>
+            <li>
+              <CheckCircle2 size={16} /> Access through 31 Dec {PLAN_YEAR}
+            </li>
           </ul>
         </div>
       </div>
 
-      // Coupon Bypass Section
       <div className="coupon-section">
         <div className="coupon-header">
           <Ticket size={24} color="var(--primary)" />
-          <h4>Have a Coupon code?</h4>
+          <h4>Have a bypass code?</h4>
         </div>
-        <p>Enter your coupon code to bypass the payment gateway</p>
-        
+        <p>Enter your coupon code to skip payment and unlock detailed planning</p>
+
         <form onSubmit={handleApplyCoupon} className="coupon-form">
-          <input 
-            type="text" 
+          <input
+            type="text"
             placeholder="Enter Coupon Code (e.g. FIN-XXXXXX)"
             value={couponCode}
             onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-            disabled={loading || success}
+            disabled={loading || success || paying}
           />
-          <button type="submit" disabled={loading || success || !couponCode} className={`btn-apply ${success ? 'success' : ''}`}>
-            {loading ? 'Verifying...' : success ? 'Activated!' : 'Apply Code'}
+          <button
+            type="submit"
+            disabled={loading || success || paying || !couponCode}
+            className={`btn-apply ${success ? 'success' : ''}`}
+          >
+            {loading ? 'Verifying...' : success ? 'Unlocked!' : 'Apply Code'}
           </button>
         </form>
 
-        {error && <div className="error-message"><Lock size={14} /> {error}</div>}
+        {error && (
+          <div className="error-message">
+            <Lock size={14} /> {error}
+          </div>
+        )}
       </div>
 
-      <div style={{ marginTop: '1.5rem', fontSize: '0.95rem', color: 'var(--text-muted)', textAlign: 'center', maxWidth: '500px' }}>
-        Don't have a coupon code? Email us at <a href="mailto:finbrellafpd@gmail.com?subject=GET ME COUPON CODE" style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 600 }}>finbrellafpd@gmail.com</a> with the subject "GET ME COUPON CODE."
+      <div
+        style={{
+          marginTop: '1.5rem',
+          fontSize: '0.95rem',
+          color: 'var(--text-muted)',
+          textAlign: 'center',
+          maxWidth: '500px',
+        }}
+      >
+        Don&apos;t have a coupon code? Email us at{' '}
+        <a
+          href="mailto:finbrellafpd@gmail.com?subject=GET ME COUPON CODE"
+          style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 600 }}
+        >
+          finbrellafpd@gmail.com
+        </a>{' '}
+        with the subject &quot;GET ME COUPON CODE.&quot;
       </div>
 
-      <button onClick={() => signOut()} className="logout-btn">
-        Log Out
-      </button>
+      <div className="gate-footer-actions">
+        {onBack && (
+          <button type="button" onClick={onBack} className="back-btn">
+            <ArrowLeft size={16} /> Back to Summary
+          </button>
+        )}
+        <button type="button" onClick={() => signOut()} className="logout-btn">
+          Log Out
+        </button>
+      </div>
 
       <style jsx>{`
         .subscription-gate {
@@ -228,11 +436,12 @@ const SubscriptionGate = ({ onActivate }) => {
 
         .pricing-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+          grid-template-columns: minmax(280px, 420px);
           gap: 2rem;
           max-width: 800px;
-          margin-bottom: 4rem;
+          margin-bottom: 2.5rem;
           width: 100%;
+          justify-content: center;
         }
 
         .pricing-card {
@@ -243,18 +452,11 @@ const SubscriptionGate = ({ onActivate }) => {
           position: relative;
           display: flex;
           flex-direction: column;
-          transition: all 0.3s ease;
         }
 
         .pricing-card.premium {
           border-color: var(--primary);
-          box-shadow: 0 10px 40px rgba(var(--primary-rgb), 0.1);
-          transform: translateY(-10px);
-        }
-
-        .pricing-card:hover {
-          transform: translateY(-10px);
-          border-color: var(--primary);
+          box-shadow: 0 10px 40px rgba(0, 115, 230, 0.12);
         }
 
         .popular-badge {
@@ -270,6 +472,7 @@ const SubscriptionGate = ({ onActivate }) => {
           font-weight: 600;
           letter-spacing: 1px;
           text-transform: uppercase;
+          white-space: nowrap;
         }
 
         .card-header h3 {
@@ -320,22 +523,17 @@ const SubscriptionGate = ({ onActivate }) => {
         }
 
         .btn-pay.primary {
-          background: #0073e6; // Razorpay Blue
+          background: #0073e6;
           color: white;
         }
 
-        .btn-pay.primary:hover {
+        .btn-pay.primary:hover:not(:disabled) {
           background: #005bb5;
         }
 
-        .btn-pay.secondary {
-          background: var(--bg-main);
-          color: var(--text);
-          border: 1px solid var(--border);
-        }
-
-        .btn-pay.secondary:hover {
-          border-color: var(--text);
+        .btn-pay:disabled {
+          opacity: 0.7;
+          cursor: not-allowed;
         }
 
         .features-list {
@@ -422,7 +620,6 @@ const SubscriptionGate = ({ onActivate }) => {
 
         .btn-apply:hover:not(:disabled) {
           transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(255,255,255,0.1);
         }
 
         .btn-apply:disabled {
@@ -448,28 +645,47 @@ const SubscriptionGate = ({ onActivate }) => {
           font-size: 0.9rem;
         }
 
+        .gate-footer-actions {
+          margin-top: 2.5rem;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 0.75rem;
+        }
+
+        .back-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.4rem;
+          background: transparent;
+          border: 1px solid var(--border);
+          color: var(--text);
+          padding: 0.65rem 1.1rem;
+          border-radius: 8px;
+          cursor: pointer;
+          font-weight: 600;
+        }
+
+        .back-btn:hover {
+          border-color: var(--primary);
+          color: var(--primary);
+        }
+
         .logout-btn {
-          margin-top: 3rem;
           background: transparent;
           border: none;
           color: var(--text-muted);
           text-decoration: underline;
           cursor: pointer;
         }
-        
+
         .logout-btn:hover {
           color: var(--text);
         }
-        
+
         @media (max-width: 768px) {
-          .pricing-grid {
-            grid-template-columns: 1fr;
-          }
-          .pricing-card.premium {
-            transform: none;
-          }
-          .pricing-card:hover {
-            transform: none;
+          .gate-header h1 {
+            font-size: 1.85rem;
           }
           .coupon-form {
             flex-direction: column;
@@ -483,7 +699,4 @@ const SubscriptionGate = ({ onActivate }) => {
   );
 };
 
-export default SubscriptionGate;
-*/
-const SubscriptionGate = () => null;
 export default SubscriptionGate;
