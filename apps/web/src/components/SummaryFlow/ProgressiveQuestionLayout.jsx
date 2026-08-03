@@ -14,6 +14,7 @@ import {
 } from '../FinancialWorkspace/workspaceNavConfig';
 import { resolveSectionId } from '../FinancialWorkspace/sectionIds';
 import { useLandingQuestion, focusLandingControl } from '../FinancialWorkspace/smartEdit/useLandingQuestion';
+import { scrollProgressiveFlowToTop } from './scrollProgressiveFlowToTop';
 
 /** Old per-screen question ids → merged screen ids (Smart Edit landing). */
 export const SUMMARY_QUESTION_ID_ALIASES = Object.freeze({
@@ -139,6 +140,7 @@ const ProgressiveQuestionLayout = ({
     const [showNarrative, setShowNarrative] = useState(false);
     const { landingQuestionId, control: landingControl, clearLanding } = useLandingQuestion(questions);
     const skipAutoAdvanceRef = useRef(false);
+    const suppressScrollUntilRef = useRef(0);
     const advanceTimerRef = useRef(null);
 
     const currentGlobalIndex = steps.findIndex(s => s.id === currentStepId);
@@ -167,6 +169,13 @@ const ProgressiveQuestionLayout = ({
         if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
     }, []);
 
+    // Keep the next question/section starting at the top of the viewport.
+    // Smart Edit landing temporarily suppresses this so focusLandingControl can scroll to the control.
+    useEffect(() => {
+        if (Date.now() < suppressScrollUntilRef.current) return;
+        scrollProgressiveFlowToTop();
+    }, [currentIndex, currentStepId]);
+
     // Smart Edit landing: jump directly to the requested question (no chevrons),
     // focus/scroll the first control, then clear the one-shot landing params.
     useEffect(() => {
@@ -175,6 +184,7 @@ const ProgressiveQuestionLayout = ({
         const idx = questions.findIndex((q) => q && (q.id === resolvedId || q.id === landingQuestionId));
         if (idx < 0) return;
         skipAutoAdvanceRef.current = true;
+        suppressScrollUntilRef.current = Date.now() + 700;
         setDirection(1);
         setCurrentIndex(idx);
         focusLandingControl(landingControl);
@@ -229,6 +239,7 @@ const ProgressiveQuestionLayout = ({
         if (savePlanData) {
             try { await savePlanData(); } catch (e) { console.error('Save failed on nav', e); }
         }
+        scrollProgressiveFlowToTop();
         if (onComplete) {
             onComplete();
         } else {
@@ -261,6 +272,7 @@ const ProgressiveQuestionLayout = ({
         if (savePlanData) {
             try { await savePlanData(); } catch (e) { console.error('Save failed on nav', e); }
         }
+        scrollProgressiveFlowToTop();
         const prevStep = steps[currentGlobalIndex - 1];
         if (prevStep) {
             if (inWorkspaceEdit) {
