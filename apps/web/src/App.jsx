@@ -2,6 +2,7 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import RoleBasedRouting from './components/Auth/RoleBasedRouting';
 import ProtectedRoute from './components/ProtectedRoute';
+import DetailedAccessGate from './components/Auth/DetailedAccessGate';
 import { useFinancialPlan } from './contexts/FinancialPlanContext';
 import BlankLayout from './components/Layouts/BlankLayout';
 
@@ -73,8 +74,17 @@ function App() {
           <Route path=":section" element={<SummaryReportView />} />
         </Route>
 
-        {/* Detailed Report View */}
-        <Route path="/detailed-report" element={<ProtectedRoute><BlankLayout /></ProtectedRoute>}>
+        {/* Detailed Report View — requires paid / coupon unlock */}
+        <Route
+          path="/detailed-report"
+          element={
+            <ProtectedRoute>
+              <DetailedAccessGate>
+                <BlankLayout />
+              </DetailedAccessGate>
+            </ProtectedRoute>
+          }
+        >
           <Route index element={<Navigate to="your_money_flow" replace />} />
           <Route path=":section" element={<DetailedReportView />} />
         </Route>
@@ -94,11 +104,29 @@ function App() {
           }
         />
 
-        {/* Legacy Existing App */}
-        <Route path="/detailed-flow/existing-app/*" element={<ProtectedRoute><DetailedFlowLayout /></ProtectedRoute>} />
+        {/* Legacy Existing App — development only; not shown in production builds */}
+        {import.meta.env.DEV && (
+          <Route
+            path="/detailed-flow/existing-app/*"
+            element={
+              <ProtectedRoute>
+                <DetailedFlowLayout />
+              </ProtectedRoute>
+            }
+          />
+        )}
 
-        {/* Detailed Flow Routes */}
-        <Route path="/detailed-flow" element={<ProtectedRoute><BlankLayout /></ProtectedRoute>}>
+        {/* Detailed Flow Routes — requires paid / coupon unlock; summary stays free */}
+        <Route
+          path="/detailed-flow"
+          element={
+            <ProtectedRoute>
+              <DetailedAccessGate>
+                <BlankLayout />
+              </DetailedAccessGate>
+            </ProtectedRoute>
+          }
+        >
           <Route path="familyinfo" element={<DetailedFamilyInfo />} />
           <Route path="money_in_out" element={<DetailedMoneyInOut />} />
           <Route path="mywealth" element={<DetailedMyWealthSnapshot />} />

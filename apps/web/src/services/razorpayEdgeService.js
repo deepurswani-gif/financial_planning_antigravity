@@ -1,4 +1,3 @@
-/* FLAG_PAYMENT_DISABLED:
 import { supabase } from '../lib/supabase';
 
 const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/razorpay-checkout`;
@@ -55,7 +54,3 @@ export const verifyRazorpaySignature = async ({
     razorpay_order_id,
     razorpay_signature,
   });
-*/
-
-export const createRazorpayOrder = async () => ({ data: null, error: new Error('Payment disabled') });
-export const verifyRazorpaySignature = async () => ({ data: null, error: new Error('Payment disabled') });

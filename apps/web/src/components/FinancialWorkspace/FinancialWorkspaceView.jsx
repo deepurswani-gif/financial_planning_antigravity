@@ -516,6 +516,7 @@ export default function FinancialWorkspaceView() {
   }, [editingSection, navigate, searchParams]);
 
   const showLegacyDevButton =
+    import.meta.env.DEV &&
     !summaryMode &&
     workspaceFocus === 'detail' &&
     activeDetailReportId === 'your_moneys_magic';

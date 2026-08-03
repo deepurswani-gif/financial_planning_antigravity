@@ -22,6 +22,7 @@ create table if not exists public.user_profiles (
   phone text,
   is_approved boolean default false,
   subscription_active boolean default false,
+  subscription_valid_until date,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );

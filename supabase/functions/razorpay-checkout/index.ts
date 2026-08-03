@@ -1,4 +1,3 @@
-/* FLAG_PAYMENT_DISABLED:
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -90,7 +89,10 @@ serve(async (req) => {
   if (action === 'create_order') {
     const amountInr = Number(body.amountInr ?? 0);
     const currency = String(body.currency || 'INR');
-    const notes = (body.notes && typeof body.notes === 'object' ? body.notes : {}) as Record<string, unknown>;
+    const notes = (body.notes && typeof body.notes === 'object' ? body.notes : {}) as Record<
+      string,
+      unknown
+    >;
 
     if (Number.isNaN(amountInr) || amountInr < 0) {
       return json(400, { success: false, error: 'amountInr must be a non-negative number' });
@@ -179,14 +181,4 @@ serve(async (req) => {
   }
 
   return json(400, { success: false, error: 'Unsupported action' });
-});
-*/
-
-import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
-
-serve(async () => {
-    return new Response(JSON.stringify({ error: "Payment disabled" }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json' },
-    });
 });
