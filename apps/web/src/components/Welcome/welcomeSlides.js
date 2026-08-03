@@ -22,12 +22,13 @@ export const WELCOME_SLIDES = [
     emphasizeWealthMap: true,
     outcomes: null,
     primaryCta: 'Create My WealthMap',
-    primaryAction: 'signup',
+    primaryAction: 'next',
     secondaryCta: 'Sign In',
     secondaryAction: 'login',
   },
   {
     id: 'protect',
+
     heroSrc: screen2,
     heroAlt:
       'The same person understanding their financial picture clearly — protection and gaps visible before they become problems',
