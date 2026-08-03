@@ -12,6 +12,7 @@ import {
   DEFAULT_DETAIL_TAB_ID,
   DEFAULT_SUMMARY_REPORT_ID,
   DRAWER_ITEM_ACTIONS,
+  SUMMARY_REPORT_NAV_ITEMS,
   getDefaultSecondaryId,
   resolveCanonicalId,
 } from './workspaceNavConfig';
@@ -23,6 +24,24 @@ import {
 } from './workspaceCapabilities';
 
 const FinancialWorkspaceContext = createContext(null);
+
+/** Summary lane when in Summary Mode or when Full Mode focus is on summary reports. */
+function isSummaryWorkflow(state) {
+  return state.mode === 'summary' || state.workspaceFocus === 'summary';
+}
+
+function getWorkflowItems(state) {
+  return isSummaryWorkflow(state) ? SUMMARY_REPORT_NAV_ITEMS : DETAIL_REPORT_TAB_ITEMS;
+}
+
+function getWorkflowActiveId(state) {
+  return isSummaryWorkflow(state) ? state.activeSummaryReportId : state.activeDetailReportId;
+}
+
+function getWorkflowIndex(state) {
+  const activeId = getWorkflowActiveId(state);
+  return getWorkflowItems(state).findIndex((item) => item.id === activeId);
+}
 
 function ensureUiBucket(map, id) {
   return map[id] || { scrollTop: 0, expanded: {}, selections: {}, draft: {} };
@@ -108,8 +127,17 @@ function workspaceReducer(state, action) {
       };
     }
     case 'WORKFLOW_PREV': {
+      if (isSummaryWorkflow(state)) {
+        const index = getWorkflowIndex(state);
+        if (index <= 0) return state;
+        return {
+          ...state,
+          activeSummaryReportId: SUMMARY_REPORT_NAV_ITEMS[index - 1].id,
+          workspaceFocus: 'summary',
+        };
+      }
       if (!canUseDetailReports(state.mode)) return state;
-      const index = DETAIL_REPORT_TAB_ITEMS.findIndex((i) => i.id === state.activeDetailReportId);
+      const index = getWorkflowIndex(state);
       if (index <= 0) return state;
       return {
         ...state,
@@ -118,8 +146,17 @@ function workspaceReducer(state, action) {
       };
     }
     case 'WORKFLOW_NEXT': {
+      if (isSummaryWorkflow(state)) {
+        const index = getWorkflowIndex(state);
+        if (index < 0 || index >= SUMMARY_REPORT_NAV_ITEMS.length - 1) return state;
+        return {
+          ...state,
+          activeSummaryReportId: SUMMARY_REPORT_NAV_ITEMS[index + 1].id,
+          workspaceFocus: 'summary',
+        };
+      }
       if (!canUseDetailReports(state.mode)) return state;
-      const index = DETAIL_REPORT_TAB_ITEMS.findIndex((i) => i.id === state.activeDetailReportId);
+      const index = getWorkflowIndex(state);
       if (index < 0 || index >= DETAIL_REPORT_TAB_ITEMS.length - 1) return state;
       return {
         ...state,
@@ -274,12 +311,23 @@ export function FinancialWorkspaceProvider({ children }) {
 
   const getDrawerAction = useCallback((itemId) => DRAWER_ITEM_ACTIONS[itemId] ?? { type: 'none' }, []);
 
-  const detailIndex = DETAIL_REPORT_TAB_ITEMS.findIndex((i) => i.id === state.activeDetailReportId);
-  const canWorkflowPrevious = detailIndex > 0 && canUseDetailReports(state.mode);
+  const workflowItems = getWorkflowItems(state);
+  const workflowIndex = getWorkflowIndex(state);
+  const summaryWorkflow = isSummaryWorkflow(state);
+  const canWorkflowPrevious =
+    workflowIndex > 0 && (summaryWorkflow || canUseDetailReports(state.mode));
   const canWorkflowNext =
-    detailIndex >= 0 &&
-    detailIndex < DETAIL_REPORT_TAB_ITEMS.length - 1 &&
-    canUseDetailReports(state.mode);
+    workflowIndex >= 0 &&
+    workflowIndex < workflowItems.length - 1 &&
+    (summaryWorkflow || canUseDetailReports(state.mode));
+  const workflowPreviousLabel = canWorkflowPrevious ? workflowItems[workflowIndex - 1]?.label ?? null : null;
+  const workflowNextLabel = canWorkflowNext ? workflowItems[workflowIndex + 1]?.label ?? null : null;
+  const workflowStepItems = workflowItems.map((item) => ({
+    id: item.id,
+    label: item.label,
+    stage: item.stage ?? null,
+  }));
+  const workflowActiveId = getWorkflowActiveId(state);
 
   const value = useMemo(
     () => ({
@@ -303,6 +351,12 @@ export function FinancialWorkspaceProvider({ children }) {
       getDrawerAction,
       canWorkflowPrevious,
       canWorkflowNext,
+      workflowPreviousLabel,
+      workflowNextLabel,
+      workflowStepItems,
+      workflowActiveId,
+      workflowIndex,
+      isSummaryWorkflow: summaryWorkflow,
       getDefaultSecondaryId,
     }),
     [
@@ -326,6 +380,12 @@ export function FinancialWorkspaceProvider({ children }) {
       getDrawerAction,
       canWorkflowPrevious,
       canWorkflowNext,
+      workflowPreviousLabel,
+      workflowNextLabel,
+      workflowStepItems,
+      workflowActiveId,
+      workflowIndex,
+      summaryWorkflow,
     ]
   );
 

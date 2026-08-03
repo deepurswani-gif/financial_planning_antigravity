@@ -6,7 +6,11 @@ import React from 'react';
  */
 export default function ActiveWorkspace({ children }) {
   return (
-    <section className="fw-active-workspace" aria-label="Active workspace">
+    <section
+      className="fw-active-workspace"
+      aria-label="Active workspace"
+      data-tour="workspace-report"
+    >
       <div className="fw-active-workspace-inner">
         {children ?? null}
       </div>
