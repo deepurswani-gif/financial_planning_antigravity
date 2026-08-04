@@ -1,4 +1,10 @@
 import { createContext, useContext, useEffect, useState } from 'react';
+import {
+  AnalyticsEventName,
+  clearAnalyticsSessionId,
+  flushAnalyticsEvents,
+  trackAnalyticsEvent,
+} from '../lib/analytics';
 import { getSession, onAuthStateChange } from '../services/authService';
 
 const AuthContext = createContext({
@@ -46,6 +52,24 @@ export const AuthProvider = ({ children }) => {
         setSession(session);
         setLoading(false);
         return;
+      }
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user?.id) {
+        trackAnalyticsEvent({
+          eventName: AnalyticsEventName.SESSION_START,
+          eventCategory: 'session',
+          userId: session.user.id,
+          feature: 'auth',
+          properties: { method: event },
+        });
+      }
+      if (event === 'SIGNED_OUT') {
+        trackAnalyticsEvent({
+          eventName: AnalyticsEventName.SESSION_END,
+          eventCategory: 'session',
+          feature: 'auth',
+        });
+        void flushAnalyticsEvents();
+        clearAnalyticsSessionId();
       }
       setSession(session);
       setUser(session?.user ?? null);

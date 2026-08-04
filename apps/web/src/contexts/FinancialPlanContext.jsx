@@ -25,6 +25,7 @@ import {
   saveWorkspaceCapability,
   resolveEffectiveCapability,
 } from '../components/FinancialWorkspace/workspaceCapabilityStorage';
+import { dispatchMonthlyWealthSummary } from '../notificationDelivery';
 
 const FinancialPlanContext = createContext();
 
@@ -699,7 +700,29 @@ export const FinancialPlanProvider = ({ children }) => {
       const { error } = await markSummaryReportGenerated(planId);
       if (error) console.error('Failed to persist summary report generated timestamp:', error);
     }
-  }, [planId]);
+    // Monthly Wealth Summary Ready — once per calendar month (registry frequency).
+    void dispatchMonthlyWealthSummary(
+      {
+        summaryReportGeneratedAt: now,
+        currentYearLedger,
+        planStartMonth,
+        familyMembers,
+        income,
+        expenseCategories,
+        hasSpouseIncome,
+      },
+      { userId, planId },
+    );
+  }, [
+    planId,
+    userId,
+    currentYearLedger,
+    planStartMonth,
+    familyMembers,
+    income,
+    expenseCategories,
+    hasSpouseIncome,
+  ]);
 
   // Keep workspace capability decoupled from onboarding flow state.
   // - Summary capability is derived from persisted summaryReportGeneratedAt

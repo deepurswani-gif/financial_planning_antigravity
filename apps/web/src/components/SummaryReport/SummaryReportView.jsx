@@ -13,6 +13,7 @@ import {
     summaryReportSlugs,
     summaryReportSteps,
 } from './summaryReportSteps';
+import { useReportDwellTracking } from '../../hooks/useReportDwellTracking';
 
 const SECTION_BY_SLUG = {
     money_story: MoneyStorySection,
@@ -41,6 +42,13 @@ const SummaryReportView = () => {
             lastSummaryReportPath: `/summary-report/${section}`,
         });
     }, [section, userId]);
+
+    useReportDwellTracking({
+        section,
+        surface: 'summary',
+        feature: 'summary_report',
+        enabled: Boolean(section),
+    });
 
     if (!section || !summaryReportSlugs.has(section)) {
         return <Navigate to={DEFAULT_SUMMARY_REPORT_PATH} replace />;

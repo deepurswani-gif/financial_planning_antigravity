@@ -1,9 +1,10 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import RecommendationCard from './RecommendationCard';
 import RecommendationEmptyState from './RecommendationEmptyState';
 import { toPresentationModels } from '../toPresentationModel';
 import { applyDensityLimit } from '../density';
 import { resolveEmptyMessage } from '../emptyStateCopy';
+import { AnalyticsEventName, trackAnalyticsEvent } from '../../lib/analytics';
 import '../recommendationPresentation.css';
 
 /**
@@ -31,6 +32,24 @@ const RecommendationList = ({
     const mapped = models ?? toPresentationModels(recommendations);
     return applyDensityLimit(mapped, density);
   }, [models, recommendations, density]);
+
+  const viewedIdsRef = useRef(new Set());
+  const modelIdsKey = presentationModels.map((m) => m.id).join('|');
+
+  useEffect(() => {
+    if (!presentationModels.length) return;
+    presentationModels.forEach((m) => {
+      if (!m?.id || viewedIdsRef.current.has(m.id)) return;
+      viewedIdsRef.current.add(m.id);
+      trackAnalyticsEvent({
+        eventName: AnalyticsEventName.RECOMMENDATION_VIEW,
+        eventCategory: 'recommendation',
+        component: 'RecommendationCard',
+        feature: 'recommendations',
+        properties: { recommendationId: m.id, title: m.title ?? null },
+      });
+    });
+  }, [modelIdsKey, presentationModels]);
 
   if (!presentationModels.length) {
     return (

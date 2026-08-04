@@ -13,6 +13,7 @@ import {
     financialWorkspacePath,
 } from '../FinancialWorkspace/workspaceNavConfig';
 import { useBreakpoints } from '../../hooks';
+import { useAnalyticsScreenTracking } from '../../hooks/useAnalyticsScreenTracking';
 
 const steps = [
     { id: 'profile', label: 'Profile', path: '/summary-flow/profile', icon: Users },
@@ -27,10 +28,12 @@ const BlankLayout = () => {
     const location = useLocation();
     const navigate = useNavigate();
     const { lg } = useBreakpoints();
-    const { saving, lastSaved, familyMembers, summaryReportGeneratedAt, savePlanData, handleLogoutCleanup } = useFinancialPlan();
+    const { saving, lastSaved, familyMembers, summaryReportGeneratedAt, savePlanData, handleLogoutCleanup, planId } = useFinancialPlan();
     const { user } = useAuth();
     const [profileOpen, setProfileOpen] = useState(false);
     const profileRef = useRef(null);
+
+    useAnalyticsScreenTracking({ planId: planId || null });
 
     const currentPath = location.pathname;
     const isSummaryFlow = currentPath.startsWith('/summary-flow');

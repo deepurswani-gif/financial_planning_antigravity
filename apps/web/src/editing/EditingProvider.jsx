@@ -9,6 +9,7 @@ import React, {
 } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useFinancialPlan } from '../contexts/FinancialPlanContext';
+import { useAuth } from '../contexts/AuthContext';
 import { getFieldById } from '../questionRegistry';
 import {
   EDIT_EVENTS,
@@ -21,6 +22,8 @@ import { validateFieldValues } from './validation';
 import { computeRootUpdate, readValueByPath } from './planAccessor';
 import { FINANCIAL_WORKSPACE_PATH } from '../components/FinancialWorkspace/workspaceNavConfig';
 import { applySmartEditWriteBack } from './smartEditWriteBack';
+import { AnalyticsEventName, trackAnalyticsEvent } from '../lib/analytics';
+import { dispatchWealthMapUpdated, dispatchCoachNotificationsAfterRecalc } from '../notificationDelivery';
 
 /**
  * EditingProvider — Finbrella's reusable Editing Platform runtime.
@@ -109,6 +112,7 @@ function hostFieldIdsForSession(session) {
 
 export function EditingProvider({ children, onRecalculate }) {
   const plan = useFinancialPlan();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [ctx, dispatch] = useReducer(editSessionReducer, undefined, createInitialEditState);
@@ -118,6 +122,8 @@ export function EditingProvider({ children, onRecalculate }) {
   // recreating callbacks or reading stale closures.
   const planRef = useRef(plan);
   planRef.current = plan;
+  const userRef = useRef(user);
+  userRef.current = user;
   const searchParamsRef = useRef(searchParams);
   searchParamsRef.current = searchParams;
   const ctxRef = useRef(ctx);
@@ -240,6 +246,30 @@ export function EditingProvider({ children, onRecalculate }) {
     });
 
     if (result.ok) {
+      trackAnalyticsEvent({
+        eventName: AnalyticsEventName.SMART_EDIT_SAVE,
+        eventCategory: 'ai',
+        component: 'EditingProvider',
+        feature: 'smart_edit',
+        properties: {
+          fieldId: session.target?.fieldId ?? session.fieldId ?? null,
+          experienceId: session.experienceId ?? null,
+        },
+      });
+
+      // Coach pushes after persist + recalculate for a meaningful edit.
+      const wasMeaningful = Boolean(ctxRef.current.dirty) || (result.impacts?.length ?? 0) > 0;
+      if (wasMeaningful) {
+        const uid = userRef.current?.id;
+        const pid = planRef.current?.planId;
+        const opts = { userId: uid, planId: pid };
+        void (async () => {
+          await dispatchWealthMapUpdated(opts);
+          // Protection → Surplus → Goals (rate limits / cooldowns applied per notification)
+          await dispatchCoachNotificationsAfterRecalc(planRef.current, opts);
+        })();
+      }
+
       dispatch({ type: EDIT_EVENTS.SAVE_SUCCESS });
       dispatch({ type: EDIT_EVENTS.RETURN_DONE });
       setSavePhase(null);

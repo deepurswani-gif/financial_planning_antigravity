@@ -22,6 +22,7 @@ import {
   canUseDetailReports,
   normalizeWorkspaceMode,
 } from './workspaceCapabilities';
+import { AnalyticsEventName, trackAnalyticsEvent } from '../../lib/analytics';
 
 const FinancialWorkspaceContext = createContext(null);
 
@@ -280,6 +281,16 @@ export function FinancialWorkspaceProvider({ children }) {
    * Experience, or Question IDs leak into cards.
    */
   const launchRecommendationAction = useCallback((recommendation) => {
+    trackAnalyticsEvent({
+      eventName: AnalyticsEventName.RECOMMENDATION_ACCEPT,
+      eventCategory: 'recommendation',
+      component: 'RecommendationActions',
+      feature: 'recommendations',
+      properties: {
+        recommendationId: recommendation?.recommendationId ?? recommendation?.id ?? null,
+        title: recommendation?.title ?? null,
+      },
+    });
     const launcher = recommendationActionLauncherRef.current;
     if (typeof launcher === 'function') {
       return launcher(recommendation);

@@ -15,6 +15,7 @@ export default function DesktopChrome({
   userInitials = 'U',
   userEmail = '',
   onLogout,
+  onOpenSettings,
   workspaceTitle = WORKSPACE_TITLE,
   dashboardLabel = WORKSPACE_DASHBOARD_LABEL,
   calculatorsLocked = false,
@@ -71,6 +72,7 @@ export default function DesktopChrome({
               userInitials={userInitials}
               userEmail={userEmail}
               onLogout={onLogout}
+              onOpenSettings={onOpenSettings}
             />
           </div>
         </div>

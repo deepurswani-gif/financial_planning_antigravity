@@ -12,11 +12,12 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.96.0",
+    "firebase": "^12.17.0",
     "framer-motion": "^12.40.0",
     "lucide-react": "^0.563.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "react-router-dom": "^7.15.1",
+    "react-router-dom": "^7.11.0",
     "recharts": "^3.8.1",
     "vite-plugin-pwa": "^1.2.0"
   },

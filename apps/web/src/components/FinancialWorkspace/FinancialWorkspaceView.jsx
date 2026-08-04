@@ -18,6 +18,7 @@ import CalculatorModal from './CalculatorModal';
 import UnlockPlanningDialog from './UnlockPlanningDialog';
 import ScrollToTopButton from './ScrollToTopButton';
 import WorkspaceProductTour from './WorkspaceProductTour';
+import NotificationSettingsPanel from './NotificationSettingsPanel';
 import {
   DETAILED_FLOW_ENTRY_PATH,
   DEFAULT_DETAIL_TAB_ID,
@@ -38,6 +39,9 @@ import {
 } from './workspaceCapabilities';
 import WorkspaceSectionEditor from './WorkspaceSectionEditor';
 import { isKnownSectionId } from './sectionRegistry';
+import { AnalyticsEventName, trackAnalyticsEvent } from '../../lib/analytics';
+import { useAnalyticsScreenTracking } from '../../hooks/useAnalyticsScreenTracking';
+import { useReportDwellTracking } from '../../hooks/useReportDwellTracking';
 import { resolveSectionId } from './sectionIds';
 import { loadWorkspaceCapability } from './workspaceCapabilityStorage';
 import {
@@ -50,6 +54,11 @@ import { useEditing } from '../../editing/EditingProvider';
 import { getExperienceById, resolveLaunch, buildActivationRequest } from '../../experienceRegistry';
 import { SmartEditActivationContext } from './smartEdit/activationChannel';
 import { resolveExperienceIdForRecommendation } from './recommendationActionLaunch';
+import {
+  isPushOptedIn,
+} from '../../lib/pushNotifications';
+import { flushPendingNotifications, dispatchMonthlyWealthSummary } from '../../notificationDelivery';
+import { ensurePushTokenForUser } from '../../services/ensurePushTokenForUser';
 
 /**
  * Scroll to a section id inside the workspace scroll container.
@@ -82,7 +91,15 @@ export default function FinancialWorkspaceView() {
     planStartMonth,
     lastSaved,
     workspaceCapability,
+    planId,
+    summaryReportGeneratedAt,
+    currentYearLedger,
+    income,
+    expenseCategories,
+    hasSpouseIncome,
+    journeyProjections,
   } = useFinancialPlan();
+  useAnalyticsScreenTracking({ planId: planId || null });
   const effectiveWorkspaceCapability = workspaceCapability ?? loadWorkspaceCapability(user?.id);
   const {
     state,
@@ -152,6 +169,53 @@ export default function FinancialWorkspaceView() {
   }, [effectiveWorkspaceCapability, mode, setMode]);
 
   const [unlockOpen, setUnlockOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // Bind FCM token to the signed-in account (handles account switch on same browser).
+  useEffect(() => {
+    if (!user?.id || !isPushOptedIn(user.id)) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const ensured = await ensurePushTokenForUser(user.id);
+        if (cancelled || !ensured.ok) return;
+        await flushPendingNotifications({ userId: user.id, planId });
+        if (summaryReportGeneratedAt) {
+          await dispatchMonthlyWealthSummary(
+            {
+              summaryReportGeneratedAt,
+              currentYearLedger,
+              planStartMonth,
+              familyMembers,
+              income,
+              expenseCategories,
+              hasSpouseIncome,
+              journeyProjections,
+            },
+            { userId: user.id, planId },
+          );
+        }
+      } catch (err) {
+        if (import.meta.env.DEV) {
+          console.warn('[FCM] Token refresh skipped:', err?.message || err);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    user?.id,
+    planId,
+    summaryReportGeneratedAt,
+    currentYearLedger,
+    planStartMonth,
+    familyMembers,
+    income,
+    expenseCategories,
+    hasSpouseIncome,
+    journeyProjections,
+  ]);
 
   const startTour = useCallback((trigger = 'manual') => {
     setDrawerOpen(false);
@@ -368,8 +432,19 @@ export default function FinancialWorkspaceView() {
     const experienceId = item.experienceId;
     const entityLaunch = item.kind === 'entity' ? item : null;
 
+    if (experienceId && !String(experienceId).startsWith('__')) {
+      trackAnalyticsEvent({
+        eventName: AnalyticsEventName.FEATURE_CLICK,
+        eventCategory: 'feature',
+        component: 'SmartEditDrawer',
+        feature: 'experience_launch',
+        properties: { experienceId, kind: item.kind || 'experience' },
+      });
+    }
+
     if (experienceId === '__settings__') {
       setDrawerOpen(false);
+      setSettingsOpen(true);
       return true;
     }
     if (experienceId === '__logout__') {
@@ -481,6 +556,19 @@ export default function FinancialWorkspaceView() {
     });
   }, [handleLaunchExperience, registerRecommendationActionLauncher, setDrawerOpen]);
 
+  const workspaceReportSection = editingSection
+    ? null
+    : isSummaryMode(mode)
+      ? activeSummaryReportId
+      : activeDetailReportId;
+
+  useReportDwellTracking({
+    section: workspaceReportSection,
+    surface: 'workspace',
+    feature: isSummaryMode(mode) ? 'summary_report' : 'detailed_report',
+    enabled: Boolean(workspaceReportSection),
+  });
+
   const handleSummaryReportSelect = (reportId) => {
     selectSummaryReport(reportId);
     if (!editingSection) return;
@@ -568,6 +656,7 @@ export default function FinancialWorkspaceView() {
           userInitials={userInitials}
           userEmail={user?.email || ''}
           onLogout={() => handleDrawerItem('logout')}
+          onOpenSettings={() => setSettingsOpen(true)}
           calculatorsLocked={calculatorsLocked}
           onOpenCalculator={openCalculator}
           onLockedSelect={openUnlockDialog}
@@ -594,6 +683,7 @@ export default function FinancialWorkspaceView() {
           userEmail={user?.email || ''}
           onLogout={() => handleDrawerItem('logout')}
           onTakeTour={() => startTour('manual')}
+          onOpenSettings={() => setSettingsOpen(true)}
           reportTitle={reportTitle}
           stageLabel={stageLabel}
           stepLabel={stepLabel}
@@ -696,6 +786,12 @@ export default function FinancialWorkspaceView() {
         open={unlockOpen}
         onClose={closeUnlockDialog}
         onContinue={goToDetailedPlanning}
+      />
+
+      <NotificationSettingsPanel
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        userId={user?.id}
       />
 
       {!lg ? (
