@@ -7,6 +7,7 @@ import {
     isSupportWeb3CooldownActive,
     markSupportWeb3Sent,
 } from '../../services/supportRequestEmailService';
+import { AnalyticsEventName, trackAnalyticsEvent } from '../../lib/analytics';
 
 const ERROR_COOLDOWN_SEC = 20;
 
@@ -84,6 +85,19 @@ const EmailCtaButton = ({ cta, context, accentColor, className }) => {
             setSendState('success');
             return;
         }
+        trackAnalyticsEvent({
+            eventName: AnalyticsEventName.CTA_CLICK,
+            eventCategory: 'feature',
+            component: 'CommercialCtaButton',
+            feature: 'commercial_cta',
+            properties: {
+                ctaId: cta.ctaId,
+                analyticsEvent: cta.analytics?.analyticsEvent ?? null,
+                recommendationId: cta.analytics?.recommendationId ?? null,
+                originatingReport: cta.analytics?.originatingReport ?? null,
+                moduleName: moduleName ?? null,
+            },
+        });
         setSendState('loading');
         try {
             const { ok } = await submitSupportRequestViaWeb3forms(emailContext);

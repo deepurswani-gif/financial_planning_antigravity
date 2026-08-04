@@ -8,6 +8,7 @@ import {
 } from './smartEdit/smartEditModel';
 import { useDynamicEntities } from './smartEdit/useDynamicEntities';
 import { useDrawerFocusRestore } from './useDrawerFocusRestore';
+import { AnalyticsEventName, trackAnalyticsEvent } from '../../lib/analytics';
 
 /**
  * Smart Edit body — reusable inside the standalone drawer or the mobile hub Edit tab.
@@ -202,6 +203,17 @@ export default function SmartEditDrawer({
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [open, closeDrawer]);
+
+  useEffect(() => {
+    if (!open) return;
+    trackAnalyticsEvent({
+      eventName: AnalyticsEventName.SMART_EDIT_OPEN,
+      eventCategory: 'ai',
+      component: 'SmartEditDrawer',
+      feature: 'smart_edit',
+      properties: { capability },
+    });
+  }, [open, capability]);
 
   useEffect(() => {
     if (!open) return undefined;

@@ -12,6 +12,7 @@ export default function MobileChrome({
   userEmail,
   onLogout,
   onTakeTour,
+  onOpenSettings,
   reportTitle,
   stageLabel,
   stepLabel,
@@ -32,6 +33,7 @@ export default function MobileChrome({
         userEmail={userEmail}
         onLogout={onLogout}
         onTakeTour={onTakeTour}
+        onOpenSettings={onOpenSettings}
         contextFields={contextFields}
       />
       <MobileReportHeader

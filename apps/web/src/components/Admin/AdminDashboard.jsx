@@ -1,8 +1,9 @@
-import { BarChart3, CheckCircle, Copy, Download, FileText, Link2, LogOut, Shield, Users, Tag } from 'lucide-react';
+import { BarChart3, CheckCircle, Copy, Download, FileText, LayoutDashboard, Link2, LogOut, Shield, Users, Tag } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { signOut } from '../../services/authService';
 import ClientFinancialDossier from './ClientFinancialDossier';
+import BusinessAnalyticsShell from './analytics/BusinessAnalyticsShell';
 import { openAdminFinancialPlanPrint } from '../../utils/adminFinancialPlanPrint';
 
 const AdminDashboard = () => {
@@ -11,7 +12,8 @@ const AdminDashboard = () => {
   const [coupons, setCoupons] = useState([]);
   const [stats, setStats] = useState({ totalClients: 0, totalReports: 0, usedCoupons: 0 });
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('analytics');
+  const [analyticsDossier, setAnalyticsDossier] = useState(null);
 
   useEffect(() => {
     loadAdminData();
@@ -88,6 +90,50 @@ const AdminDashboard = () => {
     await signOut();
   };
 
+  const openAnalyticsClient = async (row) => {
+    try {
+      let planId = row?.plan_id;
+      if (!planId && row?.user_id) {
+        const { data: plans } = await supabase
+          .from('financial_plans')
+          .select('id')
+          .eq('user_id', row.user_id)
+          .eq('is_active', true)
+          .order('updated_at', { ascending: false })
+          .limit(1);
+        planId = plans?.[0]?.id;
+      }
+      if (!planId) {
+        window.alert('No financial plan found for this user.');
+        return;
+      }
+      const { data, error } = await supabase
+        .from('financial_plans')
+        .select('*')
+        .eq('id', planId)
+        .single();
+      if (error || !data) {
+        window.alert('Could not open client dossier for this user.');
+        console.error(error);
+        return;
+      }
+      setAnalyticsDossier(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  if (analyticsDossier) {
+    return (
+      <div className="admin-dashboard">
+        <ClientFinancialDossier
+          report={analyticsDossier}
+          onBack={() => setAnalyticsDossier(null)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="admin-dashboard">
       <header className="admin-header">
@@ -111,7 +157,8 @@ const AdminDashboard = () => {
         </button>
       </header>
 
-      {/* Stats Overview */}
+      {/* Stats Overview — hide on analytics to keep CEO view clean */}
+      {activeTab !== 'analytics' && (
       <div className="stats-grid">
         <div className="stat-card">
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -149,9 +196,16 @@ const AdminDashboard = () => {
           </div>
         </div>
       </div>
+      )}
 
       {/* Tabs */}
       <div className="admin-tabs">
+        <button 
+          className={`tab-button ${activeTab === 'analytics' ? 'active' : ''}`}
+          onClick={() => setActiveTab('analytics')}
+        >
+          <LayoutDashboard size={18} /> Business Analytics
+        </button>
         <button 
           className={`tab-button ${activeTab === 'overview' ? 'active' : ''}`}
           onClick={() => setActiveTab('overview')}
@@ -180,7 +234,9 @@ const AdminDashboard = () => {
 
       {/* Tab Content */}
       <div className="admin-content">
-        {loading ? (
+        {activeTab === 'analytics' ? (
+          <BusinessAnalyticsShell onOpenClient={openAnalyticsClient} />
+        ) : loading ? (
           <div style={{ textAlign: 'center', padding: '3rem' }}>Loading...</div>
         ) : activeTab === 'overview' ? (
           <OverviewTab stats={stats} reports={reports} clients={clients} coupons={coupons} />

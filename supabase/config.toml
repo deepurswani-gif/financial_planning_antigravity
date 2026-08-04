@@ -389,3 +389,7 @@ verify_jwt = false
 
 [functions.send-coupon-email]
 verify_jwt = false
+
+# Same ES256 JWT gateway issue as razorpay-checkout; auth via getUser() inside.
+[functions.send-push-notification]
+verify_jwt = false

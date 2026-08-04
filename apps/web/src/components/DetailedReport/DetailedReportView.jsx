@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate, useParams, Navigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useReportDwellTracking } from '../../hooks/useReportDwellTracking';
 import YourMoneyFlowSection from './YourMoneyFlowSection';
 import FixYourFinancialGapsSection from './FixYourFinancialGapsSection';
 import PutYourMoneyToWorkSection from './PutYourMoneyToWorkSection';
@@ -27,6 +28,13 @@ const LEGACY_SECTION_REDIRECTS = {
 const DetailedReportView = () => {
     const navigate = useNavigate();
     const { section } = useParams();
+
+    useReportDwellTracking({
+        section,
+        surface: 'detailed',
+        feature: 'detailed_report',
+        enabled: Boolean(section && detailedReportSlugs.has(section)),
+    });
 
     if (section && LEGACY_SECTION_REDIRECTS[section]) {
         return <Navigate to={LEGACY_SECTION_REDIRECTS[section]} replace />;

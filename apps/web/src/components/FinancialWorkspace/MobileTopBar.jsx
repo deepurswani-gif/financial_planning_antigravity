@@ -15,6 +15,7 @@ export default function MobileTopBar({
   userEmail = '',
   onLogout,
   onTakeTour,
+  onOpenSettings,
   contextFields = [],
   dashboardLabel = WORKSPACE_DASHBOARD_LABEL,
 }) {
@@ -56,6 +57,7 @@ export default function MobileTopBar({
             userEmail={userEmail}
             onLogout={onLogout}
             onTakeTour={onTakeTour}
+            onOpenSettings={onOpenSettings}
             size="sm"
           />
         </div>

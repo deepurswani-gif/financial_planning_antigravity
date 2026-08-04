@@ -1,13 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 
 /**
- * Profile avatar dropdown — email + logout (matches summary-flow pattern).
+ * Profile avatar dropdown — email, settings, logout (matches summary-flow pattern).
  */
 export default function WorkspaceProfileMenu({
   userInitials = 'U',
   userEmail = '',
   onLogout,
   onTakeTour,
+  onOpenSettings,
   size = 'md',
 }) {
   const [open, setOpen] = useState(false);
@@ -47,6 +48,19 @@ export default function WorkspaceProfileMenu({
           <div className="summary-profile-dropdown-email" title={userEmail || ''}>
             {userEmail || 'Signed in'}
           </div>
+          {typeof onOpenSettings === 'function' ? (
+            <button
+              type="button"
+              className="summary-profile-dropdown-item"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                onOpenSettings();
+              }}
+            >
+              Settings
+            </button>
+          ) : null}
           {typeof onTakeTour === 'function' ? (
             <button
               type="button"

@@ -11,5 +11,8 @@
     "lint": "npm -w @finplan/web run lint",
     "preview": "npm -w @finplan/web run preview",
     "test": "npm -w @finplan/web run test"
+  },
+  "devDependencies": {
+    "supabase": "^2.111.0"
   }
 }
