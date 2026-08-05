@@ -75,6 +75,11 @@ const getGoogleAccessToken = async (sa: ServiceAccount): Promise<string> => {
   return data.access_token as string;
 };
 
+/**
+ * Data-only web push so our FCM service worker always owns display.
+ * (webpush.notification auto-display is unreliable on Chrome Android and
+ * previously made our SW skip showing — resulting in zero tray notifications.)
+ */
 const sendFcmMessage = async ({
   accessToken,
   projectId,
@@ -92,7 +97,6 @@ const sendFcmMessage = async ({
   data: Record<string, string>;
   origin: string;
 }) => {
-  // Absolute icon/link URLs are required for reliable Chrome Android tray display.
   const base = origin.replace(/\/$/, '') || 'https://wealthmap.app';
   const icon = `${base}/pwa-192x192.png`;
   const link = `${base}/`;
@@ -108,21 +112,17 @@ const sendFcmMessage = async ({
       body: JSON.stringify({
         message: {
           token,
-          // Keep title/body in data so the SW can always render (foreground + background).
           data: {
             title,
             body,
+            icon,
             url: link,
             ...data,
           },
           webpush: {
-            headers: { Urgency: 'high' },
-            notification: {
-              title,
-              body,
-              icon,
-              // Helps Android show the notification even when a tab is open.
-              requireInteraction: false,
+            headers: {
+              Urgency: 'high',
+              TTL: '86400',
             },
             fcm_options: {
               link,
@@ -202,6 +202,8 @@ serve(async (req) => {
   const action = String(body.action || '');
   const title = String(body.title || 'Finbrella');
   const messageBody = String(body.body || '');
+  const preferredToken =
+    typeof body.token === 'string' && body.token.trim() ? body.token.trim() : '';
   const dataObj =
     body.data && typeof body.data === 'object' && !Array.isArray(body.data)
       ? (body.data as Record<string, unknown>)
@@ -218,11 +220,18 @@ serve(async (req) => {
     });
   }
 
-  const { data: tokens, error: tokenError } = await supabase
+  let tokenQuery = supabase
     .from('user_push_tokens')
-    .select('token')
+    .select('token, updated_at, user_agent')
     .eq('user_id', user.id)
-    .eq('enabled', true);
+    .eq('enabled', true)
+    .order('updated_at', { ascending: false });
+
+  if (preferredToken) {
+    tokenQuery = tokenQuery.eq('token', preferredToken);
+  }
+
+  const { data: tokens, error: tokenError } = await tokenQuery;
 
   if (tokenError) {
     return json(500, { success: false, error: tokenError.message });
@@ -231,7 +240,9 @@ serve(async (req) => {
   if (!tokens?.length) {
     return json(400, {
       success: false,
-      error: 'No enabled push tokens for this user. Enable notifications in Settings first.',
+      error: preferredToken
+        ? 'Preferred device token not found for this user. Toggle push off/on and retry.'
+        : 'No enabled push tokens for this user. Enable notifications in Settings first.',
     });
   }
 
@@ -252,6 +263,16 @@ serve(async (req) => {
     (siteUrl.startsWith('http') ? siteUrl : '') ||
     'https://wealthmap.app';
 
+  console.log(
+    JSON.stringify({
+      msg: 'send-push-notification start',
+      userId: user.id,
+      tokenCount: tokens.length,
+      preferred: Boolean(preferredToken),
+      origin,
+    }),
+  );
+
   const results = [];
   for (const row of tokens) {
     const result = await sendFcmMessage({
@@ -263,20 +284,38 @@ serve(async (req) => {
       data,
       origin,
     });
-    results.push({ tokenSuffix: String(row.token).slice(-12), ...result });
+    const summary = {
+      tokenSuffix: String(row.token).slice(-12),
+      userAgent: row.user_agent ? String(row.user_agent).slice(0, 80) : null,
+      ok: result.ok,
+      status: result.status,
+      fcmName: (result.payload as { name?: string })?.name || null,
+      fcmError:
+        (result.payload as { error?: { status?: string; message?: string } })?.error?.status ||
+        (result.payload as { error?: { message?: string } })?.error?.message ||
+        null,
+    };
+    results.push(summary);
+    console.log(JSON.stringify({ msg: 'fcm-result', ...summary }));
 
-    // Drop invalid tokens so future sends stay clean
-    const fcmError = result.payload?.error?.status || result.payload?.error?.message;
     if (
       !result.ok &&
-      typeof fcmError === 'string' &&
-      /UNREGISTERED|INVALID_ARGUMENT|NOT_FOUND/i.test(fcmError)
+      typeof summary.fcmError === 'string' &&
+      /UNREGISTERED|INVALID_ARGUMENT|NOT_FOUND/i.test(summary.fcmError)
     ) {
       await supabase.from('user_push_tokens').delete().eq('token', row.token);
     }
   }
 
   const sent = results.filter((r) => r.ok).length;
+  console.log(
+    JSON.stringify({
+      msg: 'send-push-notification done',
+      sent,
+      total: results.length,
+    }),
+  );
+
   return json(200, {
     success: sent > 0,
     sent,

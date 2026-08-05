@@ -163,12 +163,28 @@ export default function NotificationSettingsPanel({ open, onClose, userId }) {
       }
       setEnabled(true);
 
-      const { error: sendError } = await sendTestPushToSelf({
+      const deviceToken =
+        ensured.token || sessionStorage.getItem('finplan_last_fcm_token') || undefined;
+      const { data: sendData, error: sendError } = await sendTestPushToSelf({
         title: 'Finbrella test',
         body: 'Push notifications are working on this device.',
+        token: deviceToken,
       });
       if (sendError) throw sendError;
-      setMessage('Test notification sent. If the tab is open, check the tray — or minimize Chrome and send again.');
+
+      const sent = sendData?.sent ?? 0;
+      const total = sendData?.total ?? 0;
+      const failed = Array.isArray(sendData?.results)
+        ? sendData.results.filter((r) => !r.ok)
+        : [];
+      if (sent > 0) {
+        setMessage(
+          `Test sent to this device (${sent}/${total}). Minimize Chrome, then check the notification tray.`,
+        );
+      } else {
+        const detail = failed[0]?.fcmError || 'FCM rejected the token';
+        setError(`Send reported no deliveries: ${detail}`);
+      }
     } catch (err) {
       setError(err?.message || 'Could not send test notification.');
     } finally {

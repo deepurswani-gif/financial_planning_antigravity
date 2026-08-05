@@ -2,6 +2,8 @@
 /**
  * Dedicated FCM service worker (separate from the VitePWA Workbox SW).
  * Public Firebase web config is intentional — same values as the client SDK.
+ *
+ * We use data-only FCM messages so this worker always owns tray display.
  */
 importScripts(
   'https://www.gstatic.com/firebasejs/12.17.0/firebase-app-compat.js'
@@ -28,26 +30,34 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
+function payloadToNotification(payload) {
+  const data = payload?.data || {};
+  const title = payload?.notification?.title || data.title || 'Finbrella';
+  const body = payload?.notification?.body || data.body || '';
+  const icon =
+    data.icon ||
+    payload?.notification?.icon ||
+    `${self.location.origin}/pwa-192x192.png`;
+  return {
+    title,
+    options: {
+      body,
+      icon,
+      data: { ...data, url: data.url || `${self.location.origin}/` },
+    },
+  };
+}
+
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
-  const title = payload.notification?.title || payload.data?.title || 'Finbrella';
-  const body = payload.notification?.body || payload.data?.body || '';
-  // If FCM already displayed a webpush.notification, skip a duplicate tray entry.
-  if (payload.notification?.title && payload.notification?.body) {
-    return;
-  }
-  const options = {
-    body,
-    icon: `${self.location.origin}/pwa-192x192.png`,
-    data: payload.data || {},
-  };
-  self.registration.showNotification(title, options);
+  const { title, options } = payloadToNotification(payload);
+  return self.registration.showNotification(title, options);
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || '/';
+  const url = event.notification.data?.url || `${self.location.origin}/`;
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
       for (const client of windowClients) {

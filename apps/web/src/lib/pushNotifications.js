@@ -99,6 +99,9 @@ function ensureForegroundListener(messaging) {
   foregroundUnsubscribe = onMessage(messaging, (payload) => {
     const title = payload.notification?.title || payload.data?.title || 'Finbrella';
     const body = payload.notification?.body || payload.data?.body || '';
+    const icon =
+      payload.data?.icon ||
+      `${typeof window !== 'undefined' ? window.location.origin : ''}/pwa-192x192.png`;
     if (import.meta.env.DEV) {
       console.info('[FCM] Message received (foreground):', payload);
     }
@@ -114,7 +117,7 @@ function ensureForegroundListener(messaging) {
         if (registration?.showNotification) {
           await registration.showNotification(title, {
             body,
-            icon: `${window.location.origin}/pwa-192x192.png`,
+            icon,
             data: payload.data || {},
           });
           return;
@@ -124,7 +127,7 @@ function ensureForegroundListener(messaging) {
       }
       new Notification(title, {
         body,
-        icon: `${window.location.origin}/pwa-192x192.png`,
+        icon,
         data: payload.data || {},
       });
     };
