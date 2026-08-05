@@ -11,6 +11,7 @@ import logo from '../../assets/finbrella_logo.png';
 import { useAuth } from '../../contexts/AuthContext';
 import { buildSupportEmailContextFromUser } from '../../services/supportRequestEmailService';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
+import IntegerInput from '../common/IntegerInput';
 
 const isLifeAlloc = (a) => (
     a
@@ -79,15 +80,15 @@ const InsuranceModule = ({ onNext, onBack, setCurrentStep }) => {
         return policies.filter(p => p.insuredName === memberName && !!p.isProposed === isProposed).length;
     };
 
-    const handlePolicyCountChange = (memberName, countStr, isProposed) => {
+    const handlePolicyCountChange = (memberName, count, isProposed) => {
         const key = `${memberName}_${isProposed ? 'proposed' : 'existing'}`;
         
-        if (countStr === '') {
+        if (count == null || count === '') {
             setPolicyCounts(prev => ({ ...prev, [key]: '' }));
             return;
         }
 
-        const newCount = Math.max(0, parseInt(countStr) || 0);
+        const newCount = Math.max(0, typeof count === 'number' ? count : parseInt(count, 10) || 0);
         setPolicyCounts(prev => ({ ...prev, [key]: newCount }));
         
         const currentMemberPolicies = policies.filter(p => p.insuredName === memberName && !!p.isProposed === isProposed);
@@ -238,12 +239,11 @@ const InsuranceModule = ({ onNext, onBack, setCurrentStep }) => {
                                         </div>
                                         <div className="input-group">
                                             <label>Number of policies</label>
-                                            <input 
-                                                type="number" 
-                                                min="0"
-                                                className="input-field" 
+                                            <IntegerInput
+                                                min={0}
+                                                className="input-field"
                                                 value={getPolicyCount(memberName, false)}
-                                                onChange={(e) => handlePolicyCountChange(memberName, e.target.value, false)}
+                                                onValueChange={(v) => handlePolicyCountChange(memberName, v, false)}
                                                 placeholder="Enter number of policies"
                                                 style={{ width: '100%' }}
                                             />
@@ -412,12 +412,11 @@ const InsuranceModule = ({ onNext, onBack, setCurrentStep }) => {
                                         </div>
                                         <div className="input-group" style={{ marginTop: '0.5rem' }}>
                                             <label>Number of proposed policies</label>
-                                            <input 
-                                                type="number" 
-                                                min="0"
-                                                className="input-field" 
+                                            <IntegerInput
+                                                min={0}
+                                                className="input-field"
                                                 value={getPolicyCount(memberName, true)}
-                                                onChange={(e) => handlePolicyCountChange(memberName, e.target.value, true)}
+                                                onValueChange={(v) => handlePolicyCountChange(memberName, v, true)}
                                                 placeholder="Enter number of policies"
                                                 style={{ width: '100%', borderColor: 'var(--secondary-dark, var(--accent))' }}
                                             />

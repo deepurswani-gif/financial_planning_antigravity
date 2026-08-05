@@ -10,6 +10,7 @@ import { computeEquityData } from '../Calculators/EquityCalculator';
 import { computeFDData } from '../Calculators/FDCalculator';
 import { computeRDData } from '../Calculators/RDCalculator';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
+import CurrencyInput from '../common/CurrencyInput';
 
 const FulfillmentModule = ({ onNext, onBack }) => {
     const { familyMembers, calculatorInputs, expenseCategories, assetCategories, goals, investmentAllocations: allocations, goalMappings, setGoalMappings } = useFinancialPlan();
@@ -107,14 +108,10 @@ const FulfillmentModule = ({ onNext, onBack }) => {
         ];
     }, []);
 
-    const handleAmountChange = (goalId, sourceId, amount, maxAllowed) => {
+    const handleAmountChange = (goalId, sourceId, amount) => {
         const currentGoalMap = goalMappings[goalId] || {};
-        let val = amount === '' ? NaN : Math.round(parseFloat(amount));
-        
-        if (!isNaN(val) && maxAllowed !== null && val > maxAllowed) {
-            val = Math.round(maxAllowed);
-        }
-        
+        const val = amount == null ? NaN : Math.round(Number(amount));
+
         let newGoalMap = { ...currentGoalMap };
         if (isNaN(val) || val <= 0) {
             delete newGoalMap[sourceId];
@@ -338,25 +335,24 @@ const FulfillmentModule = ({ onNext, onBack }) => {
                                                                     </div>
                                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                                         <button 
-                                                                            onClick={() => handleAmountChange(goal.id, source.id, roundedMax, roundedMax)}
-                                                                            style={{ 
+                                                                            onClick={() => handleAmountChange(goal.id, source.id, roundedMax)}
+                                                                            style={{
                                                                                 padding: '6px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
-                                                                                background: isAssigned ? 'var(--primary)' : 'var(--border)', 
-                                                                                color: isAssigned ? 'white' : 'var(--text-main)', 
+                                                                                background: isAssigned ? 'var(--primary)' : 'var(--border)',
+                                                                                color: isAssigned ? 'white' : 'var(--text-main)',
                                                                                 border: 'none'
                                                                             }}
                                                                         >
                                                                             {isAssigned ? 'MAX' : 'Assign'}
                                                                         </button>
-                                                                        <input 
-                                                                            type="number"
-                                                                            value={currentGoalMap[source.id] || ''}
-                                                                            onChange={(e) => handleAmountChange(goal.id, source.id, e.target.value, Math.max(0, roundedMax))}
-                                                                            placeholder="₹ 0"
-                                                                            style={{ 
-                                                                                flex: 1, padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-card)', fontSize: '0.9rem', outline: 'none' 
-                                                                            }}
-                                                                        />
+                                                                        <div style={{ flex: 1 }}>
+                                                                            <CurrencyInput
+                                                                                value={currentGoalMap[source.id] || ''}
+                                                                                onValueChange={(v) => handleAmountChange(goal.id, source.id, v)}
+                                                                                max={Math.max(0, roundedMax)}
+                                                                                placeholder="0"
+                                                                            />
+                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                             );

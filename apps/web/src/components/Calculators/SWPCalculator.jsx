@@ -2,6 +2,9 @@ import React, { useState, useMemo } from 'react';
 import { Calculator, Calendar, DollarSign, TrendingUp, Clock, Plus, Trash2, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
+import CurrencyInput from '../common/CurrencyInput';
+import PercentageInput from '../common/PercentageInput';
+import YearsInput from '../common/YearsInput';
 
 const SWPCalculator = ({ calculatorKey = "swp" }) => {
     const { calculatorInputs, setCalculatorInputs } = useFinancialPlan();
@@ -38,7 +41,7 @@ const SWPCalculator = ({ calculatorKey = "swp" }) => {
         setEvents([...events, {
             id: Date.now(),
             type, // 'adjustment' or 'lumpsum'
-            value: 0, // New monthly amount or Lumpsum amount
+            value: null, // New monthly amount or Lumpsum amount
             month: 1,
             year: currentYear
         }]);
@@ -52,17 +55,24 @@ const SWPCalculator = ({ calculatorKey = "swp" }) => {
         setEvents(events.map(e => e.id === id ? { ...e, [field]: value } : e));
     };
 
+    const amountNum = Number(investmentAmount ?? 0);
+    const withdrawalNum = Number(monthlyWithdrawal ?? 0);
+    const rateNum = Number(expectedReturns ?? 0);
+    const tenureNum = Number(tenureYears ?? 0);
+    const startAfterNum = Number(startAfterYears ?? 0);
+    const annualIncNum = Number(annualIncrement ?? 0);
+
     // Calculation Logic: Simple monthly interest (Nominal/12) to match standard benchmarks
     const calculationData = useMemo(() => {
         let results = [];
-        let runningBalance = investmentAmount;
-        let currentMonthlyWithdrawal = monthlyWithdrawal;
-        const monthlyGrowth = expectedReturns / 100 / 12; // Simple monthly rate
+        let runningBalance = amountNum;
+        let currentMonthlyWithdrawal = withdrawalNum;
+        const monthlyGrowth = rateNum / 100 / 12; // Simple monthly rate
         
         let currentMonthVal = startMonth;
         let currentYearVal = startYear;
-        const totalMonths = tenureYears * 12;
-        const swpStartMonthIndex = startAfterYears * 12;
+        const totalMonths = tenureNum * 12;
+        const swpStartMonthIndex = startAfterNum * 12;
 
         let yearlyRecord = {
             year: currentYearVal,
@@ -75,8 +85,8 @@ const SWPCalculator = ({ calculatorKey = "swp" }) => {
 
         for (let m = 0; m < totalMonths; m++) {
             // Apply Annual Increment at the start of each relative year (except first year or deferred period)
-            if (m > 0 && m % 12 === 0 && annualIncrement > 0 && m >= swpStartMonthIndex) {
-                currentMonthlyWithdrawal *= (1 + annualIncrement / 100);
+            if (m > 0 && m % 12 === 0 && annualIncNum > 0 && m >= swpStartMonthIndex) {
+                currentMonthlyWithdrawal *= (1 + annualIncNum / 100);
             }
 
             // check for midpoint events
@@ -84,9 +94,9 @@ const SWPCalculator = ({ calculatorKey = "swp" }) => {
             
             monthlyEvents.forEach(e => {
                 if (e.type === 'adjustment') {
-                    currentMonthlyWithdrawal = parseFloat(e.value) || 0;
+                    currentMonthlyWithdrawal = Number(e.value ?? 0);
                 } else if (e.type === 'lumpsum') {
-                    const amount = parseFloat(e.value) || 0;
+                    const amount = Number(e.value ?? 0);
                     yearlyRecord.lumpsumWithdrawal += amount;
                     runningBalance -= amount;
                 }
@@ -127,7 +137,7 @@ const SWPCalculator = ({ calculatorKey = "swp" }) => {
         }
 
         return results;
-    }, [investmentAmount, monthlyWithdrawal, expectedReturns, startAfterYears, tenureYears, startMonth, startYear, annualIncrement, events]);
+    }, [amountNum, withdrawalNum, rateNum, startAfterNum, tenureNum, startMonth, startYear, annualIncNum, events]);
 
     const finalValue = calculationData[calculationData.length - 1]?.finalValue || 0;
     const totalWithdrawn = calculationData.reduce((sum, y) => sum + y.yearlyWithdrawal + y.lumpsumWithdrawal, 0);
@@ -150,62 +160,55 @@ const SWPCalculator = ({ calculatorKey = "swp" }) => {
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
                             <div className="form-group">
                                 <label><DollarSign size={16} /> Initial Investment (₹)</label>
-                                <input 
-                                    type="number" 
-                                    value={investmentAmount} 
-                                    onChange={(e) => setInvestmentAmount(parseFloat(e.target.value) || 0)} 
-                                    className="form-input" 
+                                <CurrencyInput
+                                    value={investmentAmount}
+                                    onValueChange={setInvestmentAmount}
+                                    className="form-input"
                                 />
                             </div>
 
                             <div className="form-group">
                                 <label><ArrowDownRight size={16} /> Initial Monthly Withdrawal (₹)</label>
-                                <input 
-                                    type="number" 
-                                    value={monthlyWithdrawal} 
-                                    onChange={(e) => setMonthlyWithdrawal(parseFloat(e.target.value) || 0)} 
-                                    className="form-input" 
+                                <CurrencyInput
+                                    value={monthlyWithdrawal}
+                                    onValueChange={setMonthlyWithdrawal}
+                                    className="form-input"
                                 />
                             </div>
 
                             <div className="form-group">
                                 <label><TrendingUp size={16} /> Exp. CAGR (%)</label>
-                                <input 
-                                    type="number" 
-                                    step="0.1"
-                                    value={expectedReturns} 
-                                    onChange={(e) => setExpectedReturns(parseFloat(e.target.value) || 0)} 
-                                    className="form-input" 
+                                <PercentageInput
+                                    value={expectedReturns}
+                                    onValueChange={setExpectedReturns}
+                                    className="form-input"
                                 />
                             </div>
 
                             <div className="form-group">
                                 <label><ArrowUpRight size={16} /> Annual Increase (%)</label>
-                                <input 
-                                    type="number" 
-                                    value={annualIncrement} 
-                                    onChange={(e) => setAnnualIncrement(parseFloat(e.target.value) || 0)} 
-                                    className="form-input" 
+                                <PercentageInput
+                                    value={annualIncrement}
+                                    onValueChange={setAnnualIncrement}
+                                    className="form-input"
                                 />
                             </div>
 
                             <div className="form-group">
                                 <label><Calendar size={16} /> Start After (Years)</label>
-                                <input 
-                                    type="number" 
-                                    value={startAfterYears} 
-                                    onChange={(e) => setStartAfterYears(parseInt(e.target.value) || 0)} 
-                                    className="form-input" 
+                                <YearsInput
+                                    value={startAfterYears}
+                                    onValueChange={setStartAfterYears}
+                                    className="form-input"
                                 />
                             </div>
 
                             <div className="form-group">
                                 <label><Clock size={16} /> Tenure (Years)</label>
-                                <input 
-                                    type="number" 
-                                    value={tenureYears} 
-                                    onChange={(e) => setTenureYears(parseInt(e.target.value) || 0)} 
-                                    className="form-input" 
+                                <YearsInput
+                                    value={tenureYears}
+                                    onValueChange={setTenureYears}
+                                    className="form-input"
                                 />
                             </div>
 
@@ -252,13 +255,12 @@ const SWPCalculator = ({ calculatorKey = "swp" }) => {
                                                 {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
                                             </select>
                                         </div>
-                                        <input 
-                                            type="number" 
-                                            placeholder={event.type === 'adjustment' ? 'New Monthly Amt (₹)' : 'Lumpsum Amt (₹)'} 
-                                            value={event.value} 
-                                            onChange={(e) => updateEvent(event.id, 'value', e.target.value)} 
+                                        <CurrencyInput
+                                            placeholder={event.type === 'adjustment' ? 'New Monthly Amt' : 'Lumpsum Amt'}
+                                            value={event.value}
+                                            onValueChange={(v) => updateEvent(event.id, 'value', v)}
                                             className="form-input"
-                                            style={{ width: '100%', padding: '0.4rem', fontSize: '0.85rem' }} 
+                                            style={{ width: '100%', padding: '0.4rem', fontSize: '0.85rem' }}
                                         />
                                     </div>
                                 </div>
@@ -288,7 +290,7 @@ const SWPCalculator = ({ calculatorKey = "swp" }) => {
                                 </div>
                                 <div>
                                     <p style={{ margin: '0 0 0.5rem 0', opacity: 0.8, fontSize: '0.9rem' }}>Profit Generated</p>
-                                    <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: '#34d399' }}>₹{Math.round(finalValue + totalWithdrawn - investmentAmount).toLocaleString('en-IN')}</h3>
+                                    <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: '#34d399' }}>₹{Math.round(finalValue + totalWithdrawn - amountNum).toLocaleString('en-IN')}</h3>
                                 </div>
                             </div>
                         </div>

@@ -16,6 +16,8 @@ import {
     syncPolicySlots,
 } from './insuranceDetailSync';
 import InsuranceReconciliationPanel from './InsuranceReconciliationPanel';
+import CurrencyInput from '../common/CurrencyInput';
+import IntegerInput from '../common/IntegerInput';
 
 const formatInr = (val) => {
     if (!val || isNaN(val)) return '₹0';
@@ -44,6 +46,8 @@ const UserNote = ({ children }) => (
     </div>
 );
 
+const toStored = (v) => (v == null ? '' : String(v));
+
 const CurrencyField = ({ label, value, onChange, placeholder = '0' }) => (
     <div>
         {label && (
@@ -51,16 +55,12 @@ const CurrencyField = ({ label, value, onChange, placeholder = '0' }) => (
                 {label}
             </label>
         )}
-        <div className="currency-input-wrapper">
-            <span className="currency-symbol">₹</span>
-            <input
-                type="number"
-                className="conversational-input"
-                placeholder={placeholder}
-                value={value || ''}
-                onChange={(e) => onChange(e.target.value)}
-            />
-        </div>
+        <CurrencyInput
+            className="conversational-input"
+            placeholder={placeholder}
+            value={value ?? ''}
+            onValueChange={(v) => onChange(toStored(v))}
+        />
     </div>
 );
 
@@ -273,19 +273,17 @@ export function useInsurancePremiumQuestions() {
                     <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.4rem', display: 'block' }}>
                         Number of policies
                     </label>
-                    <input
-                        type="number"
-                        min="0"
+                    <IntegerInput
+                        min={0}
                         className="conversational-input"
                         placeholder="0"
                         value={entry.policyCount || ''}
-                        onChange={(e) => {
-                            const raw = e.target.value;
-                            if (raw === '') {
+                        onValueChange={(v) => {
+                            if (v == null) {
                                 updateLifeMember(member, () => applyLifeEntryUpdate(entry, { policyCount: 0 }));
                                 return;
                             }
-                            const count = Math.max(0, parseInt(raw, 10) || 0);
+                            const count = Math.max(0, v);
                             updateLifeMember(member, () => applyLifeEntryUpdate(entry, { policyCount: count }));
                         }}
                     />

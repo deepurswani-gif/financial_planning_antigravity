@@ -1,5 +1,8 @@
 import React, { useMemo } from 'react';
 import { Calculator, TrendingUp, HeartHandshake, Briefcase } from 'lucide-react';
+import CurrencyInput from '../common/CurrencyInput';
+import PercentageInput from '../common/PercentageInput';
+import IntegerInput from '../common/IntegerInput';
 
 export const computeNPSData = (proposedNPS, expectedReturns, annuityPercent, annuityRate, selfMember, defaultNPSObj = {}, defaultCorpus = 0) => {
     // Determine user demographics relative to absolute dates
@@ -149,9 +152,14 @@ const NPSCalculator = ({ calculatorKey = "nps" }) => {
     const [localCorpus, setLocalCorpus] = React.useState(defaultCorpus);
     React.useEffect(() => { setLocalCorpus(defaultCorpus); }, [defaultCorpus]);
 
+    const rateNum = Number(expectedReturns ?? 0);
+    const annuityPctNum = Number(annuityPercent ?? 0);
+    const annuityRateNum = Number(annuityRate ?? 0);
+    const corpusNum = Number(localCorpus ?? 0);
+
     const calculationData = useMemo(() => {
-        return computeNPSData(proposedNPS, expectedReturns, annuityPercent, annuityRate, selfMember, defaultNPSObj, localCorpus);
-    }, [proposedNPS, expectedReturns, annuityPercent, annuityRate, selfMember, defaultNPSObj, localCorpus]);
+        return computeNPSData(proposedNPS, rateNum, annuityPctNum, annuityRateNum, selfMember, defaultNPSObj, corpusNum);
+    }, [proposedNPS, rateNum, annuityPctNum, annuityRateNum, selfMember, defaultNPSObj, corpusNum]);
 
     const { schedule, totals } = calculationData;
 
@@ -179,87 +187,46 @@ const NPSCalculator = ({ calculatorKey = "nps" }) => {
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
                                 <div className="form-group">
                                     <label><TrendingUp size={16} /> Expected Returns (CAGR %)</label>
-                                    <input 
-                                        type="number" 
-                                        step="0.01"
-                                        min="8"
-                                        max="12"
-                                        value={expectedReturns} 
-                                        onChange={(e) => {
-                                            let val = parseFloat(e.target.value);
-                                            setExpectedReturns(isNaN(val) ? '' : val);
-                                        }} 
-                                        onBlur={(e) => {
-                                            let val = parseFloat(e.target.value);
-                                            if (isNaN(val)) val = 10.00;
-                                            if (val < 8) val = 8;
-                                            if (val > 12) val = 12;
-                                            setExpectedReturns(val.toFixed(2));
-                                        }}
-                                        className="form-input" 
+                                    <PercentageInput
+                                        value={expectedReturns}
+                                        min={8}
+                                        max={12}
+                                        onValueChange={setExpectedReturns}
+                                        className="form-input"
                                     />
                                     <small className="text-muted">Market tracking rate: 8% to 12%.</small>
                                 </div>
 
                                 <div className="form-group">
                                     <label><Briefcase size={16} /> Current Corpus (₹)</label>
-                                    <div style={{ position: 'relative' }}>
-                                        <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}>₹</span>
-                                        <input 
-                                            type="number" 
-                                            value={localCorpus} 
-                                            onChange={(e) => setLocalCorpus(parseFloat(e.target.value) || 0)} 
-                                            className="form-input" 
-                                            style={{ paddingLeft: '24px' }}
-                                        />
-                                    </div>
+                                    <CurrencyInput
+                                        value={localCorpus}
+                                        onValueChange={setLocalCorpus}
+                                        className="form-input"
+                                    />
                                     <small className="text-muted">Synced from Asset configs.</small>
                                 </div>
 
                                 <div className="form-group">
                                     <label><HeartHandshake size={16} /> Required Annuity (%)</label>
-                                    <input 
-                                        type="number" 
-                                        step="1"
-                                        min="40"
-                                        max="100"
-                                        value={annuityPercent} 
-                                        onChange={(e) => {
-                                            let val = parseFloat(e.target.value);
-                                            setAnnuityPercent(isNaN(val) ? '' : val);
-                                        }} 
-                                        onBlur={(e) => {
-                                            let val = parseFloat(e.target.value);
-                                            if (isNaN(val)) val = 40;
-                                            if (val < 40) val = 40; // Mandatory 40%
-                                            if (val > 100) val = 100;
-                                            setAnnuityPercent(Math.round(val));
-                                        }}
-                                        className="form-input" 
+                                    <IntegerInput
+                                        value={annuityPercent}
+                                        min={40}
+                                        max={100}
+                                        onValueChange={setAnnuityPercent}
+                                        className="form-input"
                                     />
                                     <small className="text-muted">Min 40% mandatory.</small>
                                 </div>
 
                                 <div className="form-group">
                                     <label><Calculator size={16} /> Expected Annuity Rate (%)</label>
-                                    <input 
-                                        type="number" 
-                                        step="0.01"
-                                        min="5"
-                                        max="8"
-                                        value={annuityRate} 
-                                        onChange={(e) => {
-                                            let val = parseFloat(e.target.value);
-                                            setAnnuityRate(isNaN(val) ? '' : val);
-                                        }} 
-                                        onBlur={(e) => {
-                                            let val = parseFloat(e.target.value);
-                                            if (isNaN(val)) val = 6.00;
-                                            if (val < 5) val = 5;
-                                            if (val > 8) val = 8;
-                                            setAnnuityRate(val.toFixed(2));
-                                        }}
-                                        className="form-input" 
+                                    <PercentageInput
+                                        value={annuityRate}
+                                        min={5}
+                                        max={8}
+                                        onValueChange={setAnnuityRate}
+                                        className="form-input"
                                     />
                                     <small className="text-muted">Yield parameter: 5% to 8%.</small>
                                 </div>

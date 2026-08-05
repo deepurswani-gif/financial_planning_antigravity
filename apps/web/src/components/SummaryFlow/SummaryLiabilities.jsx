@@ -2,6 +2,9 @@ import React, { useMemo } from 'react';
 import ProgressiveQuestionLayout, { useProgressiveAdvance } from './ProgressiveQuestionLayout';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 import { formatInrInWords } from '../../lib/formatInrInWords';
+import CurrencyInput from '../common/CurrencyInput';
+
+const toStored = (v) => (v == null ? '' : String(v));
 
 const CurrentLiabilitiesScreen = ({ hasEMI, liabilityCategories, handleSnapshotChange }) => {
     const { advance } = useProgressiveAdvance();
@@ -23,20 +26,16 @@ const CurrentLiabilitiesScreen = ({ hasEMI, liabilityCategories, handleSnapshotC
                         <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.2rem', display: 'block' }}>
                             Outstanding Loans
                         </label>
-                        <div className="currency-input-wrapper">
-                            <span className="currency-symbol">₹</span>
-                            <input
-                                type="number"
-                                className="conversational-input"
-                                placeholder="e.g. 3500000"
-                                value={liabilityCategories.summaryOutstandingLoans || ''}
-                                onChange={(e) => handleSnapshotChange('summaryOutstandingLoans', e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') advance();
-                                }}
-                                enterKeyHint="done"
-                            />
-                        </div>
+                        <CurrencyInput
+                            className="conversational-input"
+                            placeholder="e.g. 3500000"
+                            value={liabilityCategories.summaryOutstandingLoans || ''}
+                            onValueChange={(v) => handleSnapshotChange('summaryOutstandingLoans', toStored(v))}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') advance();
+                            }}
+                            enterKeyHint="done"
+                        />
                         {liabilityCategories.summaryOutstandingLoans && (
                             <div className="currency-display">
                                 {formatInrInWords(liabilityCategories.summaryOutstandingLoans)}
@@ -54,20 +53,16 @@ const CurrentLiabilitiesScreen = ({ hasEMI, liabilityCategories, handleSnapshotC
                 <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.2rem', display: 'block' }}>
                     Credit Card Outstanding
                 </label>
-                <div className="currency-input-wrapper">
-                    <span className="currency-symbol">₹</span>
-                    <input
-                        type="number"
-                        className="conversational-input"
-                        placeholder="e.g. 45000"
-                        value={liabilityCategories.summaryCreditCardDues || ''}
-                        onChange={(e) => handleSnapshotChange('summaryCreditCardDues', e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') advance();
-                        }}
-                        enterKeyHint="done"
-                    />
-                </div>
+                <CurrencyInput
+                    className="conversational-input"
+                    placeholder="e.g. 45000"
+                    value={liabilityCategories.summaryCreditCardDues || ''}
+                    onValueChange={(v) => handleSnapshotChange('summaryCreditCardDues', toStored(v))}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') advance();
+                    }}
+                    enterKeyHint="done"
+                />
                 {liabilityCategories.summaryCreditCardDues && (
                     <div className="currency-display">
                         {formatInrInWords(liabilityCategories.summaryCreditCardDues)}
@@ -86,20 +81,16 @@ const CurrentLiabilitiesScreen = ({ hasEMI, liabilityCategories, handleSnapshotC
                 <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.2rem', display: 'block' }}>
                     Other Payables
                 </label>
-                <div className="currency-input-wrapper">
-                    <span className="currency-symbol">₹</span>
-                    <input
-                        type="number"
-                        className="conversational-input"
-                        placeholder="e.g. 100000"
-                        value={liabilityCategories.summaryOtherPayables || ''}
-                        onChange={(e) => handleSnapshotChange('summaryOtherPayables', e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') advance();
-                        }}
-                        enterKeyHint="done"
-                    />
-                </div>
+                <CurrencyInput
+                    className="conversational-input"
+                    placeholder="e.g. 100000"
+                    value={liabilityCategories.summaryOtherPayables || ''}
+                    onValueChange={(v) => handleSnapshotChange('summaryOtherPayables', toStored(v))}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') advance();
+                    }}
+                    enterKeyHint="done"
+                />
                 {liabilityCategories.summaryOtherPayables && (
                     <div className="currency-display">
                         {formatInrInWords(liabilityCategories.summaryOtherPayables)}

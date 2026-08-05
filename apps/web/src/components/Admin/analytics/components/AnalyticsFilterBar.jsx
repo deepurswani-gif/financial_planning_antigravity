@@ -6,6 +6,15 @@ import {
   HYPER_OPERATORS,
   PHASE1_FILTERS,
 } from '../registry/filters';
+import CurrencyInput from '../../../common/CurrencyInput';
+import IntegerInput from '../../../common/IntegerInput';
+
+const CURRENCY_RANGE_IDS = new Set([
+  'investmentRange',
+  'sipRange',
+  'insuranceRange',
+  'netWorthRange',
+]);
 
 export default function AnalyticsFilterBar({
   filters,
@@ -110,25 +119,28 @@ export default function AnalyticsFilterBar({
             </select>
           </label>
         ))}
-        {PHASE1_FILTERS.filter((f) => f.type === 'range').map((field) => (
-          <label key={field.id} className="ba-filters__range">
-            {field.label}
-            <div>
-              <input
-                type="number"
-                placeholder="Min"
-                value={filters[field.keys[0]] || ''}
-                onChange={(e) => updateFilter(field.keys[0], e.target.value)}
-              />
-              <input
-                type="number"
-                placeholder="Max"
-                value={filters[field.keys[1]] || ''}
-                onChange={(e) => updateFilter(field.keys[1], e.target.value)}
-              />
-            </div>
-          </label>
-        ))}
+        {PHASE1_FILTERS.filter((f) => f.type === 'range').map((field) => {
+          const isCurrency = CURRENCY_RANGE_IDS.has(field.id);
+          const InputComp = isCurrency ? CurrencyInput : IntegerInput;
+          const toFilter = (v) => (v == null ? '' : String(v));
+          return (
+            <label key={field.id} className="ba-filters__range">
+              {field.label}
+              <div>
+                <InputComp
+                  placeholder="Min"
+                  value={filters[field.keys[0]] || ''}
+                  onValueChange={(v) => updateFilter(field.keys[0], toFilter(v))}
+                />
+                <InputComp
+                  placeholder="Max"
+                  value={filters[field.keys[1]] || ''}
+                  onValueChange={(v) => updateFilter(field.keys[1], toFilter(v))}
+                />
+              </div>
+            </label>
+          );
+        })}
       </div>
 
       {showHyper && (

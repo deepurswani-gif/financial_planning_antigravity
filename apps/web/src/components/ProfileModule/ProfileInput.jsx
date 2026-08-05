@@ -3,6 +3,10 @@ import { calculateRetirementYear, calculateAge } from './ProfileLogic';
 import { EDUCATION_STANDARDS } from '../JourneyModule/ProjectionLogic';
 import CurrencyInput from '../common/CurrencyInput';
 import DateInput from '../common/DateInput';
+import YearsInput from '../common/YearsInput';
+import IntegerInput from '../common/IntegerInput';
+
+const toStored = (v) => (v == null ? '' : String(v));
 
 const ProfileInput = ({ members, setMembers, onCalculate }) => {
     const handleMemberChange = (index, e) => {
@@ -180,11 +184,12 @@ const ProfileInput = ({ members, setMembers, onCalculate }) => {
                                 </div>
                                 <div className="input-group">
                                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Calendar size={14} /> Retirement Age</label>
-                                    <input
-                                        type="number"
+                                    <YearsInput
                                         name="retirementAge"
                                         value={member.retirementAge}
-                                        onChange={(e) => handleMemberChange(index, e)}
+                                        onValueChange={(v) => handleMemberChange(index, { target: { name: 'retirementAge', value: toStored(v) } })}
+                                        min={40}
+                                        max={70}
                                     />
                                 </div>
                                 <div className="input-group">
@@ -244,11 +249,10 @@ const ProfileInput = ({ members, setMembers, onCalculate }) => {
                                 </div>
                                 <div className="input-group">
                                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Calendar size={14} /> Duration of the course (Years)</label>
-                                    <input
-                                        type="number"
+                                    <YearsInput
                                         name="courseDuration"
                                         value={member.courseDuration || ''}
-                                        onChange={(e) => handleMemberChange(index, e)}
+                                        onValueChange={(v) => handleMemberChange(index, { target: { name: 'courseDuration', value: toStored(v) } })}
                                         placeholder="e.g. 4"
                                     />
                                 </div>
@@ -264,12 +268,12 @@ const ProfileInput = ({ members, setMembers, onCalculate }) => {
                                 </div>
                                 <div className="input-group">
                                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Calendar size={14} /> Remaining Time to Complete (Years)</label>
-                                    <input
-                                        type="number"
+                                    <IntegerInput
                                         name="remainingTime"
                                         value={member.remainingTime || ''}
-                                        onChange={(e) => handleMemberChange(index, e)}
+                                        onValueChange={(v) => handleMemberChange(index, { target: { name: 'remainingTime', value: toStored(v) } })}
                                         placeholder="e.g. 2"
+                                        min={0}
                                     />
                                 </div>
                                 <div className="input-group">

@@ -4,6 +4,9 @@ import { calculatePolicyEndDate } from './InsuranceLogic';
 import CurrencyInput from '../common/CurrencyInput';
 import DateInput from '../common/DateInput';
 import { todayISO } from '../../utils/dateFormat';
+import YearsInput from '../common/YearsInput';
+
+const toStored = (v) => (v == null ? '' : String(v));
 
 const InsuranceInput = ({ familyMembers, policies, setPolicies, isProposed = false, investmentAllocations = [] }) => {
 
@@ -151,12 +154,23 @@ const InsuranceInput = ({ familyMembers, policies, setPolicies, isProposed = fal
                                             </div>
                                             <div className="input-group">
                                                 <label>Payment Term (Years)</label>
-                                                <input type="number" placeholder="Years" value={p.paymentTerm} readOnly={isProposed} className={isProposed ? "input-field calc" : "input-field"} onWheel={(e) => e.target.blur()} onChange={e => updatePolicy(p.id, 'paymentTerm', e.target.value)} />
+                                                <YearsInput
+                                                    placeholder="Years"
+                                                    value={p.paymentTerm}
+                                                    readOnly={isProposed}
+                                                    className={isProposed ? "input-field calc" : "input-field"}
+                                                    onValueChange={(v) => updatePolicy(p.id, 'paymentTerm', toStored(v))}
+                                                />
                                             </div>
                                             
                                             <div className="input-group" style={{ gridColumn: p.planType === 'Term Insurance' ? 'span 2' : 'span 1' }}>
                                                 <label>Policy Term (Years)</label>
-                                                <input type="number" placeholder="Years" value={p.policyTerm} onWheel={(e) => e.target.blur()} onChange={e => updatePolicy(p.id, 'policyTerm', e.target.value)} className="input-field" />
+                                                <YearsInput
+                                                    placeholder="Years"
+                                                    value={p.policyTerm}
+                                                    onValueChange={(v) => updatePolicy(p.id, 'policyTerm', toStored(v))}
+                                                    className="input-field"
+                                                />
                                             </div>
                                             {p.planType !== 'Term Insurance' && (
                                                 <div className="input-group">

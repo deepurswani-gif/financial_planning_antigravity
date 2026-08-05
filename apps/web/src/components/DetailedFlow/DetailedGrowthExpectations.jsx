@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, TrendingUp, GraduationCap } from 'lucide-react';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 import { financialWorkspacePath } from '../FinancialWorkspace/workspaceNavConfig';
+import PercentageInput from '../common/PercentageInput';
 
 const RATE_FIELDS = [
     {
@@ -34,7 +35,7 @@ const DetailedGrowthExpectations = () => {
     const handleRateChange = (name, value) => {
         setInflationRates({
             ...inflationRates,
-            [name]: parseFloat(value) || 0,
+            [name]: value,
         });
     };
 
@@ -98,14 +99,12 @@ const DetailedGrowthExpectations = () => {
                                 <Icon size={14} />
                                 {label}
                             </label>
-                            <input
-                                type="number"
+                            <PercentageInput
                                 className="conversational-input"
                                 value={inflationRates[key] ?? ''}
-                                onChange={(e) => handleRateChange(key, e.target.value)}
+                                onValueChange={(v) => handleRateChange(key, v)}
                                 placeholder={placeholder}
-                                min="0"
-                                step="0.1"
+                                min={0}
                             />
                         </div>
                     ))}
@@ -120,7 +119,7 @@ const DetailedGrowthExpectations = () => {
                 </div>
                 <div>
                     <button className="step-nav-btn primary" onClick={handleContinue} type="button">
-                        Continue to report <ArrowRight size={16} />
+                        Continue <ArrowRight size={16} />
                     </button>
                 </div>
             </div>

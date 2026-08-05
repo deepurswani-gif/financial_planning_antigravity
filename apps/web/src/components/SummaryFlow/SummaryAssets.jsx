@@ -3,6 +3,9 @@ import ProgressiveQuestionLayout, { useProgressiveAdvance } from './ProgressiveQ
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 import { formatInrInWords } from '../../lib/formatInrInWords';
 import { syncEmergencyFundAmount } from '../DetailedFlow/wealthDetailSync';
+import CurrencyInput from '../common/CurrencyInput';
+
+const toStored = (v) => (v == null ? '' : String(v));
 
 const CurrentAssetsScreen = ({ assetCategories, handleSnapshotChange }) => {
     const { advance } = useProgressiveAdvance();
@@ -23,20 +26,16 @@ const CurrentAssetsScreen = ({ assetCategories, handleSnapshotChange }) => {
                 <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.2rem', display: 'block' }}>
                     Portfolio Value
                 </label>
-                <div className="currency-input-wrapper">
-                    <span className="currency-symbol">₹</span>
-                    <input
-                        type="number"
-                        className="conversational-input"
-                        placeholder="e.g. 500000"
-                        value={assetCategories.summaryPortfolioValue || ''}
-                        onChange={(e) => handleSnapshotChange('summaryPortfolioValue', e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') advance();
-                        }}
-                        enterKeyHint="done"
-                    />
-                </div>
+                <CurrencyInput
+                    className="conversational-input"
+                    placeholder="e.g. 500000"
+                    value={assetCategories.summaryPortfolioValue || ''}
+                    onValueChange={(v) => handleSnapshotChange('summaryPortfolioValue', toStored(v))}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') advance();
+                    }}
+                    enterKeyHint="done"
+                />
                 {assetCategories.summaryPortfolioValue && (
                     <div className="currency-display">
                         {formatInrInWords(assetCategories.summaryPortfolioValue)}
@@ -55,20 +54,16 @@ const CurrentAssetsScreen = ({ assetCategories, handleSnapshotChange }) => {
                 <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.2rem', display: 'block' }}>
                     Liquid Cash / Emergency Fund
                 </label>
-                <div className="currency-input-wrapper">
-                    <span className="currency-symbol">₹</span>
-                    <input
-                        type="number"
-                        className="conversational-input"
-                        placeholder="e.g. 200000"
-                        value={assetCategories.summaryLiquidCash || ''}
-                        onChange={(e) => handleSnapshotChange('summaryLiquidCash', e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') advance();
-                        }}
-                        enterKeyHint="done"
-                    />
-                </div>
+                <CurrencyInput
+                    className="conversational-input"
+                    placeholder="e.g. 200000"
+                    value={assetCategories.summaryLiquidCash || ''}
+                    onValueChange={(v) => handleSnapshotChange('summaryLiquidCash', toStored(v))}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') advance();
+                    }}
+                    enterKeyHint="done"
+                />
                 {assetCategories.summaryLiquidCash && (
                     <div className="currency-display">
                         {formatInrInWords(assetCategories.summaryLiquidCash)}
@@ -87,20 +82,16 @@ const CurrentAssetsScreen = ({ assetCategories, handleSnapshotChange }) => {
                 <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.2rem', display: 'block' }}>
                     Current Asset Value
                 </label>
-                <div className="currency-input-wrapper">
-                    <span className="currency-symbol">₹</span>
-                    <input
-                        type="number"
-                        className="conversational-input"
-                        placeholder="e.g. 5000000"
-                        value={assetCategories.summaryRealEstateAssets || ''}
-                        onChange={(e) => handleSnapshotChange('summaryRealEstateAssets', e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') advance();
-                        }}
-                        enterKeyHint="done"
-                    />
-                </div>
+                <CurrencyInput
+                    className="conversational-input"
+                    placeholder="e.g. 5000000"
+                    value={assetCategories.summaryRealEstateAssets || ''}
+                    onValueChange={(v) => handleSnapshotChange('summaryRealEstateAssets', toStored(v))}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') advance();
+                    }}
+                    enterKeyHint="done"
+                />
                 {assetCategories.summaryRealEstateAssets && (
                     <div className="currency-display">
                         {formatInrInWords(assetCategories.summaryRealEstateAssets)}

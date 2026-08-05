@@ -1,6 +1,10 @@
 import React from 'react';
 import { Trash2, Plus, HelpCircle } from 'lucide-react';
 import CurrencyInput from '../common/CurrencyInput';
+import YearsInput from '../common/YearsInput';
+import PercentageInput from '../common/PercentageInput';
+
+const toStored = (v) => (v == null ? '' : String(v));
 
 const GoalInput = ({ goals, setGoals, onCalculate }) => {
 
@@ -83,10 +87,9 @@ const GoalInput = ({ goals, setGoals, onCalculate }) => {
                                                             style={{ fontSize: '0.8rem' }}
                                                         />
                                                         <div style={{ display: 'flex', gap: '8px' }}>
-                                                            <input
-                                                                type="number"
+                                                            <YearsInput
                                                                 value={goal.courseDuration || ''}
-                                                                onChange={(e) => handleGoalChange(goal.id, 'courseDuration', e.target.value)}
+                                                                onValueChange={(v) => handleGoalChange(goal.id, 'courseDuration', toStored(v))}
                                                                 placeholder="Duration (Years)"
                                                                 className="input-minimal"
                                                                 style={{ fontSize: '0.8rem', width: '120px' }}
@@ -94,14 +97,13 @@ const GoalInput = ({ goals, setGoals, onCalculate }) => {
                                                             <CurrencyInput
                                                                 name="totalCourseCost"
                                                                 value={goal.totalCourseCost || ''}
-                                                                onChange={(e) => {
-                                                                    const val = e.target.value;
+                                                                onValueChange={(v) => {
+                                                                    const val = toStored(v);
                                                                     handleGoalChange(goal.id, 'totalCourseCost', val);
-                                                                    handleGoalChange(goal.id, 'presentValue', val); // Auto-fill PV
+                                                                    handleGoalChange(goal.id, 'presentValue', val);
                                                                 }}
                                                                 placeholder="Total Cost"
                                                                 className="input-minimal"
-                                                                style={{ fontSize: '0.8rem', paddingLeft: '1.5rem' }}
                                                             />
                                                         </div>
                                                     </div>
@@ -118,10 +120,9 @@ const GoalInput = ({ goals, setGoals, onCalculate }) => {
                                         )}
                                     </td>
                                     <td style={{ padding: '0.75rem' }}>
-                                        <input
-                                            type="number"
+                                        <YearsInput
                                             value={goal.yearsToGoal || ''}
-                                            onChange={(e) => handleGoalChange(goal.id, 'yearsToGoal', e.target.value)}
+                                            onValueChange={(v) => handleGoalChange(goal.id, 'yearsToGoal', toStored(v))}
                                             placeholder="Years"
                                             className="input-minimal"
                                             style={{ width: '80px' }}
@@ -141,18 +142,17 @@ const GoalInput = ({ goals, setGoals, onCalculate }) => {
                                         <CurrencyInput
                                             name="presentValue"
                                             value={goal.presentValue || ''}
-                                            onChange={(e) => handleGoalChange(goal.id, 'presentValue', e.target.value)}
+                                            onValueChange={(v) => handleGoalChange(goal.id, 'presentValue', toStored(v))}
                                             placeholder="0"
                                             className="input-minimal"
                                             readOnly={isEducation}
-                                            style={isEducation ? { background: 'var(--bg-main)', cursor: 'not-allowed', paddingLeft: '1.5rem' } : { paddingLeft: '1.5rem' }}
+                                            style={isEducation ? { background: 'var(--bg-main)', cursor: 'not-allowed' } : undefined}
                                         />
                                     </td>
                                     <td style={{ padding: '0.75rem' }}>
-                                        <input
-                                            type="number"
+                                        <PercentageInput
                                             value={goal.inflationRate || ''}
-                                            onChange={(e) => handleGoalChange(goal.id, 'inflationRate', e.target.value)}
+                                            onValueChange={(v) => handleGoalChange(goal.id, 'inflationRate', toStored(v))}
                                             placeholder="6%"
                                             className="input-minimal"
                                             style={{ width: '80px' }}

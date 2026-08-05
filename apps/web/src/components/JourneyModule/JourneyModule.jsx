@@ -10,6 +10,10 @@ import { buildSupportEmailContextFromUser } from '../../services/supportRequestE
 import finbrellaLogo from '../../assets/finbrella_logo.png';
 import adjustmentTypeImage from '../../assets/adjustment_type.png';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
+import PercentageInput from '../common/PercentageInput';
+import IntegerInput from '../common/IntegerInput';
+import YearsInput from '../common/YearsInput';
+import CurrencyInput from '../common/CurrencyInput';
 
 const JourneyModule = ({ onNext, onBack }) => {
     const { familyMembers, income, expenseCategories, goals, inflationRates, setInflationRates, journeyAdjustments, setJourneyAdjustments, policies, journeyProjections: passedProjections, currentYearLedger, hasSpouseIncome, planStartMonth } = useFinancialPlan();
@@ -44,7 +48,7 @@ const JourneyModule = ({ onNext, onBack }) => {
     const handleRateChange = (name, value) => {
         setInflationRates({
             ...inflationRates,
-            [name]: parseFloat(value) || 0
+            [name]: value,
         });
     };
 
@@ -69,9 +73,9 @@ const JourneyModule = ({ onNext, onBack }) => {
     };
 
     const calculateEmi = (p, r, n) => {
-        p = parseFloat(p) || 0;
-        r = parseFloat(r) || 0;
-        n = parseFloat(n) || 0;
+        p = Number(p ?? 0);
+        r = Number(r ?? 0);
+        n = Number(n ?? 0);
         if (p > 0 && r > 0 && n > 0) {
             const monthlyRate = r / 12 / 100;
             return Math.round((p * monthlyRate * Math.pow(1 + monthlyRate, n)) / (Math.pow(1 + monthlyRate, n) - 1));
@@ -221,10 +225,9 @@ const JourneyModule = ({ onNext, onBack }) => {
                                 <HelpCircle size={18} color="var(--primary)" />
                             </div>
                         </label>
-                        <input
-                            type="number"
+                        <PercentageInput
                             value={inflationRates.incomeIncrement}
-                            onChange={(e) => handleRateChange('incomeIncrement', e.target.value)}
+                            onValueChange={(v) => handleRateChange('incomeIncrement', v)}
                             placeholder="e.g. 10"
                         />
                     </div>
@@ -233,10 +236,9 @@ const JourneyModule = ({ onNext, onBack }) => {
                         <label>
                             <TrendingUp size={14} /> Household Inflation (%)
                         </label>
-                        <input
-                            type="number"
+                        <PercentageInput
                             value={inflationRates.householdInflation}
-                            onChange={(e) => handleRateChange('householdInflation', e.target.value)}
+                            onValueChange={(v) => handleRateChange('householdInflation', v)}
                             placeholder="e.g. 6"
                         />
                     </div>
@@ -245,10 +247,9 @@ const JourneyModule = ({ onNext, onBack }) => {
                         <label>
                             <GraduationCap size={14} /> Education Inflation (%)
                         </label>
-                        <input
-                            type="number"
+                        <PercentageInput
                             value={inflationRates.educationInflation}
-                            onChange={(e) => handleRateChange('educationInflation', e.target.value)}
+                            onValueChange={(v) => handleRateChange('educationInflation', v)}
                             placeholder="e.g. 8"
                         />
                     </div>
@@ -322,30 +323,29 @@ const JourneyModule = ({ onNext, onBack }) => {
                                             </div>
                                             <div className="input-group" style={{ marginBottom: 0 }}>
                                                 <label>Start Year</label>
-                                                <input 
-                                                    type="number" 
-                                                    value={adj.startYear} 
-                                                    onChange={(e) => {
-                                                        let val = parseInt(e.target.value) || currentYear;
-                                                        if (val < currentYear) val = currentYear;
-                                                        updateAdjustment(adj.id, 'startYear', val);
+                                                <IntegerInput
+                                                    value={adj.startYear}
+                                                    min={currentYear}
+                                                    onValueChange={(v) => {
+                                                        updateAdjustment(adj.id, 'startYear', v);
+                                                        if (v === currentYear && (adj.startMonth || 1) < currentMonth) {
+                                                            updateAdjustment(adj.id, 'startMonth', currentMonth);
+                                                        }
                                                     }}
                                                 />
                                             </div>
                                             <div className="input-group" style={{ marginBottom: 0 }}>
                                                 <label>Duration (Yrs)</label>
-                                                <input 
-                                                    type="number" 
-                                                    value={adj.duration} 
-                                                    onChange={(e) => updateAdjustment(adj.id, 'duration', e.target.value)}
+                                                <YearsInput
+                                                    value={adj.duration}
+                                                    onValueChange={(v) => updateAdjustment(adj.id, 'duration', v == null ? '' : v)}
                                                 />
                                             </div>
                                             <div className="input-group" style={{ marginBottom: 0, gridColumn: 'span 2' }}>
                                                 <label>Annual Amount (₹)</label>
-                                                <input 
-                                                    type="number" 
-                                                    value={adj.amount} 
-                                                    onChange={(e) => updateAdjustment(adj.id, 'amount', e.target.value)}
+                                                <CurrencyInput
+                                                    value={adj.amount}
+                                                    onValueChange={(v) => updateAdjustment(adj.id, 'amount', v == null ? '' : String(v))}
                                                     placeholder="e.g. 500000"
                                                 />
                                             </div>
@@ -374,13 +374,12 @@ const JourneyModule = ({ onNext, onBack }) => {
                                             </div>
                                             <div className="input-group" style={{ marginBottom: 0 }}>
                                                 <label>Principal (₹)</label>
-                                                <input 
-                                                    type="number" 
-                                                    value={adj.principal || ''} 
-                                                    onChange={(e) => {
-                                                        const p = e.target.value;
-                                                        const emi = calculateEmi(p, adj.rate, adj.tenure);
-                                                        setJourneyAdjustments(journeyAdjustments.map(a => 
+                                                <CurrencyInput
+                                                    value={adj.principal || ''}
+                                                    onValueChange={(v) => {
+                                                        const p = v == null ? '' : String(v);
+                                                        const emi = calculateEmi(v, adj.rate, adj.tenure);
+                                                        setJourneyAdjustments(journeyAdjustments.map(a =>
                                                             a.id === adj.id ? { ...a, principal: p, emi: emi, amount: emi * 12 } : a
                                                         ));
                                                     }}
@@ -389,13 +388,12 @@ const JourneyModule = ({ onNext, onBack }) => {
                                             </div>
                                             <div className="input-group" style={{ marginBottom: 0 }}>
                                                 <label>Rate (%)</label>
-                                                <input 
-                                                    type="number" 
-                                                    value={adj.rate || ''} 
-                                                    onChange={(e) => {
-                                                        const r = e.target.value;
-                                                        const emi = calculateEmi(adj.principal, r, adj.tenure);
-                                                        setJourneyAdjustments(journeyAdjustments.map(a => 
+                                                <PercentageInput
+                                                    value={adj.rate || ''}
+                                                    onValueChange={(v) => {
+                                                        const r = v == null ? '' : String(v);
+                                                        const emi = calculateEmi(adj.principal, v, adj.tenure);
+                                                        setJourneyAdjustments(journeyAdjustments.map(a =>
                                                             a.id === adj.id ? { ...a, rate: r, emi: emi, amount: emi * 12 } : a
                                                         ));
                                                     }}
@@ -404,14 +402,14 @@ const JourneyModule = ({ onNext, onBack }) => {
                                             </div>
                                             <div className="input-group" style={{ marginBottom: 0 }}>
                                                 <label>Tenure (Months)</label>
-                                                <input 
-                                                    type="number" 
-                                                    value={adj.tenure || ''} 
-                                                    onChange={(e) => {
-                                                        const t = e.target.value;
-                                                        const emi = calculateEmi(adj.principal, adj.rate, t);
-                                                        setJourneyAdjustments(journeyAdjustments.map(a => 
-                                                            a.id === adj.id ? { ...a, tenure: t, duration: Math.ceil(t / 12), emi: emi, amount: emi * 12 } : a
+                                                <IntegerInput
+                                                    value={adj.tenure || ''}
+                                                    min={1}
+                                                    onValueChange={(v) => {
+                                                        const t = v == null ? '' : String(v);
+                                                        const emi = calculateEmi(adj.principal, adj.rate, v);
+                                                        setJourneyAdjustments(journeyAdjustments.map(a =>
+                                                            a.id === adj.id ? { ...a, tenure: t, duration: Math.ceil(Number(v ?? 0) / 12), emi: emi, amount: emi * 12 } : a
                                                         ));
                                                     }}
                                                     placeholder="e.g. 60"
@@ -431,16 +429,19 @@ const JourneyModule = ({ onNext, onBack }) => {
                                                             <option key={i+1} value={i+1}>{new Date(2000, i, 1).toLocaleString('default', { month: 'short' })}</option>
                                                         ))}
                                                     </select>
-                                                    <input type="number" value={adj.startYear} onChange={(e) => {
-                                                        let val = parseInt(e.target.value) || currentYear;
-                                                        if (val <= currentYear) {
-                                                            val = currentYear;
-                                                            if ((adj.startMonth || 1) < currentMonth) {
-                                                                updateAdjustment(adj.id, 'startMonth', currentMonth);
+                                                    <IntegerInput
+                                                        value={adj.startYear}
+                                                        min={currentYear}
+                                                        onValueChange={(v) => {
+                                                            updateAdjustment(adj.id, 'startYear', v);
+                                                            if (v != null && v <= currentYear) {
+                                                                if ((adj.startMonth || 1) < currentMonth) {
+                                                                    updateAdjustment(adj.id, 'startMonth', currentMonth);
+                                                                }
                                                             }
-                                                        }
-                                                        updateAdjustment(adj.id, 'startYear', val);
-                                                    }} style={{ width: '80px' }} />
+                                                        }}
+                                                        style={{ width: '80px' }}
+                                                    />
                                                 </div>
                                             </div>
                                             <div className="input-group" style={{ marginBottom: 0, gridColumn: 'span 5', background: 'var(--bg-card)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border)' }}>

@@ -706,14 +706,6 @@ const CashFlowInput = ({ familyMembers, income, setIncome, expenseCategories, se
             )}
 
             <style>{`
-        .monthly-ledger-table input::-webkit-outer-spin-button,
-        .monthly-ledger-table input::-webkit-inner-spin-button {
-            -webkit-appearance: none;
-            margin: 0;
-        }
-        .monthly-ledger-table input[type=number] {
-            -moz-appearance: textfield;
-        }
         .input-grid-mini {
           display: grid;
           gap: 1.25rem;

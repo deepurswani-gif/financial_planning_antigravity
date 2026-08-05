@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Calculator, TrendingUp } from 'lucide-react';
+import PercentageInput from '../common/PercentageInput';
 
 export const computePPFData = (proposedPPFs, expectedReturns, defaultPPFObj = {}) => {
     let results = [];
@@ -104,9 +105,11 @@ const PPFCalculator = ({ calculatorKey = "ppf" }) => {
         return allocations.filter(a => a.type === 'PPF');
     }, [allocations]);
 
+    const rateNum = Number(expectedReturns ?? 0);
+
     const { results: calculationData, startString, endString } = useMemo(() => {
-        return computePPFData(proposedPPFs, expectedReturns, defaultPPFObj);
-    }, [proposedPPFs, expectedReturns, defaultPPFObj]);
+        return computePPFData(proposedPPFs, rateNum, defaultPPFObj);
+    }, [proposedPPFs, rateNum, defaultPPFObj]);
 
     const finalValue = calculationData.length > 0 ? calculationData[calculationData.length - 1].endValue : 0;
     const totalInvested = calculationData.reduce((sum, row) => sum + row.investment, 0);
@@ -135,24 +138,12 @@ const PPFCalculator = ({ calculatorKey = "ppf" }) => {
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
                                 <div className="form-group">
                                     <label><TrendingUp size={16} /> Expected Returns (CAGR %)</label>
-                                    <input 
-                                        type="number" 
-                                        step="0.01"
-                                        min="5"
-                                        max="9"
-                                        value={expectedReturns} 
-                                        onChange={(e) => {
-                                            let val = parseFloat(e.target.value);
-                                            setExpectedReturns(isNaN(val) ? '' : val);
-                                        }} 
-                                        onBlur={(e) => {
-                                            let val = parseFloat(e.target.value);
-                                            if (isNaN(val)) val = 7.10;
-                                            if (val < 5) val = 5;
-                                            if (val > 9) val = 9;
-                                            setExpectedReturns(val.toFixed(2));
-                                        }}
-                                        className="form-input" 
+                                    <PercentageInput
+                                        value={expectedReturns}
+                                        min={5}
+                                        max={9}
+                                        onValueChange={setExpectedReturns}
+                                        className="form-input"
                                     />
                                     <small className="text-muted">Range: 5.00% to 9.00%. Default: 7.10%.</small>
                                 </div>

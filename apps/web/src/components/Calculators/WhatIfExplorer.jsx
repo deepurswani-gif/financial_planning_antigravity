@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { FlaskConical, RotateCcw } from 'lucide-react';
+import CurrencyInput from '../common/CurrencyInput';
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -29,7 +30,7 @@ const WhatIfExplorer = ({
 
     const clampedDefaultYear = Math.min(Math.max(defaultYear, minYear), maxYear);
     const [action, setAction] = useState(addAction);
-    const [amount, setAmount] = useState('');
+    const [amount, setAmount] = useState(null);
     const [eventMonth, setEventMonth] = useState(defaultMonth);
     const [eventYear, setEventYear] = useState(clampedDefaultYear);
     const [targetYear, setTargetYear] = useState(maxYear);
@@ -42,13 +43,13 @@ const WhatIfExplorer = ({
 
     const reset = () => {
         setAction(addAction);
-        setAmount('');
+        setAmount(null);
         setEventMonth(defaultMonth);
         setEventYear(clampedDefaultYear);
         setTargetYear(maxYear);
     };
 
-    const amountNum = parseFloat(amount) || 0;
+    const amountNum = Number(amount ?? 0);
     const safeEventYear = Math.min(Math.max(eventYear, minYear), maxYear);
     const safeTargetYear = Math.min(Math.max(targetYear, minYear), maxYear);
     const eventBeforeOrAtTarget =
@@ -185,15 +186,16 @@ const WhatIfExplorer = ({
 
             <p style={{ margin: 0, fontSize: '1rem', lineHeight: 1.9, color: 'var(--text-main)' }}>
                 If I {sentenceVerb}{' '}
-                <input
-                    type="number"
-                    min="0"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="amount"
-                    style={{ ...inputStyle, width: '8rem' }}
-                    aria-label="What-if amount"
-                />
+                <span style={{ display: 'inline-block', width: '8rem', verticalAlign: 'middle', margin: '0 0.25rem' }}>
+                    <CurrencyInput
+                        value={amount}
+                        onValueChange={setAmount}
+                        min={0}
+                        placeholder="amount"
+                        style={{ ...inputStyle, width: '100%', margin: 0 }}
+                        aria-label="What-if amount"
+                    />
+                </span>
                 {mode === 'sip' && action === 'increment' ? ' from ' : ' in '}
                 <select
                     value={eventMonth}

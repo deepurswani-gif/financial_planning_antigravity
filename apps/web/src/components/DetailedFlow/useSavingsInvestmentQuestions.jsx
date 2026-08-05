@@ -7,6 +7,7 @@ import {
     getSummarySavingsTotal,
 } from './savingsDetailSync';
 import ReconciliationBar from './ReconciliationBar';
+import CurrencyInput from '../common/CurrencyInput';
 
 const formatInr = (val) => {
     if (!val || isNaN(val)) return '₹0';
@@ -17,6 +18,8 @@ const formatInr = (val) => {
     }).format(val);
 };
 
+const toStored = (v) => (v == null ? '' : String(v));
+
 const CurrencyField = ({ label, value, onChange, placeholder = '0', helperText }) => (
     <div>
         {label && (
@@ -24,16 +27,12 @@ const CurrencyField = ({ label, value, onChange, placeholder = '0', helperText }
                 {label}
             </label>
         )}
-        <div className="currency-input-wrapper">
-            <span className="currency-symbol">₹</span>
-            <input
-                type="number"
-                className="conversational-input"
-                placeholder={placeholder}
-                value={value || ''}
-                onChange={(e) => onChange(e.target.value)}
-            />
-        </div>
+        <CurrencyInput
+            className="conversational-input"
+            placeholder={placeholder}
+            value={value ?? ''}
+            onValueChange={(v) => onChange(toStored(v))}
+        />
         {helperText && (
             <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.35rem', lineHeight: 1.45 }}>
                 {helperText}
@@ -169,23 +168,19 @@ export function useSavingsInvestmentQuestions() {
                         )}
                     </div>
                 </div>
-                <div className="currency-input-wrapper">
-                    <span className="currency-symbol">₹</span>
-                    <input
-                        type="number"
-                        className="conversational-input"
-                        readOnly
-                        value={displayValue || ''}
-                        onClick={() => setActiveInvModal(invKey)}
-                        placeholder="0"
-                        style={{
-                            cursor: 'pointer',
-                            background: 'var(--bg-card)',
-                            fontWeight: 600,
-                            color: isConfigured ? 'var(--primary)' : 'var(--text-muted)',
-                        }}
-                    />
-                </div>
+                <CurrencyInput
+                    className="conversational-input"
+                    readOnly
+                    value={displayValue || ''}
+                    onClick={() => setActiveInvModal(invKey)}
+                    placeholder="0"
+                    style={{
+                        cursor: 'pointer',
+                        background: 'var(--bg-card)',
+                        fontWeight: 600,
+                        color: isConfigured ? 'var(--primary)' : 'var(--text-muted)',
+                    }}
+                />
             </div>
         );
     };
@@ -318,18 +313,14 @@ export function useSavingsInvestmentQuestions() {
                                                 </button>
                                             </div>
                                         </div>
-                                        <div className="currency-input-wrapper">
-                                            <span className="currency-symbol">₹</span>
-                                            <input
-                                                type="number"
-                                                className="conversational-input"
-                                                readOnly
-                                                value={displayValue || ''}
-                                                onClick={() => setActiveInvModal({ key: 'rd', index: rdIndex })}
-                                                placeholder="0"
-                                                style={{ cursor: 'pointer', background: 'var(--bg-main)', fontWeight: 600, color: isConfigured ? 'var(--primary)' : 'var(--text-muted)' }}
-                                            />
-                                        </div>
+                                        <CurrencyInput
+                                            className="conversational-input"
+                                            readOnly
+                                            value={displayValue || ''}
+                                            onClick={() => setActiveInvModal({ key: 'rd', index: rdIndex })}
+                                            placeholder="0"
+                                            style={{ cursor: 'pointer', background: 'var(--bg-main)', fontWeight: 600, color: isConfigured ? 'var(--primary)' : 'var(--text-muted)' }}
+                                        />
                                     </div>
                                 );
                             })}

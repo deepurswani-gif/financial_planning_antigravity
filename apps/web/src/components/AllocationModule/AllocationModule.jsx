@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { PieChart, Plus, Trash2, ArrowRight, Wallet, Target, TrendingUp, ChevronDown, ChevronUp, AlertTriangle, ChevronLeft, ChevronRight, Filter, HelpCircle } from 'lucide-react';
 import CurrencyInput from '../common/CurrencyInput';
+import IntegerInput from '../common/IntegerInput';
+import YearsInput from '../common/YearsInput';
 import ContextualHelpPopup from '../common/ContextualHelpPopup';
 import logo from '../../assets/finbrella_logo.png';
 import { useAuth } from '../../contexts/AuthContext';
@@ -452,57 +454,46 @@ const AllocationModule = ({ onNext, onBack }) => {
                                             </div>
                                             <div className="input-group" style={{ marginBottom: 0 }}>
                                                 <label>Start Year</label>
-                                                <input 
-                                                    type="number" 
-                                                    value={item.startYear} 
-                                                    onChange={(e) => {
-                                                        let val = parseInt(e.target.value) || currentYear;
-                                                        if (val < currentYear) val = currentYear;
-                                                        
-                                                        // If snapping year back to current, also validate month safely
-                                                        if (val === currentYear && item.startMonth < currentMonth) {
+                                                <IntegerInput
+                                                    value={item.startYear}
+                                                    min={currentYear}
+                                                    onValueChange={(v) => {
+                                                        updateAllocation(item.id, 'startYear', v);
+                                                        if (v === currentYear && item.startMonth < currentMonth) {
                                                             updateAllocation(item.id, 'startMonth', currentMonth);
                                                         }
-                                                        updateAllocation(item.id, 'startYear', val);
                                                     }}
                                                 />
                                             </div>
                                             {hasDuration(item.type) ? (
                                                 <div className="input-group" style={{ marginBottom: 0 }}>
                                                     <label>{item.type === 'Life Insurance' ? 'Premium Payment Term (Years)' : (item.type === 'Fixed Deposit' ? 'Tenure (Yrs)' : 'Duration (Yrs)')}</label>
-                                                    <input 
-                                                        type="number" 
-                                                        value={item.duration} 
-                                                        onChange={(e) => {
-                                                            let val = parseInt(e.target.value) || 0;
-                                                            if (item.type === 'PPF') {
-                                                                const existingPpf = expenseCategories?.savings?.ppf;
-                                                                const hasExistingPpf = existingPpf && parseFloat(existingPpf.amount) > 0;
-                                                                let earliestStartYear = currentYear;
-                                                                let earliestStartMonth = currentMonth;
-                                                                
-                                                                if (hasExistingPpf) {
-                                                                    earliestStartYear = parseInt(existingPpf.startYear) || currentYear;
-                                                                    earliestStartMonth = parseInt(existingPpf.startMonth) || currentMonth;
-                                                                } else {
-                                                                    const ppfAllocations = allocations.filter(a => a.type === 'PPF');
-                                                                    const earliest = ppfAllocations.reduce((min, p) => 
-                                                                        (p.startYear < min.startYear || (p.startYear === min.startYear && p.startMonth < min.startMonth)) ? p : min
-                                                                    , ppfAllocations[0]);
-                                                                    earliestStartYear = earliest ? earliest.startYear : currentYear;
-                                                                    earliestStartMonth = earliest ? earliest.startMonth : currentMonth;
-                                                                }
+                                                    <YearsInput
+                                                        value={item.duration}
+                                                        max={item.type === 'PPF' ? (() => {
+                                                            const existingPpf = expenseCategories?.savings?.ppf;
+                                                            const hasExistingPpf = existingPpf && parseFloat(existingPpf.amount) > 0;
+                                                            let earliestStartYear = currentYear;
+                                                            let earliestStartMonth = currentMonth;
 
-                                                                const globalPpfEndAbsolute = (earliestStartYear + 15) * 12 + earliestStartMonth - 1;
-                                                                const itemStartAbsolute = item.startYear * 12 + item.startMonth;
-                                                                const diffMonths = globalPpfEndAbsolute - itemStartAbsolute + 1;
-                                                                const maxAllowedDuration = Math.max(0, Math.min(15, Math.floor(diffMonths / 12)));
-                                                                if (val > maxAllowedDuration) {
-                                                                    val = maxAllowedDuration;
-                                                                }
+                                                            if (hasExistingPpf) {
+                                                                earliestStartYear = parseInt(existingPpf.startYear) || currentYear;
+                                                                earliestStartMonth = parseInt(existingPpf.startMonth) || currentMonth;
+                                                            } else {
+                                                                const ppfAllocations = allocations.filter(a => a.type === 'PPF');
+                                                                const earliest = ppfAllocations.reduce((min, p) =>
+                                                                    (p.startYear < min.startYear || (p.startYear === min.startYear && p.startMonth < min.startMonth)) ? p : min
+                                                                , ppfAllocations[0]);
+                                                                earliestStartYear = earliest ? earliest.startYear : currentYear;
+                                                                earliestStartMonth = earliest ? earliest.startMonth : currentMonth;
                                                             }
-                                                            updateAllocation(item.id, 'duration', val);
-                                                        }}
+
+                                                            const globalPpfEndAbsolute = (earliestStartYear + 15) * 12 + earliestStartMonth - 1;
+                                                            const itemStartAbsolute = item.startYear * 12 + item.startMonth;
+                                                            const diffMonths = globalPpfEndAbsolute - itemStartAbsolute + 1;
+                                                            return Math.max(0, Math.min(15, Math.floor(diffMonths / 12)));
+                                                        })() : undefined}
+                                                        onValueChange={(v) => updateAllocation(item.id, 'duration', v == null ? '' : v)}
                                                     />
                                                 </div>
                                             ) : (

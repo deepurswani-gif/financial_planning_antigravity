@@ -2,6 +2,10 @@ import React from 'react';
 import { useEditing } from './EditingProvider';
 import { EDIT_STATES } from './editSessionMachine';
 import DateInput from '../components/common/DateInput';
+import CurrencyInput from '../components/common/CurrencyInput';
+import PercentageInput from '../components/common/PercentageInput';
+import YearsInput from '../components/common/YearsInput';
+import NumericInput from '../components/common/NumericInput';
 import './focusedEdit.css';
 
 /**
@@ -13,10 +17,9 @@ import './focusedEdit.css';
  * session is Idle, so mounting it is inert until a session starts.
  */
 
-const CURRENCY_TYPES = new Set(['number', 'currency', 'percent', 'year']);
-
 function FieldControl({ field, value, onChange, disabled }) {
   const valueType = field?.valueType ?? 'text';
+  const mapDraft = (v) => onChange(v == null ? '' : v);
 
   if (valueType === 'boolean') {
     return (
@@ -48,20 +51,53 @@ function FieldControl({ field, value, onChange, disabled }) {
     );
   }
 
-  if (CURRENCY_TYPES.has(valueType)) {
+  if (valueType === 'currency') {
     return (
-      <div className="fe-number-wrap">
-        {valueType === 'currency' ? <span className="fe-affix">₹</span> : null}
-        <input
-          className="fe-input"
-          type="number"
-          inputMode="decimal"
-          value={value ?? ''}
-          disabled={disabled}
-          onChange={(e) => onChange(e.target.value === '' ? '' : Number(e.target.value))}
-        />
-        {valueType === 'percent' ? <span className="fe-affix fe-affix--suffix">%</span> : null}
-      </div>
+      <CurrencyInput
+        className="fe-input"
+        value={value ?? ''}
+        disabled={disabled}
+        onValueChange={mapDraft}
+        aria-label={field?.label ?? 'Amount'}
+      />
+    );
+  }
+
+  if (valueType === 'percent') {
+    return (
+      <PercentageInput
+        className="fe-input"
+        showSuffix
+        value={value ?? ''}
+        disabled={disabled}
+        onValueChange={mapDraft}
+        aria-label={field?.label ?? 'Percent'}
+      />
+    );
+  }
+
+  if (valueType === 'year') {
+    return (
+      <YearsInput
+        className="fe-input"
+        value={value ?? ''}
+        disabled={disabled}
+        onValueChange={mapDraft}
+        aria-label={field?.label ?? 'Years'}
+      />
+    );
+  }
+
+  if (valueType === 'number') {
+    return (
+      <NumericInput
+        className="fe-input"
+        allowDecimal
+        value={value ?? ''}
+        disabled={disabled}
+        onValueChange={mapDraft}
+        aria-label={field?.label ?? 'Number'}
+      />
     );
   }
 
