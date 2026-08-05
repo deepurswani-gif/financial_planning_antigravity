@@ -7,6 +7,7 @@ import {
   getNotificationPermission,
   isPushOptedIn,
   setPushOptIn,
+  showLocalTrayNotification,
 } from '../../lib/pushNotifications';
 import { ensurePushTokenForUser } from '../../services/ensurePushTokenForUser';
 import {
@@ -165,6 +166,13 @@ export default function NotificationSettingsPanel({ open, onClose, userId }) {
 
       const deviceToken =
         ensured.token || sessionStorage.getItem('finplan_last_fcm_token') || undefined;
+
+      // Prove the OS/Chrome tray works on this device (independent of FCM).
+      const local = await showLocalTrayNotification({
+        title: 'Finbrella tray check',
+        body: 'If you see this, notifications work on this phone. FCM test follows.',
+      });
+
       const { data: sendData, error: sendError } = await sendTestPushToSelf({
         title: 'Finbrella test',
         body: 'Push notifications are working on this device.',
@@ -174,16 +182,19 @@ export default function NotificationSettingsPanel({ open, onClose, userId }) {
 
       const sent = sendData?.sent ?? 0;
       const total = sendData?.total ?? 0;
-      const failed = Array.isArray(sendData?.results)
-        ? sendData.results.filter((r) => !r.ok)
-        : [];
-      if (sent > 0) {
+      if (!local.ok) {
+        setError(
+          'Chrome/OS blocked the local tray notification. Check site notification permission and phone battery settings for Chrome.',
+        );
+      } else if (sent > 0) {
         setMessage(
-          `Test sent to this device (${sent}/${total}). Minimize Chrome, then check the notification tray.`,
+          `Local tray OK · FCM accepted (${sent}/${total}). Minimize Chrome — you should get a second “Finbrella test” notification.`,
         );
       } else {
-        const detail = failed[0]?.fcmError || 'FCM rejected the token';
-        setError(`Send reported no deliveries: ${detail}`);
+        const detail = Array.isArray(sendData?.results)
+          ? sendData.results.find((r) => !r.ok)?.fcmError
+          : null;
+        setError(`FCM reported no deliveries: ${detail || 'unknown error'}`);
       }
     } catch (err) {
       setError(err?.message || 'Could not send test notification.');

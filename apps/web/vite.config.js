@@ -43,8 +43,18 @@ export default defineConfig({
         mode: 'development',
         // Main bundle exceeds Workbox's default 2 MiB precache limit.
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+        // Run FCM inside the same SW that VitePWA registers (avoids dual-SW miss on Android).
+        importScripts: ['/firebase-messaging-sw.js'],
       },
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icons.svg'],
+      includeAssets: [
+        'favicon.ico',
+        'apple-touch-icon.png',
+        'mask-icons.svg',
+        'pwa-192x192.png',
+        'pwa-512x512.png',
+        'notification-icon.png',
+        'firebase-messaging-sw.js',
+      ],
       manifest: {
         name: 'FinPlan - Financial Planning PWA',
         short_name: 'FinPlan',

@@ -2,6 +2,7 @@ import { deleteToken, getToken, onMessage } from 'firebase/messaging';
 import { getFirebaseMessaging, isFirebaseConfigured } from './firebase';
 
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY;
+/** Legacy dedicated FCM SW (fallback if PWA SW is not ready). */
 const FCM_SW_URL = '/firebase-messaging-sw.js';
 const FCM_SW_SCOPE = '/firebase-cloud-messaging-push-scope';
 /** Legacy browser-wide flag (pre per-user). */
@@ -77,21 +78,40 @@ async function waitUntilServiceWorkerActive(registration) {
   return registration;
 }
 
+/**
+ * Prefer the VitePWA Workbox SW (scope `/`, importScripts FCM).
+ * Fall back to a dedicated FCM registration if PWA SW is unavailable.
+ */
 async function getOrRegisterMessagingServiceWorker() {
   if (!('serviceWorker' in navigator)) {
     throw new Error('Service workers are not supported in this browser.');
   }
 
-  let registration = await navigator.serviceWorker.getRegistration(FCM_SW_SCOPE);
+  // Wait briefly for VitePWA's injected register() to finish.
+  const readyPromise = navigator.serviceWorker.ready;
+  const timeout = new Promise((resolve) => setTimeout(() => resolve(null), 4000));
+  const ready = await Promise.race([readyPromise, timeout]);
+  if (ready?.active) {
+    try {
+      await ready.update();
+    } catch {
+      /* ignore */
+    }
+    return ready;
+  }
 
+  let registration = await navigator.serviceWorker.getRegistration(FCM_SW_SCOPE);
   if (!registration || !registration.active) {
     registration = await navigator.serviceWorker.register(FCM_SW_URL, {
       scope: FCM_SW_SCOPE,
       updateViaCache: 'none',
     });
   }
-
   return waitUntilServiceWorkerActive(registration);
+}
+
+function notificationIconUrl() {
+  return `${typeof window !== 'undefined' ? window.location.origin : ''}/pwa-192x192.png`;
 }
 
 function ensureForegroundListener(messaging) {
@@ -99,40 +119,71 @@ function ensureForegroundListener(messaging) {
   foregroundUnsubscribe = onMessage(messaging, (payload) => {
     const title = payload.notification?.title || payload.data?.title || 'Finbrella';
     const body = payload.notification?.body || payload.data?.body || '';
-    const icon =
-      payload.data?.icon ||
-      `${typeof window !== 'undefined' ? window.location.origin : ''}/pwa-192x192.png`;
+    const icon = payload.data?.icon || notificationIconUrl();
     if (import.meta.env.DEV) {
       console.info('[FCM] Message received (foreground):', payload);
     }
     if (Notification.permission !== 'granted') return;
 
-    // Chrome Android often ignores `new Notification()` while the tab is focused.
-    // Prefer the FCM service worker tray notification instead.
     const showViaSw = async () => {
       try {
         const registration =
-          (await navigator.serviceWorker.getRegistration(FCM_SW_SCOPE)) ||
-          (await navigator.serviceWorker.ready);
+          (await navigator.serviceWorker.ready) ||
+          (await navigator.serviceWorker.getRegistration(FCM_SW_SCOPE));
         if (registration?.showNotification) {
           await registration.showNotification(title, {
             body,
             icon,
+            badge: icon,
             data: payload.data || {},
           });
           return;
         }
-      } catch {
-        /* fall through */
+      } catch (err) {
+        if (import.meta.env.DEV) {
+          console.warn('[FCM] showNotification failed:', err);
+        }
       }
-      new Notification(title, {
-        body,
-        icon,
-        data: payload.data || {},
-      });
+      try {
+        new Notification(title, { body, icon, data: payload.data || {} });
+      } catch {
+        /* ignore */
+      }
     };
     void showViaSw();
   });
+}
+
+/**
+ * Show a local tray notification via the active SW (does not use FCM).
+ * Useful to verify OS/Chrome notification permission independently of FCM delivery.
+ */
+export async function showLocalTrayNotification({ title, body, data } = {}) {
+  if (Notification.permission !== 'granted') {
+    return { ok: false, reason: 'permission' };
+  }
+  const icon = notificationIconUrl();
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    await registration.showNotification(title || 'Finbrella', {
+      body: body || '',
+      icon,
+      badge: icon,
+      data: data || {},
+    });
+    return { ok: true };
+  } catch (err) {
+    try {
+      new Notification(title || 'Finbrella', {
+        body: body || '',
+        icon,
+        data: data || {},
+      });
+      return { ok: true, via: 'Notification' };
+    } catch (err2) {
+      return { ok: false, error: err2 || err };
+    }
+  }
 }
 
 /**
