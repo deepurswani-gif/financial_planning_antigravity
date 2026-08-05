@@ -1,5 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { Calculator, Calendar, DollarSign, TrendingDown, Clock, Info } from 'lucide-react';
+import CurrencyInput from '../common/CurrencyInput';
+import PercentageInput from '../common/PercentageInput';
+import YearsInput from '../common/YearsInput';
 
 const PersonalLoanEngine = ({
     loanKey, title, loanAmount, interestRate, tenureYears, startMonth, startYear, 
@@ -10,7 +13,10 @@ const PersonalLoanEngine = ({
     const currentMonth = new Date().getMonth() + 1;
 
     // Derived values
-    const tenureMonths = tenureYears * 12;
+    const amountNum = Number(loanAmount ?? 0);
+    const rateNum = Number(interestRate ?? 0);
+    const tenureNum = Number(tenureYears ?? 0);
+    const tenureMonths = tenureNum * 12;
 
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const yearOptions = Array.from({ length: 31 }, (_, i) => currentYear - 10 + i);
@@ -25,8 +31,8 @@ const PersonalLoanEngine = ({
 
     // EMI Calculation (Reducing Balance)
     const emiData = useMemo(() => {
-        const P = loanAmount;
-        const r = interestRate / 12 / 100;
+        const P = amountNum;
+        const r = rateNum / 12 / 100;
         const n = tenureMonths;
 
         if (r === 0) return { emi: P / n, totalPayment: P, totalInterest: 0 };
@@ -36,13 +42,13 @@ const PersonalLoanEngine = ({
         const totalInterest = totalPayment - P;
 
         return { emi, totalPayment, totalInterest };
-    }, [loanAmount, interestRate, tenureMonths]);
+    }, [amountNum, rateNum, tenureMonths]);
 
     // Table Schedule Generation
     const schedule = useMemo(() => {
         let results = [];
-        let runningBalance = loanAmount;
-        const r = interestRate / 12 / 100;
+        let runningBalance = amountNum;
+        const r = rateNum / 12 / 100;
         const monthlyEMI = emiData.emi;
 
         let currentM = startMonth;
@@ -50,7 +56,7 @@ const PersonalLoanEngine = ({
 
         let yearlyData = {
             year: currentY,
-            openingBalance: loanAmount,
+            openingBalance: amountNum,
             principalPaid: 0,
             interestPaid: 0,
             closingBalance: 0
@@ -85,7 +91,7 @@ const PersonalLoanEngine = ({
         }
 
         return results;
-    }, [loanAmount, interestRate, tenureMonths, startMonth, startYear, emiData.emi]);
+    }, [amountNum, rateNum, tenureMonths, startMonth, startYear, emiData.emi]);
 
     return (
         <div className="fade-in" style={{ padding: '1rem' }}>
@@ -107,37 +113,33 @@ const PersonalLoanEngine = ({
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
                             <div className="form-group">
                                 <label><DollarSign size={16} /> Loan Amount (₹)</label>
-                                <input 
-                                    type="number" 
-                                    value={loanAmount} 
+                                <CurrencyInput
+                                    value={loanAmount}
                                     readOnly={isReadOnly}
-                                    onChange={(e) => !isReadOnly && setLoanAmount(parseFloat(e.target.value) || 0)} 
-                                    className="form-input" 
+                                    onValueChange={(v) => !isReadOnly && setLoanAmount(v)}
+                                    className="form-input"
                                     style={isReadOnly ? { background: 'var(--bg-main)', cursor: 'not-allowed' } : {}}
                                 />
                             </div>
 
                             <div className="form-group">
                                 <label><TrendingDown size={16} /> Interest Rate (% p.a.)</label>
-                                <input 
-                                    type="number" 
-                                    step="0.1"
-                                    value={interestRate} 
+                                <PercentageInput
+                                    value={interestRate}
                                     readOnly={isReadOnly}
-                                    onChange={(e) => !isReadOnly && setInterestRate(parseFloat(e.target.value) || 0)} 
-                                    className="form-input" 
+                                    onValueChange={(v) => !isReadOnly && setInterestRate(v)}
+                                    className="form-input"
                                     style={isReadOnly ? { background: 'var(--bg-main)', cursor: 'not-allowed' } : {}}
                                 />
                             </div>
 
                             <div className="form-group">
                                 <label><Clock size={16} /> Tenure (Years)</label>
-                                <input 
-                                    type="number" 
-                                    value={tenureYears} 
+                                <YearsInput
+                                    value={tenureYears}
                                     readOnly={isReadOnly}
-                                    onChange={(e) => !isReadOnly && setTenureYears(parseInt(e.target.value) || 0)} 
-                                    className="form-input" 
+                                    onValueChange={(v) => !isReadOnly && setTenureYears(v)}
+                                    className="form-input"
                                     style={isReadOnly ? { background: 'var(--bg-main)', cursor: 'not-allowed' } : {}}
                                 />
                                 <small className="text-muted">Tenure in Months: {tenureMonths}</small>
@@ -202,7 +204,7 @@ const PersonalLoanEngine = ({
                                 <div>
                                     <p style={{ margin: '0 0 0.5rem 0', opacity: 0.9, fontSize: '0.9rem' }}>Principal Amount</p>
                                     <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>
-                                        ₹{loanAmount.toLocaleString('en-IN')}
+                                        ₹{amountNum.toLocaleString('en-IN')}
                                     </h2>
                                 </div>
                                 <div>

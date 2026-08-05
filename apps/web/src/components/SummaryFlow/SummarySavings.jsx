@@ -3,6 +3,9 @@ import ProgressiveQuestionLayout, { useProgressiveAdvance } from './ProgressiveQ
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 import { Shield, Heart } from 'lucide-react';
 import { formatInrInWords } from '../../lib/formatInrInWords';
+import CurrencyInput from '../common/CurrencyInput';
+
+const toStored = (v) => (v == null ? '' : String(v));
 
 const SavingsInvestmentsScreen = ({ expenseCategories, handleSummaryChange }) => {
     const { advance } = useProgressiveAdvance();
@@ -22,20 +25,16 @@ const SavingsInvestmentsScreen = ({ expenseCategories, handleSummaryChange }) =>
                 <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.2rem', display: 'block' }}>
                     Monthly Investments
                 </label>
-                <div className="currency-input-wrapper">
-                    <span className="currency-symbol">₹</span>
-                    <input
-                        type="number"
-                        className="conversational-input"
-                        placeholder="e.g. 15000"
-                        value={expenseCategories.summaryMonthlyInvestments || ''}
-                        onChange={(e) => handleSummaryChange('summaryMonthlyInvestments', e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') advance();
-                        }}
-                        enterKeyHint="done"
-                    />
-                </div>
+                <CurrencyInput
+                    className="conversational-input"
+                    placeholder="e.g. 15000"
+                    value={expenseCategories.summaryMonthlyInvestments || ''}
+                    onValueChange={(v) => handleSummaryChange('summaryMonthlyInvestments', toStored(v))}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') advance();
+                    }}
+                    enterKeyHint="done"
+                />
                 {expenseCategories.summaryMonthlyInvestments && (
                     <div className="currency-display">
                         {formatInrInWords(expenseCategories.summaryMonthlyInvestments)} / month
@@ -54,20 +53,16 @@ const SavingsInvestmentsScreen = ({ expenseCategories, handleSummaryChange }) =>
                 <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.2rem', display: 'block' }}>
                     Other Monthly Savings
                 </label>
-                <div className="currency-input-wrapper">
-                    <span className="currency-symbol">₹</span>
-                    <input
-                        type="number"
-                        className="conversational-input"
-                        placeholder="e.g. 10000"
-                        value={expenseCategories.summaryOtherSavings || ''}
-                        onChange={(e) => handleSummaryChange('summaryOtherSavings', e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') advance();
-                        }}
-                        enterKeyHint="done"
-                    />
-                </div>
+                <CurrencyInput
+                    className="conversational-input"
+                    placeholder="e.g. 10000"
+                    value={expenseCategories.summaryOtherSavings || ''}
+                    onValueChange={(v) => handleSummaryChange('summaryOtherSavings', toStored(v))}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') advance();
+                    }}
+                    enterKeyHint="done"
+                />
                 {expenseCategories.summaryOtherSavings && (
                     <div className="currency-display">
                         {formatInrInWords(expenseCategories.summaryOtherSavings)} / month
@@ -136,20 +131,16 @@ const InsuranceProtectionScreen = ({
                     <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.2rem', display: 'block' }}>
                         Total Life Insurance Cover
                     </label>
-                    <div className="currency-input-wrapper">
-                        <span className="currency-symbol">₹</span>
-                        <input
-                            type="number"
-                            className="conversational-input"
-                            placeholder="e.g. 10000000"
-                            value={summaryLifeCover || ''}
-                            onChange={(e) => setSummaryLifeCover(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' && summaryLifeCover) advance();
-                            }}
-                            enterKeyHint="done"
-                        />
-                    </div>
+                    <CurrencyInput
+                        className="conversational-input"
+                        placeholder="e.g. 10000000"
+                        value={summaryLifeCover || ''}
+                        onValueChange={(v) => setSummaryLifeCover(toStored(v))}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' && summaryLifeCover) advance();
+                        }}
+                        enterKeyHint="done"
+                    />
                     {summaryLifeCover && (
                         <div className="currency-display">
                             {formatInrInWords(summaryLifeCover)}
@@ -199,20 +190,16 @@ const InsuranceProtectionScreen = ({
                     <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.2rem', display: 'block' }}>
                         Total Health Insurance Cover
                     </label>
-                    <div className="currency-input-wrapper">
-                        <span className="currency-symbol">₹</span>
-                        <input
-                            type="number"
-                            className="conversational-input"
-                            placeholder="e.g. 500000"
-                            value={summaryHealthCover || ''}
-                            onChange={(e) => setSummaryHealthCover(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' && summaryHealthCover) advance();
-                            }}
-                            enterKeyHint="done"
-                        />
-                    </div>
+                    <CurrencyInput
+                        className="conversational-input"
+                        placeholder="e.g. 500000"
+                        value={summaryHealthCover || ''}
+                        onValueChange={(v) => setSummaryHealthCover(toStored(v))}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' && summaryHealthCover) advance();
+                        }}
+                        enterKeyHint="done"
+                    />
                     {summaryHealthCover && (
                         <div className="currency-display">
                             {formatInrInWords(summaryHealthCover)}

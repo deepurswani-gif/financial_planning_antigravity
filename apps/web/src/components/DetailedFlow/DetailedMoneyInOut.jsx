@@ -29,6 +29,7 @@ import { EMI_LOAN_KEYS } from './expenseDetailSync';
 import { useSmartEditActivation } from '../FinancialWorkspace/smartEdit/activationChannel';
 import SmartEditInstancePicker from '../FinancialWorkspace/smartEdit/SmartEditInstancePicker';
 import { resolveInstanceActivation } from '../../experienceRegistry';
+import CurrencyInput from '../common/CurrencyInput';
 
 const formatInr = (val) => {
     if (!val || isNaN(val)) return '₹0';
@@ -39,6 +40,8 @@ const formatInr = (val) => {
     }).format(val);
 };
 
+const toStored = (v) => (v == null ? '' : String(v));
+
 const CurrencyField = ({ label, value, onChange, placeholder = '0', readOnly = false }) => (
     <div>
         {label && (
@@ -46,22 +49,20 @@ const CurrencyField = ({ label, value, onChange, placeholder = '0', readOnly = f
                 {label}
             </label>
         )}
-        <div className="currency-input-wrapper">
-            <span className="currency-symbol">₹</span>
-            <input
-                type="number"
-                className="conversational-input"
-                placeholder={placeholder}
-                value={value || ''}
-                readOnly={readOnly}
-                onChange={(e) => !readOnly && onChange(e.target.value)}
-                style={readOnly ? {
-                    background: 'var(--bg-main)',
-                    color: 'var(--text-muted)',
-                    cursor: 'default',
-                } : undefined}
-            />
-        </div>
+        <CurrencyInput
+            className="conversational-input"
+            placeholder={placeholder}
+            value={value ?? ''}
+            readOnly={readOnly}
+            onValueChange={(v) => {
+                if (!readOnly) onChange(toStored(v));
+            }}
+            style={readOnly ? {
+                background: 'var(--bg-main)',
+                color: 'var(--text-muted)',
+                cursor: 'default',
+            } : undefined}
+        />
     </div>
 );
 

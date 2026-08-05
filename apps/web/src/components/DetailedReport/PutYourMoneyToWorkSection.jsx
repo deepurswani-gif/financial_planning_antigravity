@@ -1753,7 +1753,7 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
                 }
                 .pymtw-lisp-field label { display: block; margin-bottom: 0.35rem; font-size: 0.85rem; }
                 .pymtw-lisp-field select,
-                .pymtw-lisp-field input[type="number"] {
+                .pymtw-lisp-field input {
                     width: 100%;
                     padding: 0.65rem 0.75rem;
                     border-radius: 8px;

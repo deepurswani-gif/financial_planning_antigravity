@@ -8,6 +8,9 @@ import {
 } from '../DetailedFlow/incomeDetailSync';
 import { guessEmploymentTypeFromSummaryOccupation } from '../DetailedFlow/employmentTypeSync';
 import { formatInrInWords } from '../../lib/formatInrInWords';
+import CurrencyInput from '../common/CurrencyInput';
+
+const toStored = (v) => (v == null ? '' : String(v));
 
 const HouseholdIncomeScreen = ({
     income,
@@ -26,20 +29,16 @@ const HouseholdIncomeScreen = ({
             <h2 className="question-title">What is your monthly in-hand-salary / Take-home-profit?</h2>
 
             <div className="question-fields" style={{ maxWidth: '420px', margin: '0 auto' }}>
-                <div className="currency-input-wrapper">
-                    <span className="currency-symbol">₹</span>
-                    <input
-                        type="number"
-                        className="conversational-input"
-                        placeholder="e.g. 100000"
-                        value={selfIncome}
-                        onChange={(e) => handleIncomeChange('self', e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && selfIncome) advance();
-                        }}
-                        enterKeyHint="done"
-                    />
-                </div>
+                <CurrencyInput
+                    className="conversational-input"
+                    placeholder="e.g. 100000"
+                    value={selfIncome}
+                    onValueChange={(v) => handleIncomeChange('self', toStored(v))}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' && selfIncome) advance();
+                    }}
+                    enterKeyHint="done"
+                />
                 {selfIncome && (
                     <div className="currency-display">{formatInrInWords(selfIncome)} / month</div>
                 )}
@@ -73,20 +72,16 @@ const HouseholdIncomeScreen = ({
                         <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.4rem', display: 'block' }}>
                             Spouse&apos;s monthly in-hand-salary / Take-home-profit (₹)
                         </label>
-                        <div className="currency-input-wrapper">
-                            <span className="currency-symbol">₹</span>
-                            <input
-                                type="number"
-                                className="conversational-input"
-                                placeholder="e.g. 75000"
-                                value={getSummaryIncomeTarget(income, 'spouse')}
-                                onChange={(e) => handleIncomeChange('spouse', e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && getSummaryIncomeTarget(income, 'spouse')) advance();
-                                }}
-                                enterKeyHint="done"
-                            />
-                        </div>
+                        <CurrencyInput
+                            className="conversational-input"
+                            placeholder="e.g. 75000"
+                            value={getSummaryIncomeTarget(income, 'spouse')}
+                            onValueChange={(v) => handleIncomeChange('spouse', toStored(v))}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && getSummaryIncomeTarget(income, 'spouse')) advance();
+                            }}
+                            enterKeyHint="done"
+                        />
                         {getSummaryIncomeTarget(income, 'spouse') && (
                             <div className="currency-display">{formatInrInWords(getSummaryIncomeTarget(income, 'spouse'))} / month</div>
                         )}
@@ -120,30 +115,26 @@ const MonthlyOutflowsScreen = ({
             </p>
 
             <div className="question-fields" style={{ maxWidth: '420px', margin: '0 auto' }}>
-                <div className="currency-input-wrapper">
-                    <span className="currency-symbol">₹</span>
-                    <input
-                        type="number"
-                        className="conversational-input"
-                        placeholder="e.g. 50000"
-                        value={householdTotal}
-                        onChange={(e) => {
-                            const value = e.target.value;
-                            setExpenseCategories(prev => ({
-                                ...prev,
-                                summaryHouseholdTotal: value,
-                                household: {
-                                    ...prev.household,
-                                    lifestyle: '',
-                                },
-                            }));
-                        }}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && householdTotal) advance();
-                        }}
-                        enterKeyHint="done"
-                    />
-                </div>
+                <CurrencyInput
+                    className="conversational-input"
+                    placeholder="e.g. 50000"
+                    value={householdTotal}
+                    onValueChange={(v) => {
+                        const value = toStored(v);
+                        setExpenseCategories(prev => ({
+                            ...prev,
+                            summaryHouseholdTotal: value,
+                            household: {
+                                ...prev.household,
+                                lifestyle: '',
+                            },
+                        }));
+                    }}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' && householdTotal) advance();
+                    }}
+                    enterKeyHint="done"
+                />
                 {householdTotal && (
                     <div className="currency-display">
                         {formatInrInWords(householdTotal)} / month
@@ -159,23 +150,19 @@ const MonthlyOutflowsScreen = ({
             </p>
 
             <div className="question-fields" style={{ maxWidth: '420px', margin: '0 auto' }}>
-                <div className="currency-input-wrapper">
-                    <span className="currency-symbol">₹</span>
-                    <input
-                        type="number"
-                        className="conversational-input"
-                        placeholder="e.g. 5000"
-                        value={expenseCategories.summaryInsuranceTotal || ''}
-                        onChange={(e) => setExpenseCategories(prev => ({
-                            ...prev,
-                            summaryInsuranceTotal: e.target.value,
-                        }))}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') advance();
-                        }}
-                        enterKeyHint="done"
-                    />
-                </div>
+                <CurrencyInput
+                    className="conversational-input"
+                    placeholder="e.g. 5000"
+                    value={expenseCategories.summaryInsuranceTotal || ''}
+                    onValueChange={(v) => setExpenseCategories(prev => ({
+                        ...prev,
+                        summaryInsuranceTotal: toStored(v),
+                    }))}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') advance();
+                    }}
+                    enterKeyHint="done"
+                />
                 {expenseCategories.summaryInsuranceTotal && (
                     <div className="currency-display">
                         {formatInrInWords(expenseCategories.summaryInsuranceTotal)} / month
@@ -216,23 +203,19 @@ const MonthlyOutflowsScreen = ({
                     <label style={{ fontSize: '0.92rem', fontWeight: 500, color: 'var(--text-main)', textAlign: 'center', display: 'block' }}>
                         What is your total monthly EMI burden?
                     </label>
-                    <div className="currency-input-wrapper">
-                        <span className="currency-symbol">₹</span>
-                        <input
-                            type="number"
-                            className="conversational-input"
-                            placeholder="e.g. 35000"
-                            value={expenseCategories.summaryEmiTotal || ''}
-                            onChange={(e) => setExpenseCategories(prev => ({
-                                ...prev,
-                                summaryEmiTotal: e.target.value,
-                            }))}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' && expenseCategories.summaryEmiTotal) advance();
-                            }}
-                            enterKeyHint="done"
-                        />
-                    </div>
+                    <CurrencyInput
+                        className="conversational-input"
+                        placeholder="e.g. 35000"
+                        value={expenseCategories.summaryEmiTotal || ''}
+                        onValueChange={(v) => setExpenseCategories(prev => ({
+                            ...prev,
+                            summaryEmiTotal: toStored(v),
+                        }))}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' && expenseCategories.summaryEmiTotal) advance();
+                        }}
+                        enterKeyHint="done"
+                    />
                     {expenseCategories.summaryEmiTotal && (
                         <div className="currency-display">
                             {formatInrInWords(expenseCategories.summaryEmiTotal)} / month

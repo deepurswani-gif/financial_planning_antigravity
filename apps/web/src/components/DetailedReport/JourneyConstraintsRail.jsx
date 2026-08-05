@@ -9,13 +9,16 @@ import {
     validateJourneyAdjustmentsAgainstSurplus,
 } from './putYourMoneyToWorkLogic';
 import ReportReveal from './ReportReveal';
+import CurrencyInput from '../common/CurrencyInput';
+import PercentageInput from '../common/PercentageInput';
+import IntegerInput from '../common/IntegerInput';
 
 const ADJUSTMENT_CATEGORIES = [
     { id: 'standard_expenses', label: 'Standard expenses (one-time)' },
     { id: 'future_loans', label: 'Future Loans' },
 ];
 
-const parseAmount = (value) => parseFloat(value) || 0;
+const parseAmount = (value) => Number(value ?? 0);
 
 const isExpenseDraft = (adj) => (adj.type || 'expense') !== 'loan';
 
@@ -144,9 +147,9 @@ const JourneyConstraintsRail = ({
     };
 
     const calculateEmi = (principal, rate, tenure) => {
-        const p = parseFloat(principal) || 0;
-        const r = parseFloat(rate) || 0;
-        const n = parseFloat(tenure) || 0;
+        const p = Number(principal ?? 0);
+        const r = Number(rate ?? 0);
+        const n = Number(tenure ?? 0);
         if (p > 0 && r > 0 && n > 0) {
             const monthlyRate = r / 12 / 100;
             return Math.round((p * monthlyRate * Math.pow(1 + monthlyRate, n)) / (Math.pow(1 + monthlyRate, n) - 1));
@@ -317,8 +320,7 @@ const JourneyConstraintsRail = ({
                         </div>
                         <div className="input-group">
                             <label>Occurs in year</label>
-                            <input
-                                type="number"
+                            <IntegerInput
                                 value={defaultCalendarYear}
                                 readOnly
                                 disabled
@@ -327,15 +329,14 @@ const JourneyConstraintsRail = ({
                         </div>
                         <div className="input-group">
                             <label>One-time amount (INR)</label>
-                            <input
-                                type="number"
+                            <CurrencyInput
                                 value={adj.amount || ''}
-                                onChange={(e) => {
+                                onValueChange={(v) => {
                                     setDraftAdjustments((prev) => prev.map((item) => (
                                         item.id === adj.id
                                             ? {
                                                 ...item,
-                                                amount: e.target.value,
+                                                amount: v == null ? '' : String(v),
                                                 duration: 1,
                                                 startYear: defaultCalendarYear,
                                             }
@@ -399,12 +400,11 @@ const JourneyConstraintsRail = ({
                         </div>
                         <div className="input-group">
                             <label>Principal (INR)</label>
-                            <input
-                                type="number"
+                            <CurrencyInput
                                 value={adj.principal || ''}
-                                onChange={(e) => {
-                                    const principal = e.target.value;
-                                    const emi = calculateEmi(principal, adj.rate, adj.tenure);
+                                onValueChange={(v) => {
+                                    const principal = v == null ? '' : String(v);
+                                    const emi = calculateEmi(v, adj.rate, adj.tenure);
                                     setDraftAdjustments((prev) => prev.map((item) => (
                                         item.id === adj.id ? { ...item, principal, emi, amount: emi * 12 } : item
                                     )));
@@ -414,12 +414,11 @@ const JourneyConstraintsRail = ({
                         </div>
                         <div className="input-group">
                             <label>Rate (%)</label>
-                            <input
-                                type="number"
+                            <PercentageInput
                                 value={adj.rate || ''}
-                                onChange={(e) => {
-                                    const rate = e.target.value;
-                                    const emi = calculateEmi(adj.principal, rate, adj.tenure);
+                                onValueChange={(v) => {
+                                    const rate = v == null ? '' : String(v);
+                                    const emi = calculateEmi(adj.principal, v, adj.tenure);
                                     setDraftAdjustments((prev) => prev.map((item) => (
                                         item.id === adj.id ? { ...item, rate, emi, amount: emi * 12 } : item
                                     )));
@@ -429,18 +428,18 @@ const JourneyConstraintsRail = ({
                         </div>
                         <div className="input-group">
                             <label>Tenure (months)</label>
-                            <input
-                                type="number"
+                            <IntegerInput
                                 value={adj.tenure || ''}
-                                onChange={(e) => {
-                                    const tenure = e.target.value;
-                                    const emi = calculateEmi(adj.principal, adj.rate, tenure);
+                                min={1}
+                                onValueChange={(v) => {
+                                    const tenure = v == null ? '' : String(v);
+                                    const emi = calculateEmi(adj.principal, adj.rate, v);
                                     setDraftAdjustments((prev) => prev.map((item) => (
                                         item.id === adj.id
                                             ? {
                                                 ...item,
                                                 tenure,
-                                                duration: Math.ceil((parseInt(tenure, 10) || 0) / 12),
+                                                duration: Math.ceil(Number(v ?? 0) / 12),
                                                 emi,
                                                 amount: emi * 12,
                                             }
@@ -470,8 +469,7 @@ const JourneyConstraintsRail = ({
                         </div>
                         <div className="input-group">
                             <label>Start year</label>
-                            <input
-                                type="number"
+                            <IntegerInput
                                 value={defaultCalendarYear}
                                 readOnly
                                 disabled

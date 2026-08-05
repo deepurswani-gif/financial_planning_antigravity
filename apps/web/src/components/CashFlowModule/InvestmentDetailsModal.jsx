@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import CurrencyInput from '../common/CurrencyInput';
+import YearsInput from '../common/YearsInput';
 
 const InvestmentDetailsModal = ({ isOpen, onClose, onSave, initialData, investmentTypeTitle }) => {
     const currentYearVal = new Date().getFullYear();
@@ -135,22 +137,26 @@ const InvestmentDetailsModal = ({ isOpen, onClose, onSave, initialData, investme
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
                         <div className="input-group" style={{ gridColumn: '1 / -1' }}>
                             <label htmlFor="amount">Monthly Investment / Contribution Amount (₹)</label>
-                            <input id="amount" type="number" 
+                            <CurrencyInput
+                                id="amount"
                                 aria-label="Investment Amount"
-                                value={formData.amount} 
-                                onChange={(e) => setFormData({...formData, amount: e.target.value})} 
-                                />
+                                value={formData.amount}
+                                onValueChange={(v) => setFormData({ ...formData, amount: v == null ? '' : String(v) })}
+                            />
                             <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>e.g. 5000</small>
                         </div>
                         
                         {!isPPF && (
                             <div className="input-group" style={{ gridColumn: '1 / -1' }}>
                                 <label htmlFor="duration">Tenure / Duration (Years)</label>
-                                <input id="duration" type="number" min="1" max="60"
+                                <YearsInput
+                                    id="duration"
+                                    min={1}
+                                    max={60}
                                     aria-label="Investment Duration"
-                                    value={formData.duration} 
-                                    onChange={(e) => setFormData({...formData, duration: e.target.value})} 
-                                    />
+                                    value={formData.duration}
+                                    onValueChange={(v) => setFormData({ ...formData, duration: v == null ? '' : v })}
+                                />
                                 <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>e.g. 10</small>
                             </div>
                         )}

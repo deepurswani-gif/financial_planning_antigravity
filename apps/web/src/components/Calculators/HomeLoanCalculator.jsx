@@ -1,5 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { Calculator, Calendar, DollarSign, TrendingDown, Clock, Plus, Trash2, Info } from 'lucide-react';
+import CurrencyInput from '../common/CurrencyInput';
+import PercentageInput from '../common/PercentageInput';
+import YearsInput from '../common/YearsInput';
 
 const isLeapYear = (year) => {
     return (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
@@ -22,7 +25,7 @@ const HomeLoanEngine = ({
         setEvents([...events, {
             id: Date.now(),
             type,
-            value: 0,
+            value: null,
             month: 1,
             year: currentYear
         }]);
@@ -36,24 +39,28 @@ const HomeLoanEngine = ({
         setEvents(events.map(e => e.id === id ? { ...e, [field]: value } : e));
     };
 
+    const amountNum = Number(loanAmount ?? 0);
+    const rateNum = Number(interestRate ?? 0);
+    const tenureNum = Number(tenureYears ?? 0);
+
     // Main Calculation Logic: Daily Rest
     const calculationData = useMemo(() => {
-        let runningPrincipal = loanAmount;
-        let currentRate = interestRate;
+        let runningPrincipal = amountNum;
+        let currentRate = rateNum;
         let results = [];
         
         const startD = new Date(startYear, startMonth - 1, 1);
         let currentD = new Date(startD);
 
         // Calculate base EMI (Standard formula for initial reference)
-        const P = loanAmount;
-        const r_initial = interestRate / 12 / 100;
-        const n = tenureYears * 12;
+        const P = amountNum;
+        const r_initial = rateNum / 12 / 100;
+        const n = tenureNum * 12;
         const baseEMI = (P * r_initial * Math.pow(1 + r_initial, n)) / (Math.pow(1 + r_initial, n) - 1);
 
         let yearlySummary = {
             year: startYear,
-            openingBalance: loanAmount,
+            openingBalance: amountNum,
             principalPaid: 0,
             interestPaid: 0,
             prepayments: 0,
@@ -75,7 +82,7 @@ const HomeLoanEngine = ({
             // 1. Check for Rate Change events at the start of this month
             const rateChange = events.find(e => e.type === 'rate_change' && parseInt(e.month) === m && parseInt(e.year) === y);
             if (rateChange) {
-                currentRate = parseFloat(rateChange.value) || currentRate;
+                currentRate = Number(rateChange.value ?? currentRate);
             }
 
             // 2. Daily rest interest calculation for the month
@@ -86,7 +93,7 @@ const HomeLoanEngine = ({
             
             // Check for prepayments in this month
             const monthlyPrepayments = events.filter(e => e.type === 'prepayment' && parseInt(e.month) === m && parseInt(e.year) === y);
-            const totalPrepaymentThisMonth = monthlyPrepayments.reduce((sum, p) => sum + (parseFloat(p.value) || 0), 0);
+            const totalPrepaymentThisMonth = monthlyPrepayments.reduce((sum, p) => sum + Number(p.value ?? 0), 0);
 
             let monthlyInterestAccumulated = 0;
             // Simplification: Interest calculate on monthly opening principal * days
@@ -138,8 +145,8 @@ const HomeLoanEngine = ({
             monthCount++;
         }
 
-        return { schedule: results, baseEMI, totalPrincipal: loanAmount };
-    }, [loanAmount, interestRate, tenureYears, startMonth, startYear, events]);
+        return { schedule: results, baseEMI, totalPrincipal: amountNum };
+    }, [amountNum, rateNum, tenureNum, startMonth, startYear, events]);
 
     const totalInterest = useMemo(() => {
         return calculationData.schedule.reduce((sum, y) => sum + y.interestPaid, 0);
@@ -167,37 +174,33 @@ const HomeLoanEngine = ({
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
                             <div className="form-group">
                                 <label><DollarSign size={16} /> Loan Amount (₹)</label>
-                                <input 
-                                    type="number" 
-                                    value={loanAmount} 
+                                <CurrencyInput
+                                    value={loanAmount}
                                     readOnly={isReadOnly}
-                                    onChange={(e) => !isReadOnly && setLoanAmount(parseFloat(e.target.value) || 0)} 
-                                    className="form-input" 
+                                    onValueChange={(v) => !isReadOnly && setLoanAmount(v)}
+                                    className="form-input"
                                     style={isReadOnly ? { background: 'var(--bg-main)', cursor: 'not-allowed' } : {}}
                                 />
                             </div>
 
                             <div className="form-group">
                                 <label><TrendingDown size={16} /> Annual Interest Rate (%)</label>
-                                <input 
-                                    type="number" 
-                                    step="0.01"
-                                    value={interestRate} 
+                                <PercentageInput
+                                    value={interestRate}
                                     readOnly={isReadOnly}
-                                    onChange={(e) => !isReadOnly && setInterestRate(parseFloat(e.target.value) || 0)} 
-                                    className="form-input" 
+                                    onValueChange={(v) => !isReadOnly && setInterestRate(v)}
+                                    className="form-input"
                                     style={isReadOnly ? { background: 'var(--bg-main)', cursor: 'not-allowed' } : {}}
                                 />
                             </div>
 
                             <div className="form-group">
                                 <label><Clock size={16} /> Tenure (Years)</label>
-                                <input 
-                                    type="number" 
-                                    value={tenureYears} 
+                                <YearsInput
+                                    value={tenureYears}
                                     readOnly={isReadOnly}
-                                    onChange={(e) => !isReadOnly && setTenureYears(parseInt(e.target.value) || 0)} 
-                                    className="form-input" 
+                                    onValueChange={(v) => !isReadOnly && setTenureYears(v)}
+                                    className="form-input"
                                     style={isReadOnly ? { background: 'var(--bg-main)', cursor: 'not-allowed' } : {}}
                                 />
                             </div>
@@ -245,14 +248,23 @@ const HomeLoanEngine = ({
                                                 {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
                                             </select>
                                         </div>
-                                        <input 
-                                            type="number" 
-                                            placeholder={event.type === 'prepayment' ? 'Amount (₹)' : 'New Rate %'} 
-                                            value={event.value} 
-                                            onChange={(e) => updateEvent(event.id, 'value', e.target.value)} 
-                                            className="form-input"
-                                            style={{ width: '100%', padding: '0.4rem', fontSize: '0.85rem' }} 
-                                        />
+                                        {event.type === 'prepayment' ? (
+                                            <CurrencyInput
+                                                placeholder="Amount"
+                                                value={event.value}
+                                                onValueChange={(v) => updateEvent(event.id, 'value', v)}
+                                                className="form-input"
+                                                style={{ width: '100%', padding: '0.4rem', fontSize: '0.85rem' }}
+                                            />
+                                        ) : (
+                                            <PercentageInput
+                                                placeholder="New Rate %"
+                                                value={event.value}
+                                                onValueChange={(v) => updateEvent(event.id, 'value', v)}
+                                                className="form-input"
+                                                style={{ width: '100%', padding: '0.4rem', fontSize: '0.85rem' }}
+                                            />
+                                        )}
                                     </div>
                                 </div>
                             ))}
@@ -277,7 +289,7 @@ const HomeLoanEngine = ({
                                 </div>
                                 <div>
                                     <p style={{ margin: '0 0 0.5rem 0', opacity: 0.9, fontSize: '0.9rem', color: 'white' }}>Total Principal</p>
-                                    <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: 'white' }}>₹{loanAmount.toLocaleString('en-IN')}</h3>
+                                    <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: 'white' }}>₹{amountNum.toLocaleString('en-IN')}</h3>
                                 </div>
                                 <div>
                                     <p style={{ margin: '0 0 0.5rem 0', opacity: 0.9, fontSize: '0.9rem', color: 'white' }}>Total Interest</p>

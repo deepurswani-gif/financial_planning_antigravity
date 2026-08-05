@@ -17,6 +17,8 @@ import {
     financialWorkspacePath,
 } from '../FinancialWorkspace/workspaceNavConfig';
 import { formatInrInWords } from '../../lib/formatInrInWords';
+import CurrencyInput from '../common/CurrencyInput';
+import YearsInput from '../common/YearsInput';
 import { scrollProgressiveFlowToTop } from './scrollProgressiveFlowToTop';
 
 /* ─── Screen constants (3 screens) ─── */
@@ -507,29 +509,24 @@ const SummaryGoals = () => {
                                                 <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.2rem', display: 'block' }}>
                                                     Years Remaining
                                                 </label>
-                                                <input
-                                                    type="number"
+                                                <YearsInput
                                                     className="conversational-input"
                                                     placeholder="e.g. 10"
                                                     value={goal.yearsToGoal || ''}
-                                                    onChange={(e) => updateGoal(goal.id, 'yearsToGoal', e.target.value)}
+                                                    onValueChange={(v) => updateGoal(goal.id, 'yearsToGoal', v == null ? '' : String(v))}
                                                     style={{ textAlign: 'center', fontSize: '1.1rem', fontWeight: 600, marginBottom: '0.75rem' }}
                                                     enterKeyHint="next"
                                                 />
                                                 <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.2rem', display: 'block' }}>
                                                     Present Value of Goal
                                                 </label>
-                                                <div className="currency-input-wrapper">
-                                                    <span className="currency-symbol">₹</span>
-                                                    <input
-                                                        type="number"
-                                                        className="conversational-input"
-                                                        placeholder="e.g. 500000"
-                                                        value={goal.presentValue || ''}
-                                                        onChange={(e) => updateGoal(goal.id, 'presentValue', e.target.value)}
-                                                        enterKeyHint="done"
-                                                    />
-                                                </div>
+                                                <CurrencyInput
+                                                    className="conversational-input"
+                                                    placeholder="e.g. 500000"
+                                                    value={goal.presentValue || ''}
+                                                    onValueChange={(v) => updateGoal(goal.id, 'presentValue', v == null ? '' : String(v))}
+                                                    enterKeyHint="done"
+                                                />
                                                 <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
                                                     Assumed Inflation Rate: <strong style={{ color: 'var(--primary)' }}>{goal.inflationRate || 6}%</strong>
                                                 </div>

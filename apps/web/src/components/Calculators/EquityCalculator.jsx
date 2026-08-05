@@ -1,6 +1,9 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { Calculator, DollarSign, TrendingUp, Clock } from 'lucide-react';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
+import CurrencyInput from '../common/CurrencyInput';
+import PercentageInput from '../common/PercentageInput';
+import YearsInput from '../common/YearsInput';
 import WhatIfExplorer from './WhatIfExplorer';
 
 export const computeEquityData = (currentValue, expectedReturns, tenureYears, startMonth, startYear, events, proposedEquities, goalMappings = {}, goals = []) => {
@@ -127,20 +130,23 @@ const EquityCalculator = ({ calculatorKey = "equity" }) => {
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const yearOptions = Array.from({ length: 51 }, (_, i) => currentYear - 5 + i);
 
+    const rateNum = Number(expectedReturns ?? 0);
+    const tenureNum = Number(tenureYears ?? 0);
+
     // Baseline: modules + PYMTW only (ignore saved free-form events)
     const calculationData = useMemo(() => {
-        return computeEquityData(currentValue, expectedReturns, tenureYears, startMonth, startYear, [], proposedEquities, goalMappings, goals);
-    }, [currentValue, expectedReturns, tenureYears, startMonth, startYear, proposedEquities, goalMappings, goals]);
+        return computeEquityData(currentValue, rateNum, tenureNum, startMonth, startYear, [], proposedEquities, goalMappings, goals);
+    }, [currentValue, rateNum, tenureNum, startMonth, startYear, proposedEquities, goalMappings, goals]);
 
     const runProjection = useCallback((events) => {
-        return computeEquityData(currentValue, expectedReturns, tenureYears, startMonth, startYear, events, proposedEquities, goalMappings, goals);
-    }, [currentValue, expectedReturns, tenureYears, startMonth, startYear, proposedEquities, goalMappings, goals]);
+        return computeEquityData(currentValue, rateNum, tenureNum, startMonth, startYear, events, proposedEquities, goalMappings, goals);
+    }, [currentValue, rateNum, tenureNum, startMonth, startYear, proposedEquities, goalMappings, goals]);
 
     const finalValue = calculationData[calculationData.length - 1]?.valueAfterWithdrawal || 0;
     const totalInvested = currentValue + proposedEquities.reduce((sum, l) => sum + (parseFloat(l.amount) || 0), 0);
     const totalWithdrawals = calculationData.reduce((sum, r) => sum + (r.withdrawal || 0), 0);
 
-    const maxYear = startYear + Math.max(tenureYears, 1) - 1;
+    const maxYear = startYear + Math.max(tenureNum, 1) - 1;
     const hasLinkedItems = proposedEquities.length > 0 || goals.some(g => {
         const mappedAmt = (goalMappings[g.id] || {})['equity'] || 0;
         const gYear = new Date().getFullYear() + Math.round(parseFloat(g.yearsToGoal) || 0);
@@ -165,8 +171,7 @@ const EquityCalculator = ({ calculatorKey = "equity" }) => {
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
                             <div className="form-group">
                                 <label><DollarSign size={16} /> Current Portfolio Value (₹)</label>
-                                <input
-                                    type="number"
+                                <CurrencyInput
                                     value={currentValue}
                                     readOnly
                                     className="form-input bg-muted"
@@ -176,24 +181,21 @@ const EquityCalculator = ({ calculatorKey = "equity" }) => {
 
                             <div className="form-group">
                                 <label><TrendingUp size={16} /> Expected Returns (CAGR %)</label>
-                                <input
-                                    type="number"
-                                    step="0.1"
+                                <PercentageInput
                                     value={expectedReturns}
-                                    onChange={(e) => setExpectedReturns(parseFloat(e.target.value) || 0)}
+                                    onValueChange={setExpectedReturns}
                                     className="form-input"
                                 />
                             </div>
 
                             <div className="form-group">
                                 <label><Clock size={16} /> Tenure (Years)</label>
-                                <input
-                                    type="number"
+                                <YearsInput
                                     value={tenureYears}
-                                    onChange={(e) => setTenureYears(parseInt(e.target.value) || 0)}
+                                    onValueChange={setTenureYears}
                                     className="form-input"
                                 />
-                                <small className="text-muted">Tenure in Months: {tenureYears * 12}</small>
+                                <small className="text-muted">Tenure in Months: {tenureNum * 12}</small>
                             </div>
 
                             <div className="form-group">

@@ -13,6 +13,9 @@ import {
 } from './employmentTypeSync';
 import { EDUCATION_STANDARDS } from '../JourneyModule/ProjectionLogic';
 import { applyHouseholdEducationFromChildren } from './educationExpenseSync';
+import YearsInput from '../common/YearsInput';
+import IntegerInput from '../common/IntegerInput';
+import CurrencyInput from '../common/CurrencyInput';
 import DateInput from '../common/DateInput';
 
 const formatDate = (value) => {
@@ -378,7 +381,13 @@ const DetailedFamilyInfo = () => {
                                 </div>
                                 <div>
                                     <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.4rem', display: 'block' }}>Retirement age</label>
-                                    <input type="number" className="conversational-input" min="40" max="70" value={spouseMember?.retirementAge ?? 60} onChange={(e) => updateSpouse('retirementAge', parseInt(e.target.value, 10) || 60)} />
+                                    <YearsInput
+                                        className="conversational-input"
+                                        min={40}
+                                        max={70}
+                                        value={spouseMember?.retirementAge ?? 60}
+                                        onValueChange={(v) => updateSpouse('retirementAge', v)}
+                                    />
                                 </div>
                             </div>
                         </div>
@@ -454,15 +463,31 @@ const DetailedFamilyInfo = () => {
                                                 </div>
                                                 <div>
                                                     <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.4rem', display: 'block' }}>Duration of the course (Years)</label>
-                                                    <input type="number" className="conversational-input" value={child.courseDuration || ''} onChange={(e) => updateChild(index, 'courseDuration', e.target.value)} placeholder="e.g. 4" />
+                                                    <IntegerInput
+                                                        className="conversational-input"
+                                                        value={child.courseDuration || ''}
+                                                        onValueChange={(v) => updateChild(index, 'courseDuration', v == null ? '' : String(v))}
+                                                        placeholder="e.g. 4"
+                                                    />
                                                 </div>
                                                 <div>
                                                     <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.4rem', display: 'block' }}>How many years of fee yet to pay?</label>
-                                                    <input type="number" className="conversational-input" value={child.remainingTime || ''} onChange={(e) => updateChild(index, 'remainingTime', e.target.value)} placeholder="e.g. 2" min="0" />
+                                                    <IntegerInput
+                                                        className="conversational-input"
+                                                        value={child.remainingTime || ''}
+                                                        onValueChange={(v) => updateChild(index, 'remainingTime', v == null ? '' : String(v))}
+                                                        placeholder="e.g. 2"
+                                                        min={0}
+                                                    />
                                                 </div>
                                                 <div>
                                                     <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.4rem', display: 'block' }}>Cost of complete course</label>
-                                                    <input type="number" className="conversational-input" value={child.costOfCompleteCourse || ''} onChange={(e) => updateChild(index, 'costOfCompleteCourse', e.target.value)} placeholder="0" />
+                                                    <CurrencyInput
+                                                        className="conversational-input"
+                                                        value={child.costOfCompleteCourse || ''}
+                                                        onValueChange={(v) => updateChild(index, 'costOfCompleteCourse', v == null ? '' : String(v))}
+                                                        placeholder="0"
+                                                    />
                                                 </div>
                                                 <div>
                                                     <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.4rem', display: 'block' }}>

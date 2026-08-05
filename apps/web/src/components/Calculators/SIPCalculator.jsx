@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useCallback } from 'react';
 import { TrendingUp, Wallet, Calculator, Clock } from 'lucide-react';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
+import CurrencyInput from '../common/CurrencyInput';
+import PercentageInput from '../common/PercentageInput';
+import YearsInput from '../common/YearsInput';
 import WhatIfExplorer from './WhatIfExplorer';
 
 export const computeSIPData = (currentYear, monthlySIP, expectedReturns, tenureYears, currentValue, events, proposedSIPs, goalMappings = {}, goals = []) => {
@@ -127,16 +130,19 @@ const SIPCalculator = ({ calculatorKey = "sip" }) => {
 
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+    const rateNum = Number(expectedReturns ?? 0);
+    const tenureNum = Number(tenureYears ?? 0);
+
     // Baseline projection: modules + PYMTW only (ignore saved free-form increments)
     const calculationData = useMemo(() => {
-        return computeSIPData(currentYear, monthlySIP, expectedReturns, tenureYears, currentValue, [], proposedSIPs, goalMappings, goals);
-    }, [monthlySIP, expectedReturns, tenureYears, currentValue, currentYear, proposedSIPs, goalMappings, goals]);
+        return computeSIPData(currentYear, monthlySIP, rateNum, tenureNum, currentValue, [], proposedSIPs, goalMappings, goals);
+    }, [monthlySIP, rateNum, tenureNum, currentValue, currentYear, proposedSIPs, goalMappings, goals]);
 
     const runProjection = useCallback((events) => {
-        return computeSIPData(currentYear, monthlySIP, expectedReturns, tenureYears, currentValue, events, proposedSIPs, goalMappings, goals);
-    }, [currentYear, monthlySIP, expectedReturns, tenureYears, currentValue, proposedSIPs, goalMappings, goals]);
+        return computeSIPData(currentYear, monthlySIP, rateNum, tenureNum, currentValue, events, proposedSIPs, goalMappings, goals);
+    }, [currentYear, monthlySIP, rateNum, tenureNum, currentValue, proposedSIPs, goalMappings, goals]);
 
-    const maxYear = currentYear + Math.max(tenureYears, 1) - 1;
+    const maxYear = currentYear + Math.max(tenureNum, 1) - 1;
     const hasLinkedItems = proposedSIPs.length > 0 || goals.some(g => {
         const mappedAmt = (goalMappings[g.id] || {})['sip'] || 0;
         const gYear = currentYear + Math.round(parseFloat(g.yearsToGoal) || 0);
@@ -162,8 +168,7 @@ const SIPCalculator = ({ calculatorKey = "sip" }) => {
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
                             <div className="form-group">
                                 <label><Wallet size={16} /> Monthly Amount of SIP (₹)</label>
-                                <input
-                                    type="number"
+                                <CurrencyInput
                                     value={monthlySIP}
                                     readOnly
                                     className="form-input bg-muted"
@@ -173,28 +178,25 @@ const SIPCalculator = ({ calculatorKey = "sip" }) => {
 
                             <div className="form-group">
                                 <label><TrendingUp size={16} /> Expected Returns (%)</label>
-                                <input
-                                    type="number"
+                                <PercentageInput
                                     value={expectedReturns}
-                                    onChange={(e) => setExpectedReturns(parseFloat(e.target.value) || 0)}
+                                    onValueChange={setExpectedReturns}
                                     className="form-input"
                                 />
                             </div>
 
                             <div className="form-group">
                                 <label><Clock size={16} /> Tenure in Years</label>
-                                <input
-                                    type="number"
+                                <YearsInput
                                     value={tenureYears}
-                                    onChange={(e) => setTenureYears(parseInt(e.target.value) || 0)}
+                                    onValueChange={setTenureYears}
                                     className="form-input"
                                 />
                             </div>
 
                             <div className="form-group">
                                 <label>Current Portfolio Value (₹)</label>
-                                <input
-                                    type="number"
+                                <CurrencyInput
                                     value={currentValue}
                                     readOnly
                                     className="form-input bg-muted"
@@ -286,7 +288,7 @@ const SIPCalculator = ({ calculatorKey = "sip" }) => {
                                     </h2>
                                 </div>
                                 <div style={{ textAlign: 'right' }}>
-                                    <p style={{ margin: '0 0 0.5rem 0', opacity: 0.9, fontSize: '1rem' }}>Final Corpus Value ({currentYear + tenureYears - 1})</p>
+                                    <p style={{ margin: '0 0 0.5rem 0', opacity: 0.9, fontSize: '1rem' }}>Final Corpus Value ({currentYear + tenureNum - 1})</p>
                                     <h2 style={{ margin: 0, fontSize: '2.5rem', fontWeight: 800 }}>
                                         ₹{Math.round(calculationData[calculationData.length - 1]?.valueAfterWithdrawal || 0).toLocaleString('en-IN')}
                                     </h2>

@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import CurrencyInput from '../common/CurrencyInput';
+import PercentageInput from '../common/PercentageInput';
+import IntegerInput from '../common/IntegerInput';
 
 const LoanDetailsModal = ({ isOpen, onClose, onSave, initialData, loanTypeTitle }) => {
     const [formData, setFormData] = useState({
@@ -33,9 +36,9 @@ const LoanDetailsModal = ({ isOpen, onClose, onSave, initialData, loanTypeTitle 
 
     // Calculate EMI dynamically
     useEffect(() => {
-        const p = parseFloat(formData.principal) || 0;
-        const r = parseFloat(formData.rate) || 0;
-        const n = parseFloat(formData.tenure) || 0;
+        const p = Number(formData.principal ?? 0);
+        const r = Number(formData.rate ?? 0);
+        const n = Number(formData.tenure ?? 0);
 
         if (p > 0 && r > 0 && n > 0) {
             const monthlyRate = r / 12 / 100;
@@ -70,28 +73,6 @@ const LoanDetailsModal = ({ isOpen, onClose, onSave, initialData, loanTypeTitle 
     const handleClear = () => {
         onSave(''); // Clear back to empty string primitive
         onClose();
-    };
-
-    const handleRateChange = (e) => {
-        let val = e.target.value;
-        if (val === '') {
-            setFormData({ ...formData, rate: '' });
-            return;
-        }
-        // Mask: Allow digits and max one dot, up to 2 decimal places
-        const regex = /^\d*\.?\d{0,2}$/;
-        if (regex.test(val)) {
-            setFormData({ ...formData, rate: val });
-        }
-    };
-
-    const handleTenureChange = (e) => {
-        let val = e.target.value;
-        // Mask: only numeric
-        const regex = /^\d*$/;
-        if (regex.test(val)) {
-            setFormData({ ...formData, tenure: val });
-        }
     };
 
     const now = new Date();
@@ -143,31 +124,35 @@ const LoanDetailsModal = ({ isOpen, onClose, onSave, initialData, loanTypeTitle 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
                         <div className="input-group" style={{ gridColumn: '1 / -1' }}>
                             <label htmlFor="principal">Original Loan Amount (₹)</label>
-                            <input id="principal" type="number" 
+                            <CurrencyInput
+                                id="principal"
                                 aria-label="Original Loan Amount"
-                                value={formData.principal} 
-                                onChange={(e) => setFormData({...formData, principal: e.target.value})} 
-                                />
+                                value={formData.principal}
+                                onValueChange={(v) => setFormData({ ...formData, principal: v == null ? '' : String(v) })}
+                            />
                             <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>e.g. 5000000</small>
                         </div>
 
                         <div className="input-group">
                             <label htmlFor="rate">Interest Rate (%)</label>
-                            <input id="rate" type="text" 
+                            <PercentageInput
+                                id="rate"
                                 aria-label="Interest Rate Percentage"
-                                value={formData.rate} 
-                                onChange={handleRateChange} 
-                                />
+                                value={formData.rate}
+                                onValueChange={(v) => setFormData({ ...formData, rate: v == null ? '' : String(v) })}
+                            />
                             <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>e.g. 8.5 (max 2 decimals)</small>
                         </div>
 
                         <div className="input-group">
                             <label htmlFor="tenure">Total Tenure (Months)</label>
-                            <input id="tenure" type="text" 
+                            <IntegerInput
+                                id="tenure"
                                 aria-label="Total Tenure in Months"
-                                value={formData.tenure} 
-                                onChange={handleTenureChange} 
-                                />
+                                value={formData.tenure}
+                                min={1}
+                                onValueChange={(v) => setFormData({ ...formData, tenure: v == null ? '' : String(v) })}
+                            />
                             <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>e.g. 240 for 20 Yrs</small>
                         </div>
                     </div>

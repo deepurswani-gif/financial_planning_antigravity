@@ -30,6 +30,7 @@ import {
     SCENARIO_WEALTH,
 } from './trackSurplusAllocationLogic';
 import ReportReveal from './ReportReveal';
+import CurrencyInput from '../common/CurrencyInput';
 
 /** Winding route across a 640×220 map canvas. */
 const ROUTE_PATH = 'M 48 168 C 110 40, 170 200, 240 112 S 340 36, 400 128 S 470 210, 592 72';
@@ -473,13 +474,11 @@ const CustomizePanel = ({
                                 Max {formatCurrency(avenue.availableMax)}
                             </div>
                         </div>
-                        <input
-                            type="number"
+                        <CurrencyInput
                             min={0}
                             max={avenue.availableMax}
-                            step={1000}
-                            value={draft[avenue.id] ?? 0}
-                            onChange={(event) => onChange(avenue.id, event.target.value, avenue.availableMax)}
+                            value={draft[avenue.id] ?? ''}
+                            onValueChange={(v) => onChange(avenue.id, v, avenue.availableMax)}
                         />
                     </label>
                 ))}
@@ -799,7 +798,10 @@ const TrackSurplusAllocationSection = () => {
             ...prev,
             [goalId]: {
                 ...(prev[goalId] || {}),
-                [avenueId]: clampAvenueAmount(value, availableMax),
+                // Allow empty while editing; clamp only when a numeric value is present.
+                [avenueId]: value == null || value === ''
+                    ? ''
+                    : clampAvenueAmount(value, availableMax),
             },
         }));
     };

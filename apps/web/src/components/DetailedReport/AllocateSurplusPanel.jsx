@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
     TrendingUp, Coins, Landmark, PiggyBank, BarChart2, Shield, ChevronDown,
 } from 'lucide-react';
 import { formatCurrency } from '../CashFlowModule/CashFlowLogic';
+import CurrencyInput from '../common/CurrencyInput';
+import YearsInput from '../common/YearsInput';
 import {
     INSTRUMENT_REGISTRY,
     LISP_INSTRUMENT_TYPE,
@@ -43,14 +45,20 @@ export const InstrumentAmountSlider = ({
     const def = INSTRUMENT_REGISTRY[instrumentType];
     const isMonthly = def?.inputMode === 'monthly';
     const amountSuffix = isMonthly ? '/mo' : '';
-    const [inputValue, setInputValue] = useState(String(draftAmount || 0));
+    const [inputValue, setInputValue] = useState(
+        draftAmount == null || draftAmount === '' ? '' : String(draftAmount)
+    );
+    const [syncedDraft, setSyncedDraft] = useState(draftAmount);
+    const pendingRef = useRef(undefined);
 
-    useEffect(() => {
-        setInputValue(String(draftAmount || 0));
-    }, [draftAmount]);
+    // Sync local draft text when the parent amount changes (e.g. slider / reset).
+    if (draftAmount !== syncedDraft) {
+        setSyncedDraft(draftAmount);
+        setInputValue(draftAmount == null || draftAmount === '' ? '' : String(draftAmount));
+    }
 
     const commitAmount = (raw) => {
-        const parsed = Math.round(parseFloat(String(raw).replace(/,/g, '')) || 0);
+        const parsed = Math.round(Number(raw ?? 0));
         const clamped = Math.max(0, Math.min(parsed, Math.max(0, maxAmount)));
         if (clamped === Math.round(draftAmount || 0)) {
             setInputValue(String(clamped));
@@ -69,16 +77,22 @@ export const InstrumentAmountSlider = ({
             <div className="pymtw-sip-slider-head">
                 <span>Allocate this month</span>
                 <div className="pymtw-amount-input-wrap">
-                    <span className="pymtw-amount-prefix">₹</span>
-                    <input
-                        type="number"
+                    <CurrencyInput
                         className="pymtw-amount-input"
                         min={0}
                         max={Math.max(0, maxAmount)}
-                        step={1}
-                        value={inputValue}
-                        onChange={(e) => setInputValue(e.target.value)}
-                        onBlur={() => commitAmount(inputValue)}
+                        value={inputValue === '' || inputValue == null ? '' : inputValue}
+                        onValueChange={(v) => {
+                            pendingRef.current = v;
+                            setInputValue(v == null ? '' : String(v));
+                        }}
+                        onBlur={() => {
+                            const raw = pendingRef.current !== undefined
+                                ? pendingRef.current
+                                : inputValue;
+                            pendingRef.current = undefined;
+                            commitAmount(raw == null ? '' : String(raw));
+                        }}
                         onKeyDown={(e) => {
                             if (e.key === 'Enter') e.currentTarget.blur();
                         }}
@@ -142,20 +156,13 @@ const LifeInsuranceSavingForm = ({
         onChange({ ...value, [field]: nextVal });
     };
 
-    const commitPremium = (raw) => {
-        const parsed = Math.round(parseFloat(String(raw).replace(/,/g, '')) || 0);
-        // Cap by monthly-equivalent remaining capacity
-        const freq = value.frequency || 'Monthly';
-        const maxPremium = (() => {
-            const f = String(freq).toLowerCase();
-            if (f === 'quarterly') return Math.round(maxMonthly * 3);
-            if (f === 'half-yearly' || f === 'half yearly') return Math.round(maxMonthly * 6);
-            if (f === 'annual' || f === 'annually') return Math.round(maxMonthly * 12);
-            return Math.round(maxMonthly);
-        })();
-        const clamped = Math.max(0, Math.min(parsed, Math.max(0, maxPremium)));
-        patch('premium', clamped);
-    };
+    const maxPremium = (() => {
+        const freq = String(value.frequency || 'Monthly').toLowerCase();
+        if (freq === 'quarterly') return Math.round(maxMonthly * 3);
+        if (freq === 'half-yearly' || freq === 'half yearly') return Math.round(maxMonthly * 6);
+        if (freq === 'annual' || freq === 'annually') return Math.round(maxMonthly * 12);
+        return Math.round(maxMonthly);
+    })();
 
     return (
         <div className="pymtw-lisp-form">
@@ -178,19 +185,14 @@ const LifeInsuranceSavingForm = ({
                 </div>
                 <div className="input-group pymtw-lisp-field">
                     <label htmlFor="pymtw-lisp-premium">Premium Amount</label>
-                    <div className="pymtw-amount-input-wrap">
-                        <span className="pymtw-amount-prefix">₹</span>
-                        <input
-                            id="pymtw-lisp-premium"
-                            type="number"
-                            className="pymtw-amount-input"
-                            min={0}
-                            step={1}
-                            value={value.premium || ''}
-                            onChange={(e) => patch('premium', e.target.value === '' ? 0 : e.target.value)}
-                            onBlur={(e) => commitPremium(e.target.value)}
-                        />
-                    </div>
+                    <CurrencyInput
+                        id="pymtw-lisp-premium"
+                        className="pymtw-amount-input"
+                        min={0}
+                        max={Math.max(0, maxPremium)}
+                        value={value.premium === 0 || value.premium === '0' ? 0 : (value.premium ?? '')}
+                        onValueChange={(v) => patch('premium', v)}
+                    />
                     <small className="pymtw-lisp-hint">
                         ≈ {formatCurrency(Math.round(monthly))}/mo · Mode: {value.frequency || 'Monthly'}
                     </small>
@@ -209,13 +211,12 @@ const LifeInsuranceSavingForm = ({
                 </div>
                 <div className="input-group pymtw-lisp-field">
                     <label htmlFor="pymtw-lisp-ppt">Premium Payment Term (Years)</label>
-                    <input
+                    <YearsInput
                         id="pymtw-lisp-ppt"
-                        type="number"
                         min={1}
                         max={50}
-                        value={value.duration || 10}
-                        onChange={(e) => patch('duration', parseInt(e.target.value, 10) || 1)}
+                        value={value.duration ?? ''}
+                        onValueChange={(v) => patch('duration', v)}
                     />
                 </div>
             </div>

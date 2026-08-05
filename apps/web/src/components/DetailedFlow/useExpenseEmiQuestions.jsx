@@ -18,6 +18,7 @@ import {
 } from './expenseDetailSync';
 import HouseholdReconciliationPanel from './HouseholdReconciliationPanel';
 import ReconciliationBar from './ReconciliationBar';
+import CurrencyInput from '../common/CurrencyInput';
 
 const formatInr = (val) => {
     if (!val || isNaN(val)) return '₹0';
@@ -28,6 +29,8 @@ const formatInr = (val) => {
     }).format(val);
 };
 
+const toStored = (v) => (v == null ? '' : String(v));
+
 const CurrencyField = ({ label, value, onChange, placeholder = '0' }) => (
     <div>
         {label && (
@@ -35,16 +38,12 @@ const CurrencyField = ({ label, value, onChange, placeholder = '0' }) => (
                 {label}
             </label>
         )}
-        <div className="currency-input-wrapper">
-            <span className="currency-symbol">₹</span>
-            <input
-                type="number"
-                className="conversational-input"
-                placeholder={placeholder}
-                value={value || ''}
-                onChange={(e) => onChange(e.target.value)}
-            />
-        </div>
+        <CurrencyInput
+            className="conversational-input"
+            placeholder={placeholder}
+            value={value ?? ''}
+            onValueChange={(v) => onChange(toStored(v))}
+        />
     </div>
 );
 
@@ -397,18 +396,14 @@ export function useExpenseEmiQuestions() {
                                                 style={{ marginBottom: '0.5rem' }}
                                             />
                                         )}
-                                        <div className="currency-input-wrapper">
-                                            <span className="currency-symbol">₹</span>
-                                            <input
-                                                type="number"
-                                                className="conversational-input"
-                                                readOnly
-                                                value={displayValue || ''}
-                                                onClick={() => setActiveLoanModal(key)}
-                                                placeholder="0"
-                                                style={{ cursor: 'pointer', background: 'var(--bg-card)', fontWeight: 600, color: isConfigured ? 'var(--primary)' : 'var(--text-muted)' }}
-                                            />
-                                        </div>
+                                        <CurrencyInput
+                                            className="conversational-input"
+                                            readOnly
+                                            value={displayValue || ''}
+                                            onClick={() => setActiveLoanModal(key)}
+                                            placeholder="0"
+                                            style={{ cursor: 'pointer', background: 'var(--bg-card)', fontWeight: 600, color: isConfigured ? 'var(--primary)' : 'var(--text-muted)' }}
+                                        />
                                     </div>
                                 );
                             })}

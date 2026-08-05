@@ -1,5 +1,7 @@
 import React, { useMemo } from 'react';
 import { Calculator, TrendingUp, Wallet, ArrowRight, ShieldCheck } from 'lucide-react';
+import CurrencyInput from '../common/CurrencyInput';
+import PercentageInput from '../common/PercentageInput';
 
 export const computeFDData = (proposedFDs, expectedReturns, frequency, rawBaselineFDs = []) => {
     let freqMonths = 3;
@@ -186,9 +188,12 @@ const FDEngine = ({
         return { amount: localAmount, startMonth, startYear, duration };
     }, [localAmount, startMonth, startYear, duration]);
 
+    const rateNum = Number(rate ?? 0);
+    const amountSafe = Number(localAmount ?? 0);
+
     const calculationData = useMemo(() => {
-        return computeFDData([], rate, frequency, activeFDObj);
-    }, [rate, frequency, activeFDObj]);
+        return computeFDData([], rateNum, frequency, { ...activeFDObj, amount: amountSafe });
+    }, [rateNum, frequency, activeFDObj, amountSafe]);
 
     const { schedule, totals } = calculationData;
 
@@ -205,7 +210,7 @@ const FDEngine = ({
                     </div>
                 </div>
 
-                {(localAmount === 0 && !isReadOnly) ? (
+                {((localAmount ?? 0) === 0 && !isReadOnly) ? (
                     <div style={{ textAlign: 'center', padding: '3rem', border: '2px dashed var(--border)', borderRadius: '12px', color: 'var(--text-muted)' }}>
                         <p>{noActiveMessage || "No active FD mapped."}</p>
                         <p style={{ fontSize: '0.9rem' }}>Go back to Step 8 or Step 9 to inject your baseline or allocate future installments.</p>
@@ -218,43 +223,25 @@ const FDEngine = ({
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
                                 <div className="form-group">
                                     <label><TrendingUp size={16} /> Expected Interest Rate (% p.a)</label>
-                                    <input 
-                                        type="number" 
-                                        step="0.1"
-                                        min="5"
-                                        max="9"
-                                        value={rate} 
-                                        onChange={(e) => {
-                                            if (!setRate) return;
-                                            let val = parseFloat(e.target.value);
-                                            setRate(isNaN(val) ? '' : val);
-                                        }} 
-                                        onBlur={(e) => {
-                                            if (!setRate) return;
-                                            let val = parseFloat(e.target.value);
-                                            if (isNaN(val)) val = 7.00;
-                                            if (val < 5) val = 5;
-                                            if (val > 9) val = 9;
-                                            setRate(val.toFixed(2));
-                                        }}
-                                        className="form-input" 
+                                    <PercentageInput
+                                        value={rate}
+                                        min={5}
+                                        max={9}
+                                        onValueChange={(v) => setRate && setRate(v)}
+                                        className="form-input"
                                     />
                                     <small className="text-muted">Prevailing FD rates range from 5% to 9%.</small>
                                 </div>
 
                                 <div className="form-group">
                                     <label><ShieldCheck size={16} /> Deposit Amount (₹)</label>
-                                    <div style={{ position: 'relative' }}>
-                                        <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}>₹</span>
-                                        <input 
-                                            type="number" 
-                                            value={localAmount} 
-                                            readOnly={isReadOnly}
-                                            style={isReadOnly ? { background: 'var(--bg-main)', cursor: 'not-allowed', paddingLeft: '24px' } : { paddingLeft: '24px' }}
-                                            onChange={(e) => !isReadOnly && setLocalAmount(parseFloat(e.target.value) || 0)} 
-                                            className="form-input" 
-                                        />
-                                    </div>
+                                    <CurrencyInput
+                                        value={localAmount}
+                                        readOnly={isReadOnly}
+                                        onValueChange={(v) => !isReadOnly && setLocalAmount(v)}
+                                        className="form-input"
+                                        style={isReadOnly ? { background: 'var(--bg-main)', cursor: 'not-allowed' } : undefined}
+                                    />
                                     <small className="text-muted">{isReadOnly ? "Locked to your synchronized configuration." : "Manual Standalone Testing Mode."}</small>
                                 </div>
 

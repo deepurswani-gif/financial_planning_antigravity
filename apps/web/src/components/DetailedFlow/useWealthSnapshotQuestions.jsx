@@ -12,6 +12,7 @@ import {
 } from './wealthDetailSync';
 import { reconcileAmounts } from './detailReconcile';
 import ReconciliationBar from './ReconciliationBar';
+import CurrencyInput from '../common/CurrencyInput';
 
 const formatInr = (val) => {
     if (!val || isNaN(val)) return '₹0';
@@ -22,6 +23,8 @@ const formatInr = (val) => {
     }).format(val);
 };
 
+const toStored = (v) => (v == null ? '' : String(v));
+
 const CurrencyField = ({ label, value, onChange, placeholder = '0', helperText, readOnly, onClick }) => (
     <div>
         {label && (
@@ -29,19 +32,17 @@ const CurrencyField = ({ label, value, onChange, placeholder = '0', helperText, 
                 {label}
             </label>
         )}
-        <div className="currency-input-wrapper">
-            <span className="currency-symbol">₹</span>
-            <input
-                type="number"
-                className="conversational-input"
-                placeholder={placeholder}
-                value={value || ''}
-                onChange={readOnly ? undefined : (e) => onChange(e.target.value)}
-                readOnly={readOnly}
-                onClick={onClick}
-                style={readOnly ? { cursor: 'pointer', background: 'var(--bg-card)', fontWeight: 600 } : undefined}
-            />
-        </div>
+        <CurrencyInput
+            className="conversational-input"
+            placeholder={placeholder}
+            value={value ?? ''}
+            readOnly={readOnly}
+            onClick={onClick}
+            onValueChange={(v) => {
+                if (!readOnly) onChange(toStored(v));
+            }}
+            style={readOnly ? { cursor: 'pointer', background: 'var(--bg-card)', fontWeight: 600 } : undefined}
+        />
         {helperText && (
             <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.35rem', lineHeight: 1.45 }}>
                 {helperText}
