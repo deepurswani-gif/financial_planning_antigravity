@@ -38,19 +38,21 @@ async function invokePushFunction(payload) {
 }
 
 /** Phase 3: send a notification to the current user's stored devices. */
-export const sendTestPushToSelf = async ({ title, body, data } = {}) =>
+export const sendTestPushToSelf = async ({ title, body, data, token } = {}) =>
   invokePushFunction({
     action: 'send_to_self',
     title: title || 'Finbrella',
     body: body || 'Test notification',
     data: data || {},
+    ...(token ? { token } : {}),
   });
 
 /** Registry-driven coach push (same transport as test send). */
-export const sendPushToSelf = async ({ title, body, data } = {}) =>
+export const sendPushToSelf = async ({ title, body, data, token } = {}) =>
   invokePushFunction({
     action: 'send_to_self',
     title: title || 'Finbrella',
     body: body || '',
     data: data || {},
+    ...(token ? { token } : {}),
   });
