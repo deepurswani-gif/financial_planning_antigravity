@@ -52,6 +52,8 @@ const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
   const { title, options } = payloadToNotification(payload);
+  // Always show from the SW. Chrome may also auto-display webpush.notification;
+  // a rare duplicate is better than a silent miss on Android.
   return self.registration.showNotification(title, options);
 });
 
