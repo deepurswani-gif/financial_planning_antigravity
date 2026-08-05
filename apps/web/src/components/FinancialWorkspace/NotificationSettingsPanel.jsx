@@ -168,7 +168,7 @@ export default function NotificationSettingsPanel({ open, onClose, userId }) {
         body: 'Push notifications are working on this device.',
       });
       if (sendError) throw sendError;
-      setMessage('Test notification sent. Check your tray or this tab.');
+      setMessage('Test notification sent. If the tab is open, check the tray — or minimize Chrome and send again.');
     } catch (err) {
       setError(err?.message || 'Could not send test notification.');
     } finally {

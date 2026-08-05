@@ -31,10 +31,15 @@ self.addEventListener('activate', (event) => {
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
-  const title = payload.notification?.title || payload.data?.title || 'FinPlan';
+  const title = payload.notification?.title || payload.data?.title || 'Finbrella';
+  const body = payload.notification?.body || payload.data?.body || '';
+  // If FCM already displayed a webpush.notification, skip a duplicate tray entry.
+  if (payload.notification?.title && payload.notification?.body) {
+    return;
+  }
   const options = {
-    body: payload.notification?.body || payload.data?.body || '',
-    icon: '/pwa-192x192.png',
+    body,
+    icon: `${self.location.origin}/pwa-192x192.png`,
     data: payload.data || {},
   };
   self.registration.showNotification(title, options);

@@ -82,6 +82,7 @@ const sendFcmMessage = async ({
   title,
   body,
   data,
+  origin,
 }: {
   accessToken: string;
   projectId: string;
@@ -89,7 +90,13 @@ const sendFcmMessage = async ({
   title: string;
   body: string;
   data: Record<string, string>;
+  origin: string;
 }) => {
+  // Absolute icon/link URLs are required for reliable Chrome Android tray display.
+  const base = origin.replace(/\/$/, '') || 'https://wealthmap.app';
+  const icon = `${base}/pwa-192x192.png`;
+  const link = `${base}/`;
+
   const res = await fetch(
     `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
     {
@@ -101,14 +108,24 @@ const sendFcmMessage = async ({
       body: JSON.stringify({
         message: {
           token,
-          notification: { title, body },
-          data,
+          // Keep title/body in data so the SW can always render (foreground + background).
+          data: {
+            title,
+            body,
+            url: link,
+            ...data,
+          },
           webpush: {
             headers: { Urgency: 'high' },
             notification: {
               title,
               body,
-              icon: '/pwa-192x192.png',
+              icon,
+              // Helps Android show the notification even when a tab is open.
+              requireInteraction: false,
+            },
+            fcm_options: {
+              link,
             },
           },
         },
@@ -228,6 +245,13 @@ serve(async (req) => {
     });
   }
 
+  const originHeader = req.headers.get('origin') || '';
+  const siteUrl = Deno.env.get('SITE_URL') || '';
+  const origin =
+    (originHeader.startsWith('http') ? originHeader : '') ||
+    (siteUrl.startsWith('http') ? siteUrl : '') ||
+    'https://wealthmap.app';
+
   const results = [];
   for (const row of tokens) {
     const result = await sendFcmMessage({
@@ -237,6 +261,7 @@ serve(async (req) => {
       title,
       body: messageBody,
       data,
+      origin,
     });
     results.push({ tokenSuffix: String(row.token).slice(-12), ...result });
 
