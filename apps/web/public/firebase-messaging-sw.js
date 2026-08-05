@@ -1,9 +1,9 @@
 /* eslint-disable no-undef */
 /**
- * Dedicated FCM service worker (separate from the VitePWA Workbox SW).
- * Public Firebase web config is intentional — same values as the client SDK.
- *
- * We use data-only FCM messages so this worker always owns tray display.
+ * Firebase Messaging background handler.
+ * Loaded either as:
+ *  - standalone `/firebase-messaging-sw.js`, or
+ *  - importScripts'd into the VitePWA Workbox SW (preferred on production).
  */
 importScripts(
   'https://www.gstatic.com/firebasejs/12.17.0/firebase-app-compat.js'
@@ -22,18 +22,11 @@ firebase.initializeApp({
   measurementId: 'G-SV53FJV1ZW',
 });
 
-self.addEventListener('install', (event) => {
-  self.skipWaiting();
-});
-
-self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
-});
-
 function payloadToNotification(payload) {
   const data = payload?.data || {};
   const title = payload?.notification?.title || data.title || 'Finbrella';
   const body = payload?.notification?.body || data.body || '';
+  // Small square PNG under /public — large logos cause Chrome Android to drop trays.
   const icon =
     data.icon ||
     payload?.notification?.icon ||
@@ -43,19 +36,22 @@ function payloadToNotification(payload) {
     options: {
       body,
       icon,
+      badge: `${self.location.origin}/pwa-192x192.png`,
       data: { ...data, url: data.url || `${self.location.origin}/` },
     },
   };
 }
 
-const messaging = firebase.messaging();
-
-messaging.onBackgroundMessage((payload) => {
-  const { title, options } = payloadToNotification(payload);
-  // Always show from the SW. Chrome may also auto-display webpush.notification;
-  // a rare duplicate is better than a silent miss on Android.
-  return self.registration.showNotification(title, options);
-});
+try {
+  const messaging = firebase.messaging();
+  messaging.onBackgroundMessage((payload) => {
+    const { title, options } = payloadToNotification(payload);
+    return self.registration.showNotification(title, options);
+  });
+} catch (err) {
+  // Avoid breaking the host Workbox SW if Messaging init fails.
+  console.error('[FCM SW] init failed', err);
+}
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
