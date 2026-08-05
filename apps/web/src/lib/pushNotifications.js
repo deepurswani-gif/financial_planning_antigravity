@@ -102,13 +102,33 @@ function ensureForegroundListener(messaging) {
     if (import.meta.env.DEV) {
       console.info('[FCM] Message received (foreground):', payload);
     }
-    if (Notification.permission === 'granted') {
+    if (Notification.permission !== 'granted') return;
+
+    // Chrome Android often ignores `new Notification()` while the tab is focused.
+    // Prefer the FCM service worker tray notification instead.
+    const showViaSw = async () => {
+      try {
+        const registration =
+          (await navigator.serviceWorker.getRegistration(FCM_SW_SCOPE)) ||
+          (await navigator.serviceWorker.ready);
+        if (registration?.showNotification) {
+          await registration.showNotification(title, {
+            body,
+            icon: `${window.location.origin}/pwa-192x192.png`,
+            data: payload.data || {},
+          });
+          return;
+        }
+      } catch {
+        /* fall through */
+      }
       new Notification(title, {
         body,
-        icon: '/pwa-192x192.png',
+        icon: `${window.location.origin}/pwa-192x192.png`,
         data: payload.data || {},
       });
-    }
+    };
+    void showViaSw();
   });
 }
 
