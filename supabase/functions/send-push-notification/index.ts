@@ -124,6 +124,12 @@ const sendFcmMessage = async ({
               Urgency: 'high',
               TTL: '86400',
             },
+            // Valid absolute icon is required — relative/404 icons cause Chrome Android to drop the tray entry.
+            notification: {
+              title,
+              body,
+              icon,
+            },
             fcm_options: {
               link,
             },
