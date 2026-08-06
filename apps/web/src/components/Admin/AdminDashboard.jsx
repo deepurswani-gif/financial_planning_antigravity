@@ -1,9 +1,11 @@
-import { BarChart3, CheckCircle, Copy, Download, FileText, LayoutDashboard, Link2, LogOut, Shield, Users, Tag } from 'lucide-react';
+import { BarChart3, Bell, CheckCircle, Copy, Download, FileText, LayoutDashboard, Layers, Link2, LogOut, Shield, Users, Tag } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { signOut } from '../../services/authService';
 import ClientFinancialDossier from './ClientFinancialDossier';
 import BusinessAnalyticsShell from './analytics/BusinessAnalyticsShell';
+import CohortsTab from './cohorts/CohortsTab';
+import PushCampaignsTab from './pushCampaigns/PushCampaignsTab';
 import { openAdminFinancialPlanPrint } from '../../utils/adminFinancialPlanPrint';
 
 const AdminDashboard = () => {
@@ -230,12 +232,28 @@ const AdminDashboard = () => {
         >
           <Tag size={18} /> Coupon Manager
         </button>
+        <button
+          className={`tab-button ${activeTab === 'cohorts' ? 'active' : ''}`}
+          onClick={() => setActiveTab('cohorts')}
+        >
+          <Layers size={18} /> Cohorts
+        </button>
+        <button
+          className={`tab-button ${activeTab === 'push-campaigns' ? 'active' : ''}`}
+          onClick={() => setActiveTab('push-campaigns')}
+        >
+          <Bell size={18} /> Push Campaigns
+        </button>
       </div>
 
       {/* Tab Content */}
       <div className="admin-content">
         {activeTab === 'analytics' ? (
           <BusinessAnalyticsShell onOpenClient={openAnalyticsClient} />
+        ) : activeTab === 'cohorts' ? (
+          <CohortsTab />
+        ) : activeTab === 'push-campaigns' ? (
+          <PushCampaignsTab />
         ) : loading ? (
           <div style={{ textAlign: 'center', padding: '3rem' }}>Loading...</div>
         ) : activeTab === 'overview' ? (
