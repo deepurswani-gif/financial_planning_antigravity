@@ -1,10 +1,11 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { create, getNumericDate } from 'https://deno.land/x/djwt@v3.0.2/mod.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, apikey, content-type, x-cron-secret',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
@@ -21,6 +22,17 @@ type ServiceAccount = {
   project_id: string;
   client_email: string;
   private_key: string;
+};
+
+type CampaignRow = {
+  id: string;
+  title: string;
+  body: string;
+  image_url: string | null;
+  deep_link_url: string | null;
+  audience_type: 'all_push' | 'cohort';
+  cohort_id: string | null;
+  status: string;
 };
 
 const pemToArrayBuffer = (pem: string): ArrayBuffer => {
@@ -75,11 +87,6 @@ const getGoogleAccessToken = async (sa: ServiceAccount): Promise<string> => {
   return data.access_token as string;
 };
 
-/**
- * Data-only web push so our FCM service worker always owns display.
- * (webpush.notification auto-display is unreliable on Chrome Android and
- * previously made our SW skip showing — resulting in zero tray notifications.)
- */
 const sendFcmMessage = async ({
   accessToken,
   projectId,
@@ -99,7 +106,7 @@ const sendFcmMessage = async ({
 }) => {
   const base = origin.replace(/\/$/, '') || 'https://wealthmap.app';
   const icon = `${base}/pwa-192x192.png`;
-  const link = `${base}/`;
+  const link = data.url || `${base}/`;
 
   const res = await fetch(
     `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
@@ -124,7 +131,6 @@ const sendFcmMessage = async ({
               Urgency: 'high',
               TTL: '86400',
             },
-            // Valid absolute icon is required — relative/404 icons cause Chrome Android to drop the tray entry.
             notification: {
               title,
               body,
@@ -143,6 +149,203 @@ const sendFcmMessage = async ({
   return { ok: res.ok, status: res.status, payload };
 };
 
+const resolveOrigin = (req: Request) => {
+  const originHeader = req.headers.get('origin') || '';
+  const siteUrl = Deno.env.get('SITE_URL') || '';
+  return (
+    (originHeader.startsWith('http') ? originHeader : '') ||
+    (siteUrl.startsWith('http') ? siteUrl : '') ||
+    'https://wealthmap.app'
+  );
+};
+
+const assertAdmin = async (supabase: SupabaseClient, userId: string) => {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .select('role')
+    .eq('id', userId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (data?.role !== 'admin') {
+    throw new Error('Admin access required');
+  }
+};
+
+const loadServiceAccount = (): ServiceAccount => {
+  const saRaw = Deno.env.get('FIREBASE_SERVICE_ACCOUNT_JSON');
+  if (!saRaw) {
+    throw new Error(
+      'Missing FIREBASE_SERVICE_ACCOUNT_JSON secret (Firebase Console → Project settings → Service accounts → Generate new private key)',
+    );
+  }
+  let serviceAccount: ServiceAccount;
+  try {
+    serviceAccount = JSON.parse(saRaw) as ServiceAccount;
+  } catch {
+    throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON is not valid JSON');
+  }
+  if (!serviceAccount.project_id || !serviceAccount.client_email || !serviceAccount.private_key) {
+    throw new Error('Service account JSON must include project_id, client_email, private_key');
+  }
+  return serviceAccount;
+};
+
+const resolveAudienceUserIds = async (
+  adminClient: SupabaseClient,
+  campaign: CampaignRow,
+): Promise<string[]> => {
+  if (campaign.audience_type === 'cohort') {
+    if (!campaign.cohort_id) return [];
+    const { data, error } = await adminClient
+      .from('cohort_members')
+      .select('user_id')
+      .eq('cohort_id', campaign.cohort_id);
+    if (error) throw new Error(error.message);
+    return [...new Set((data || []).map((r) => r.user_id as string))];
+  }
+
+  const { data, error } = await adminClient
+    .from('user_push_tokens')
+    .select('user_id')
+    .eq('enabled', true);
+  if (error) throw new Error(error.message);
+  return [...new Set((data || []).map((r) => r.user_id as string))];
+};
+
+const executeCampaign = async ({
+  adminClient,
+  serviceAccount,
+  campaign,
+  origin,
+  accessToken,
+}: {
+  adminClient: SupabaseClient;
+  serviceAccount: ServiceAccount;
+  campaign: CampaignRow;
+  origin: string;
+  accessToken: string;
+}) => {
+  const now = new Date().toISOString();
+  await adminClient
+    .from('push_campaigns')
+    .update({ status: 'sending', started_at: now, updated_at: now })
+    .eq('id', campaign.id);
+
+  const userIds = await resolveAudienceUserIds(adminClient, campaign);
+  let sent = 0;
+  let failed = 0;
+  let targeted = 0;
+
+  const deepLink =
+    campaign.deep_link_url && String(campaign.deep_link_url).startsWith('http')
+      ? String(campaign.deep_link_url)
+      : `${origin.replace(/\/$/, '')}/`;
+
+  for (const userId of userIds) {
+    const { data: tokens, error: tokenError } = await adminClient
+      .from('user_push_tokens')
+      .select('token')
+      .eq('user_id', userId)
+      .eq('enabled', true);
+
+    if (tokenError) {
+      failed += 1;
+      await adminClient.from('push_campaign_deliveries').insert({
+        campaign_id: campaign.id,
+        user_id: userId,
+        status: 'failed',
+        error: tokenError.message,
+      });
+      continue;
+    }
+
+    if (!tokens?.length) {
+      await adminClient.from('push_campaign_deliveries').insert({
+        campaign_id: campaign.id,
+        user_id: userId,
+        status: 'skipped',
+        error: 'No enabled push token',
+      });
+      continue;
+    }
+
+    for (const row of tokens) {
+      targeted += 1;
+      const result = await sendFcmMessage({
+        accessToken,
+        projectId: serviceAccount.project_id,
+        token: row.token,
+        title: campaign.title,
+        body: campaign.body,
+        data: {
+          url: deepLink,
+          campaignId: campaign.id,
+        },
+        origin,
+      });
+
+      const fcmError =
+        (result.payload as { error?: { status?: string; message?: string } })?.error?.status ||
+        (result.payload as { error?: { message?: string } })?.error?.message ||
+        null;
+      const fcmName = (result.payload as { name?: string })?.name || null;
+
+      if (result.ok) {
+        sent += 1;
+        await adminClient.from('push_campaign_deliveries').insert({
+          campaign_id: campaign.id,
+          user_id: userId,
+          token_suffix: String(row.token).slice(-12),
+          status: 'sent',
+          fcm_name: fcmName,
+          sent_at: new Date().toISOString(),
+        });
+      } else {
+        failed += 1;
+        await adminClient.from('push_campaign_deliveries').insert({
+          campaign_id: campaign.id,
+          user_id: userId,
+          token_suffix: String(row.token).slice(-12),
+          status: 'failed',
+          error: typeof fcmError === 'string' ? fcmError : `HTTP ${result.status}`,
+          fcm_name: fcmName,
+        });
+        if (
+          typeof fcmError === 'string' &&
+          /UNREGISTERED|INVALID_ARGUMENT|NOT_FOUND/i.test(fcmError)
+        ) {
+          await adminClient.from('user_push_tokens').delete().eq('token', row.token);
+        }
+      }
+    }
+  }
+
+  const finalStatus = sent > 0 ? 'sent' : failed > 0 ? 'failed' : 'sent';
+  const completedAt = new Date().toISOString();
+  await adminClient
+    .from('push_campaigns')
+    .update({
+      status: finalStatus,
+      completed_at: completedAt,
+      updated_at: completedAt,
+      stats: { targeted, sent, failed },
+    })
+    .eq('id', campaign.id);
+
+  console.log(
+    JSON.stringify({
+      msg: 'admin campaign done',
+      campaignId: campaign.id,
+      targeted,
+      sent,
+      failed,
+      finalStatus,
+    }),
+  );
+
+  return { targeted, sent, failed, status: finalStatus };
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -151,38 +354,115 @@ serve(async (req) => {
     return json(405, { success: false, error: 'Method not allowed' });
   }
 
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader) {
-    return json(401, { success: false, error: 'Missing authorization header' });
-  }
-
+  const authHeader = req.headers.get('Authorization') || '';
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
-  const saRaw = Deno.env.get('FIREBASE_SERVICE_ACCOUNT_JSON');
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+  const cronSecret = Deno.env.get('PUSH_CRON_SECRET') || '';
 
   if (!supabaseUrl || !supabaseAnonKey) {
     return json(500, { success: false, error: 'Missing Supabase environment variables' });
   }
-  if (!saRaw) {
-    return json(500, {
-      success: false,
-      error:
-        'Missing FIREBASE_SERVICE_ACCOUNT_JSON secret (Firebase Console → Project settings → Service accounts → Generate new private key)',
-    });
-  }
 
   let serviceAccount: ServiceAccount;
   try {
-    serviceAccount = JSON.parse(saRaw) as ServiceAccount;
-  } catch {
-    return json(500, { success: false, error: 'FIREBASE_SERVICE_ACCOUNT_JSON is not valid JSON' });
-  }
-
-  if (!serviceAccount.project_id || !serviceAccount.client_email || !serviceAccount.private_key) {
+    serviceAccount = loadServiceAccount();
+  } catch (err) {
     return json(500, {
       success: false,
-      error: 'Service account JSON must include project_id, client_email, private_key',
+      error: err instanceof Error ? err.message : 'Service account error',
     });
+  }
+
+  let body: Record<string, unknown> = {};
+  try {
+    body = await req.json();
+  } catch {
+    return json(400, { success: false, error: 'Invalid JSON payload' });
+  }
+
+  const action = String(body.action || '');
+  const origin = resolveOrigin(req);
+
+  const isCron =
+    Boolean(cronSecret && req.headers.get('x-cron-secret') === cronSecret) ||
+    Boolean(serviceRoleKey && authHeader === `Bearer ${serviceRoleKey}`);
+
+  const adminClient = createClient(
+    supabaseUrl,
+    serviceRoleKey || supabaseAnonKey,
+    serviceRoleKey
+      ? { auth: { persistSession: false, autoRefreshToken: false } }
+      : { global: { headers: { Authorization: authHeader } } },
+  );
+
+  // --- Cron / due scheduled campaigns ---
+  if (action === 'admin_process_due') {
+    if (!isCron) {
+      // Also allow signed-in admins to flush due jobs from the UI
+      if (!authHeader) {
+        return json(401, { success: false, error: 'Missing authorization' });
+      }
+      const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const {
+        data: { user },
+        error: userError,
+      } = await userClient.auth.getUser();
+      if (userError || !user) {
+        return json(401, { success: false, error: 'Unauthorized' });
+      }
+      try {
+        await assertAdmin(userClient, user.id);
+      } catch (err) {
+        return json(403, {
+          success: false,
+          error: err instanceof Error ? err.message : 'Forbidden',
+        });
+      }
+    }
+
+    const { data: due, error: dueError } = await adminClient
+      .from('push_campaigns')
+      .select('id, title, body, image_url, deep_link_url, audience_type, cohort_id, status')
+      .eq('status', 'scheduled')
+      .lte('scheduled_at', new Date().toISOString())
+      .order('scheduled_at', { ascending: true })
+      .limit(10);
+
+    if (dueError) {
+      return json(500, { success: false, error: dueError.message });
+    }
+
+    let accessToken: string;
+    try {
+      accessToken = await getGoogleAccessToken(serviceAccount);
+    } catch (err) {
+      return json(500, {
+        success: false,
+        error: err instanceof Error ? err.message : 'Google auth failed',
+      });
+    }
+
+    const processed = [];
+    for (const campaign of (due || []) as CampaignRow[]) {
+      const result = await executeCampaign({
+        adminClient,
+        serviceAccount,
+        campaign,
+        origin,
+        accessToken,
+      });
+      processed.push({ campaignId: campaign.id, ...result });
+    }
+
+    return json(200, { success: true, processed, count: processed.length });
+  }
+
+  // --- Authenticated user actions ---
+  if (!authHeader) {
+    return json(401, { success: false, error: 'Missing authorization header' });
   }
 
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -198,14 +478,68 @@ serve(async (req) => {
     return json(401, { success: false, error: 'Unauthorized user session' });
   }
 
-  let body: Record<string, unknown> = {};
-  try {
-    body = await req.json();
-  } catch {
-    return json(400, { success: false, error: 'Invalid JSON payload' });
+  // --- Admin send campaign ---
+  if (action === 'admin_send_campaign') {
+    try {
+      await assertAdmin(supabase, user.id);
+    } catch (err) {
+      return json(403, {
+        success: false,
+        error: err instanceof Error ? err.message : 'Forbidden',
+      });
+    }
+
+    const campaignId = String(body.campaignId || '');
+    if (!campaignId) {
+      return json(400, { success: false, error: 'campaignId is required' });
+    }
+
+    const { data: campaign, error: campaignError } = await adminClient
+      .from('push_campaigns')
+      .select('id, title, body, image_url, deep_link_url, audience_type, cohort_id, status')
+      .eq('id', campaignId)
+      .maybeSingle();
+
+    if (campaignError || !campaign) {
+      return json(404, { success: false, error: campaignError?.message || 'Campaign not found' });
+    }
+
+    if (!['draft', 'scheduled', 'failed'].includes(campaign.status)) {
+      return json(400, {
+        success: false,
+        error: `Campaign cannot be sent from status "${campaign.status}"`,
+      });
+    }
+
+    let accessToken: string;
+    try {
+      accessToken = await getGoogleAccessToken(serviceAccount);
+    } catch (err) {
+      return json(500, {
+        success: false,
+        error: err instanceof Error ? err.message : 'Google auth failed',
+      });
+    }
+
+    const result = await executeCampaign({
+      adminClient,
+      serviceAccount,
+      campaign: campaign as CampaignRow,
+      origin,
+      accessToken,
+    });
+
+    return json(200, { success: result.sent > 0 || result.targeted === 0, ...result });
   }
 
-  const action = String(body.action || '');
+  // --- send_to_self (unchanged behavior) ---
+  if (action !== 'send_to_self') {
+    return json(400, {
+      success: false,
+      error: 'Unsupported action. Use send_to_self, admin_send_campaign, or admin_process_due.',
+    });
+  }
+
   const title = String(body.title || 'Finbrella');
   const messageBody = String(body.body || '');
   const preferredToken =
@@ -217,13 +551,6 @@ serve(async (req) => {
   const data: Record<string, string> = {};
   for (const [k, v] of Object.entries(dataObj)) {
     data[k] = String(v ?? '');
-  }
-
-  if (action !== 'send_to_self') {
-    return json(400, {
-      success: false,
-      error: 'Unsupported action. Use send_to_self.',
-    });
   }
 
   let tokenQuery = supabase
@@ -238,11 +565,9 @@ serve(async (req) => {
   }
 
   const { data: tokens, error: tokenError } = await tokenQuery;
-
   if (tokenError) {
     return json(500, { success: false, error: tokenError.message });
   }
-
   if (!tokens?.length) {
     return json(400, {
       success: false,
@@ -261,23 +586,6 @@ serve(async (req) => {
       error: err instanceof Error ? err.message : 'Google auth failed',
     });
   }
-
-  const originHeader = req.headers.get('origin') || '';
-  const siteUrl = Deno.env.get('SITE_URL') || '';
-  const origin =
-    (originHeader.startsWith('http') ? originHeader : '') ||
-    (siteUrl.startsWith('http') ? siteUrl : '') ||
-    'https://wealthmap.app';
-
-  console.log(
-    JSON.stringify({
-      msg: 'send-push-notification start',
-      userId: user.id,
-      tokenCount: tokens.length,
-      preferred: Boolean(preferredToken),
-      origin,
-    }),
-  );
 
   const results = [];
   for (const row of tokens) {
@@ -302,7 +610,6 @@ serve(async (req) => {
         null,
     };
     results.push(summary);
-    console.log(JSON.stringify({ msg: 'fcm-result', ...summary }));
 
     if (
       !result.ok &&
@@ -314,14 +621,6 @@ serve(async (req) => {
   }
 
   const sent = results.filter((r) => r.ok).length;
-  console.log(
-    JSON.stringify({
-      msg: 'send-push-notification done',
-      sent,
-      total: results.length,
-    }),
-  );
-
   return json(200, {
     success: sent > 0,
     sent,
