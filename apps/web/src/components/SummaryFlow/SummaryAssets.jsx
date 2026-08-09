@@ -16,11 +16,8 @@ const CurrentAssetsScreen = ({ assetCategories, handleSnapshotChange }) => {
             </p>
 
             <h2 className="question-title">
-                What is the current value of your investment portfolio?
+                Investment Portfolio Value <span className="tooltip-wrapper" data-tooltip="Total current value of your Mutual Funds, Stocks, ETFs, Bonds, etc." style={{ cursor: 'help', color: 'var(--primary)', fontSize: '0.8em', verticalAlign: 'middle' }}>ⓘ</span>
             </h2>
-            <p className="question-helper">
-                Mutual Funds, Stocks, ETFs, Bonds, etc.
-            </p>
 
             <div className="question-fields" style={{ maxWidth: '420px', margin: '0 auto' }}>
                 <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.2rem', display: 'block' }}>
@@ -44,11 +41,8 @@ const CurrentAssetsScreen = ({ assetCategories, handleSnapshotChange }) => {
             </div>
 
             <h2 className="question-title" style={{ marginTop: '2rem' }}>
-                How much emergency or readily available cash do you currently maintain?
+                Liquid Cash / Emergency Fund <span className="tooltip-wrapper" data-tooltip="Readily available cash in Savings Accounts, emergency funds, liquid funds, etc." style={{ cursor: 'help', color: 'var(--primary)', fontSize: '0.8em', verticalAlign: 'middle' }}>ⓘ</span>
             </h2>
-            <p className="question-helper">
-                Savings Account balance, emergency funds, liquid funds, cash reserves, etc.
-            </p>
 
             <div className="question-fields" style={{ maxWidth: '420px', margin: '0 auto' }}>
                 <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.2rem', display: 'block' }}>
@@ -72,11 +66,8 @@ const CurrentAssetsScreen = ({ assetCategories, handleSnapshotChange }) => {
             </div>
 
             <h2 className="question-title" style={{ marginTop: '2rem' }}>
-                Do you own any real estate or high-value assets?
+                Real Estate & High-Value Assets <span className="tooltip-wrapper" data-tooltip="Estimated current value of Property, land, gold, commercial assets, etc." style={{ cursor: 'help', color: 'var(--primary)', fontSize: '0.8em', verticalAlign: 'middle' }}>ⓘ</span>
             </h2>
-            <p className="question-helper">
-                Property, land, gold, commercial assets, valuable possessions, etc.
-            </p>
 
             <div className="question-fields" style={{ maxWidth: '420px', margin: '0 auto' }}>
                 <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.2rem', display: 'block' }}>

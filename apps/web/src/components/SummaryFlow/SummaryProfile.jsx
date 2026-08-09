@@ -45,7 +45,7 @@ const PersonalDetailsWithAdvance = ({ selfMember, handleSelfChange, retireAge, s
 
                 <div style={{ marginTop: '1.5rem' }}>
                     <h2 className="question-title" style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>
-                        What is your Date of Birth?
+                        Date of Birth <span className="tooltip-wrapper" data-tooltip="Your DOB helps us calculate time horizons for your goals." style={{ cursor: 'help', color: 'var(--primary)', fontSize: '0.8em', verticalAlign: 'middle' }}>ⓘ</span>
                     </h2>
                     <DateInput
                         className="conversational-input"
@@ -61,8 +61,8 @@ const PersonalDetailsWithAdvance = ({ selfMember, handleSelfChange, retireAge, s
                 </div>
 
                 <div style={{ marginTop: '2rem' }}>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', marginBottom: '1.5rem' }}>
-                        And at what age would you ideally like to retire?
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', marginBottom: '1.5rem', fontWeight: 600 }}>
+                        Target Retirement Age <span className="tooltip-wrapper" data-tooltip="The age you plan to stop working and live off your investments." style={{ cursor: 'help', color: 'var(--primary)', fontSize: '0.8em', verticalAlign: 'middle' }}>ⓘ</span>
                     </p>
                     <div style={{ fontSize: '2.8rem', fontWeight: 'bold', color: 'var(--primary)', marginBottom: '1.25rem', letterSpacing: '-1px' }}>
                         {retireAge} <span style={{ fontSize: '1.1rem', fontWeight: 500, color: 'var(--text-muted)' }}>Years</span>

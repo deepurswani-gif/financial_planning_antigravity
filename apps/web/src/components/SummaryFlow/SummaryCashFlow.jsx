@@ -26,7 +26,9 @@ const HouseholdIncomeScreen = ({
             <p className="question-narrative">
                 Let&apos;s understand your household&apos;s monthly income.
             </p>
-            <h2 className="question-title">What is your monthly in-hand-salary / Take-home-profit?</h2>
+            <h2 className="question-title">
+                Monthly In-Hand Salary / Take-Home Profit <span className="tooltip-wrapper" data-tooltip="Your net monthly income after taxes and standard deductions." style={{ cursor: 'help', color: 'var(--primary)', fontSize: '0.8em', verticalAlign: 'middle' }}>ⓘ</span>
+            </h2>
 
             <div className="question-fields" style={{ maxWidth: '420px', margin: '0 auto' }}>
                 <CurrencyInput
@@ -44,7 +46,7 @@ const HouseholdIncomeScreen = ({
                 )}
 
                 <div style={{ marginTop: '1.5rem' }}>
-                    <p style={{ color: 'var(--text-main)', fontSize: '0.95rem', fontWeight: 500, marginBottom: '0.75rem' }}>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', fontWeight: 600, marginBottom: '0.75rem' }}>
                         Does your spouse also contribute to the household income?
                     </p>
                     <div className="yes-no-toggle">
@@ -69,8 +71,8 @@ const HouseholdIncomeScreen = ({
                     </div>
 
                     <div className={`conditional-field ${hasSpouseIncome ? 'visible' : ''}`}>
-                        <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.4rem', display: 'block' }}>
-                            Spouse&apos;s monthly in-hand-salary / Take-home-profit (₹)
+                        <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.4rem', display: 'block', color: 'var(--text-muted)' }}>
+                            Spouse&apos;s Monthly In-Hand Salary / Take-Home Profit (₹)
                         </label>
                         <CurrencyInput
                             className="conversational-input"
@@ -108,10 +110,10 @@ const MonthlyOutflowsScreen = ({
             </p>
 
             <h2 className="question-title">
-                Approximately how much does your household spend every month?
+                Monthly Household Expenses <span className="tooltip-wrapper" data-tooltip="Includes groceries, utilities, lifestyle, travel, medical, and other standard living costs. Exclude insurance premiums." style={{ cursor: 'help', color: 'var(--primary)', fontSize: '0.8em', verticalAlign: 'middle' }}>ⓘ</span>
             </h2>
             <p className="question-helper">
-                Including groceries, utilities, lifestyle, travel, medical, etc. Exclude insurance premiums.
+                Exclude insurance premiums.
             </p>
 
             <div className="question-fields" style={{ maxWidth: '420px', margin: '0 auto' }}>
@@ -143,10 +145,10 @@ const MonthlyOutflowsScreen = ({
             </div>
 
             <h2 className="question-title" style={{ marginTop: '2rem' }}>
-                How much do you pay in insurance premiums every month?
+                Monthly Insurance Premiums <span className="tooltip-wrapper" data-tooltip="Total monthly amount for life, health, car, two-wheeler, and other insurance." style={{ cursor: 'help', color: 'var(--primary)', fontSize: '0.8em', verticalAlign: 'middle' }}>ⓘ</span>
             </h2>
             <p className="question-helper">
-                Total monthly amount for life, health, car, two-wheeler, and other insurance. Enter 0 if none.
+                Enter 0 if none.
             </p>
 
             <div className="question-fields" style={{ maxWidth: '420px', margin: '0 auto' }}>
@@ -171,7 +173,7 @@ const MonthlyOutflowsScreen = ({
             </div>
 
             <h2 className="question-title" style={{ marginTop: '2rem' }}>
-                Do you currently have any ongoing EMI commitments?
+                Ongoing EMI Commitments <span className="tooltip-wrapper" data-tooltip="Any loans like home loans, car loans, or personal loans that you are currently paying off." style={{ cursor: 'help', color: 'var(--primary)', fontSize: '0.8em', verticalAlign: 'middle' }}>ⓘ</span>
             </h2>
 
             <div className="yes-no-toggle" style={{ marginBottom: '1rem' }}>
@@ -201,7 +203,7 @@ const MonthlyOutflowsScreen = ({
             <div className={`conditional-field ${hasEMI ? 'visible' : ''}`}>
                 <div className="question-fields" style={{ maxWidth: '420px', margin: '0 auto' }}>
                     <label style={{ fontSize: '0.92rem', fontWeight: 500, color: 'var(--text-main)', textAlign: 'center', display: 'block' }}>
-                        What is your total monthly EMI burden?
+                        Total Monthly EMI Burden
                     </label>
                     <CurrencyInput
                         className="conversational-input"
