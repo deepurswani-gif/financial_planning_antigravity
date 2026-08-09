@@ -1,0 +1,367 @@
+Communication & Notification Policy
+Version: 1.0
+Effective Date: 05 August 2026
+Last Updated: 05 August 2026
+
+1. Introduction
+This Communication & Notification Policy ("Policy") explains how Finbrella communicates with users regarding their accounts, WealthMap, Financial Workspace, financial planning activities, products, services, and other platform-related matters.
+The purpose of this Policy is to help users understand:
+•	Why Finbrella communicates with them.
+•	The different types of communications they may receive.
+•	The channels used for communication.
+•	How communication preferences may be managed.
+•	The circumstances in which certain communications cannot be disabled.
+This Policy should be read together with Finbrella's Privacy Policy, Terms of Use, and other applicable policies.
+
+2. Purpose of Communications
+Finbrella communicates with users to support the effective, secure, and continuous use of the Services.
+Communications may be necessary to:
+•	Deliver WealthMap and Financial Workspace services.
+•	Notify users about important account activity.
+•	Inform users of financial planning progress.
+•	Remind users to review or update financial information.
+•	Support insurance and investment planning activities.
+•	Provide educational financial content.
+•	Maintain platform security.
+•	Comply with legal or regulatory obligations.
+•	Improve user experience.
+•	Inform users about new features, products, or services.
+Finbrella aims to ensure that communications are timely, relevant, and respectful of user preferences wherever reasonably possible.
+
+3. Communication Channels
+Depending on the Services used and the preferences selected by the user, Finbrella may communicate through one or more of the following channels:
+Within WealthMap and Financial Workspace
+Examples include:
+•	In-app notifications.
+•	Informational banners.
+•	Alerts.
+•	Planning reminders.
+•	Status updates.
+•	Educational messages.
+
+Browser Push Notifications
+Users who grant permission may receive browser push notifications relating to:
+•	Account activity.
+•	Financial planning reminders.
+•	Goal progress.
+•	Insurance reviews.
+•	Educational insights.
+•	Platform updates.
+•	Other relevant notifications.
+Users can withdraw browser notification permissions through their browser or device settings at any time.
+
+Email
+Email may be used for:
+•	Account verification.
+•	Password resets.
+•	Security notifications.
+•	Financial reports.
+•	Important policy updates.
+•	Service announcements.
+•	Educational content.
+•	Product information.
+•	Customer support.
+
+Mobile Communications
+Where supported, Finbrella may communicate using:
+•	SMS.
+•	Messaging applications.
+•	Voice calls.
+•	Other communication methods introduced in the future.
+Such communications will generally be limited to purposes consistent with this Policy and applicable law.
+
+4. Types of Communications
+Communications from Finbrella generally fall into the following categories.
+
+Account Communications
+Examples include:
+•	Account creation.
+•	Login verification.
+•	Password reset.
+•	Email verification.
+•	Profile updates.
+•	Account recovery.
+•	Account security alerts.
+
+Financial Planning Communications
+Examples include:
+•	WealthMap updates.
+•	Financial Workspace updates.
+•	Goal progress.
+•	Retirement planning reminders.
+•	Cash flow review reminders.
+•	Protection gap updates.
+•	Insurance review reminders.
+•	Planning recommendations.
+
+Transactional Communications
+Examples include:
+•	Service confirmations.
+•	Document upload confirmations.
+•	Account requests.
+•	Customer support responses.
+•	Service acknowledgements.
+•	Technical notifications.
+Transactional communications are considered part of the Services and may continue even where users have opted out of promotional communications.
+
+Educational Communications
+Examples include:
+•	Financial literacy articles.
+•	Investment education.
+•	Insurance awareness.
+•	Retirement planning guidance.
+•	Goal planning tips.
+•	Platform tutorials.
+•	Product education.
+•	Wealth-building insights.
+Educational communications are intended to improve financial awareness and should not be interpreted as personalised financial advice.
+
+Product and Service Communications
+Finbrella may inform users about:
+•	New platform features.
+•	New planning tools.
+•	Additional financial products.
+•	Insurance solutions.
+•	Mutual fund services.
+•	Platform improvements.
+•	Service enhancements.
+•	Promotional campaigns, where permitted by applicable law and user preferences.
+
+5. Consent and Communication Preferences
+Where required by applicable law, Finbrella will obtain appropriate consent before sending communications that require consent.
+Users may manage available communication preferences through account settings or other mechanisms provided by Finbrella.
+Depending on the nature of the communication, users may be able to choose:
+•	Preferred communication channels.
+•	Types of notifications.
+•	Educational communications.
+•	Promotional communications.
+•	Browser notification permissions.
+Certain operational, security, legal, or transactional communications form part of the Services and may not be disabled where they are necessary for the protection of users, the operation of the platform, or compliance with applicable legal obligations.
+
+6. Browser Push Notifications
+Users who choose to enable browser push notifications may receive timely notifications designed to support their use of WealthMap and Financial Workspace.
+Browser push notifications may include:
+•	Financial planning reminders.
+•	Goal progress updates.
+•	Insurance review reminders.
+•	Retirement planning reminders.
+•	Important account alerts.
+•	Security notifications.
+•	Feature announcements.
+•	Educational insights.
+•	Service updates.
+•	Other relevant notifications related to the Services.
+Granting browser notification permission is voluntary.
+Users may disable browser push notifications at any time through their browser or device settings.
+Disabling browser push notifications does not affect other communication channels such as email or in-app notifications.
+
+7. Notification Categories
+Finbrella organises notifications into different categories to ensure that communications remain useful and relevant.
+Service Notifications
+These notifications support the operation and security of your account.
+Examples include:
+•	Login alerts.
+•	Password reset notifications.
+•	Account verification.
+•	Security warnings.
+•	Important policy updates.
+•	Service interruptions.
+•	Critical platform announcements.
+These notifications are considered essential for the secure operation of the Services and may not be disabled where required for security, legal, or operational reasons.
+
+Financial Planning Notifications
+These notifications help users actively manage their financial journey.
+Examples include:
+•	WealthMap updates.
+•	Financial Workspace reminders.
+•	Goal milestone reminders.
+•	Insurance review reminders.
+•	Retirement planning reminders.
+•	Cash flow review reminders.
+•	Net worth updates.
+•	Protection gap reminders.
+
+Educational Notifications
+Examples include:
+•	Financial literacy content.
+•	Investment education.
+•	Insurance awareness.
+•	Tax planning reminders.
+•	Financial planning tips.
+•	Platform tutorials.
+•	Educational campaigns.
+These notifications are intended to improve financial awareness and should not be interpreted as personalised financial advice.
+
+Product and Feature Notifications
+Examples include:
+•	New WealthMap capabilities.
+•	New planning tools.
+•	Additional financial products.
+•	Platform enhancements.
+•	Feature releases.
+•	Service improvements.
+Where required by applicable law, promotional communications will be sent only with appropriate consent.
+
+8. Notification Frequency
+Finbrella aims to communicate responsibly and avoid excessive notifications.
+To promote a positive user experience, Finbrella may apply reasonable limits to the number and frequency of notifications sent to users.
+Notification frequency may vary depending on:
+•	Account activity.
+•	User preferences.
+•	Financial planning events.
+•	Security requirements.
+•	Product updates.
+•	Legal or regulatory obligations.
+Where practical, Finbrella seeks to prioritise quality and relevance over quantity.
+
+9. Quiet Hours
+To minimise unnecessary interruptions, Finbrella may apply quiet hours during which non-essential notifications are deferred.
+Examples of communications that may be deferred include:
+•	Educational messages.
+•	Financial planning reminders.
+•	Product announcements.
+•	Promotional communications.
+However, security alerts, critical account notifications, legal notices, fraud prevention messages, or other important operational communications may still be delivered where reasonably necessary.
+Quiet hours may vary based on operational requirements, user preferences, or future platform enhancements.
+
+10. Deep Links and Contextual Notifications
+Where technically supported, notifications may contain secure deep links that take users directly to the relevant section of WealthMap or Financial Workspace.
+Examples include links to:
+•	Goal planning.
+•	Insurance review.
+•	Cash flow analysis.
+•	Retirement planning.
+•	Financial reports.
+•	Uploaded documents.
+•	Account settings.
+•	Other relevant platform features.
+Deep links are intended to improve user experience by helping users quickly access the information related to a notification.
+
+11. Notification Analytics and Service Improvement
+Finbrella may analyse notification performance to improve the relevance, usefulness, and effectiveness of communications.
+Examples of operational metrics may include:
+•	Notification delivery status.
+•	Notification open rates.
+•	User interaction patterns.
+•	Preference selections.
+•	General engagement trends.
+•	Feature usage following notifications.
+Such analysis helps Finbrella:
+•	Improve user experience.
+•	Reduce unnecessary notifications.
+•	Improve communication timing.
+•	Enhance planning reminders.
+•	Evaluate the effectiveness of platform communications.
+Where analytics involve Personal Data, they will be processed in accordance with the Privacy Policy.
+
+12. Testing and Continuous Improvement
+Finbrella continuously reviews and improves its communication practices.
+To better understand what works for users, Finbrella may evaluate different versions of notifications, communication timing, layouts, or messaging styles.
+Such evaluations are intended to:
+•	Improve clarity.
+•	Improve user engagement.
+•	Reduce notification fatigue.
+•	Enhance financial planning participation.
+•	Improve the overall user experience.
+Testing activities are conducted as part of normal product improvement and do not alter users' legal rights or obligations.
+
+13. Managing Communication Preferences
+Where supported by the Services, users may manage available communication preferences through their Finbrella account settings.
+Depending on platform functionality, users may be able to:
+•	Enable or disable browser push notifications.
+•	Manage educational communications.
+•	Manage promotional communications.
+•	Update communication channels.
+•	Review notification permissions.
+•	Modify other available communication preferences.
+Some preferences may also be managed through browser settings, device settings, or other third-party platforms used to deliver notifications.
+Changes to communication preferences may not affect notifications that have already been scheduled or communications that are legally or operationally required.
+
+14. Opting Out of Communications
+Users may opt out of certain non-essential communications where such options are made available.
+Examples may include:
+•	Promotional communications.
+•	Educational campaigns.
+•	Product announcements.
+•	Marketing-related messages.
+However, users generally cannot opt out of communications that are necessary for:
+•	Account security.
+•	Identity verification.
+•	Fraud prevention.
+•	Password recovery.
+•	Service operation.
+•	Legal compliance.
+•	Important account administration.
+These communications are considered an integral part of providing the Services safely and responsibly.
+
+15. Delivery of Communications
+While Finbrella makes reasonable efforts to deliver communications promptly and reliably, successful delivery depends on various factors beyond our direct control.
+These factors may include:
+•	Internet connectivity.
+•	Browser settings.
+•	Device settings.
+•	Notification permissions.
+•	Email service availability.
+•	Mobile network availability.
+•	Third-party communication providers.
+•	Spam filtering.
+•	Technical interruptions.
+Accordingly, Finbrella cannot guarantee that every communication will be delivered immediately or received by every user.
+Users are encouraged to periodically access WealthMap and Financial Workspace directly rather than relying solely on notifications.
+
+16. Third-Party Communication Providers
+Finbrella may use trusted third-party service providers to facilitate communications and notifications.
+Examples may include providers supporting:
+•	Email delivery.
+•	Browser push notifications.
+•	SMS services.
+•	Messaging services.
+•	Customer support communications.
+•	Communication analytics.
+These providers process information only to the extent reasonably necessary to perform the requested services on Finbrella's behalf and are expected to maintain appropriate security and confidentiality measures.
+The use of such providers does not alter Finbrella's commitment to protecting Personal Data in accordance with its Privacy Policy.
+
+17. Security and Emergency Communications
+Certain communications are essential for protecting users and maintaining the integrity of the Services.
+Examples include:
+•	Suspicious login activity.
+•	Password reset requests.
+•	Identity verification.
+•	Security alerts.
+•	Fraud prevention notifications.
+•	Service interruption notices.
+•	Legal or regulatory notices.
+•	Other communications necessary to protect users or the platform.
+Where reasonably necessary, Finbrella may send such communications regardless of a user's general communication preferences.
+
+18. Changes to this Policy
+Finbrella may update this Communication & Notification Policy from time to time to reflect:
+•	Changes in applicable laws or regulations.
+•	Improvements to WealthMap and Financial Workspace.
+•	New communication channels.
+•	New notification features.
+•	Product enhancements.
+•	Security improvements.
+•	Operational changes.
+The updated Policy will include a revised Version and Last Updated date.
+Where material changes affect users' communication preferences or rights, Finbrella may provide notice through the Finbrella website, WealthMap, Financial Workspace, email, or other appropriate communication channels.
+Continued use of the Services after the updated Policy becomes effective constitutes acceptance of the revised Policy, to the extent permitted by applicable law.
+
+19. Contact Us
+If you have questions regarding this Communication & Notification Policy or wish to seek clarification about communications from Finbrella, you may contact us using the contact details published in the Legal Information section of the Finbrella website or within the Financial Workspace.
+We welcome user feedback regarding the clarity, relevance, and usefulness of our communications as part of our ongoing efforts to improve the user experience.
+
+20. Acceptance of this Policy
+By creating an account, accessing, or using Finbrella's Services, you acknowledge that:
+•	You have read this Communication & Notification Policy.
+•	You understand the different types of communications that may be sent by Finbrella.
+•	You understand how available communication preferences may be managed.
+•	You acknowledge that certain security, operational, legal, and transactional communications are essential to the provision of the Services and may not be disabled.
+•	You agree to receive communications in accordance with this Policy and applicable law.
+If you do not agree with this Policy, you should discontinue using the Services.
+
+21. Final Statement
+Finbrella believes that effective communication is an essential part of responsible financial planning.
+Our objective is to provide timely, relevant, and meaningful communications that help users stay informed, protect their accounts, monitor financial progress, and make better financial decisions—while respecting user preferences, privacy, and applicable legal requirements.
+We remain committed to continuously improving how we communicate so that every notification, reminder, and update contributes positively to your long-term financial journey.
+

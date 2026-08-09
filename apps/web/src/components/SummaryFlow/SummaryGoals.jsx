@@ -12,6 +12,7 @@ import { loadSummaryUiDraft, patchSummaryUiDraft } from '../../lib/summaryFlowSt
 import { calculateFutureCost } from '../GoalModule/GoalLogic';
 import QuestionProgressBar from './QuestionProgressBar';
 import { useProgressiveShellWidth } from './useProgressiveShellWidth';
+import { calculateAge } from '../ProfileModule/ProfileLogic';
 import {
     DEFAULT_SUMMARY_REPORT_ID,
     financialWorkspacePath,
@@ -119,7 +120,7 @@ const NarrativeOverlay = ({ text, onContinue }) => {
    MAIN COMPONENT
    ═══════════════════════════════════════════════════ */
 const SummaryGoals = () => {
-    const { goals, setGoals, savePlanData, summaryReportGeneratedAt, markReportGenerated } = useFinancialPlan();
+    const { goals, setGoals, savePlanData, summaryReportGeneratedAt, markReportGenerated, familyMembers } = useFinancialPlan();
     const { user } = useAuth();
     const navigate = useNavigate();
     const userId = user?.id ?? null;
@@ -215,12 +216,22 @@ const SummaryGoals = () => {
 
             let existing = updated.find((g) => g.templateId === tmplId);
             if (!existing) {
+                let initialYearsToGoal = '';
+                if (tmplId === 'retirement') {
+                    const selfMember = familyMembers?.find(m => m.relation === 'Self') || familyMembers?.[0];
+                    if (selfMember?.dob && selfMember?.retirementAge) {
+                        const currentAge = calculateAge(selfMember.dob);
+                        const years = parseInt(selfMember.retirementAge, 10) - currentAge;
+                        if (years > 0) initialYearsToGoal = String(years);
+                    }
+                }
+
                 existing = {
                     id: `goal_${Date.now()}_${tmplId}`,
                     name: tmpl.label,
                     templateId: tmpl.id,
                     presentValue: '',
-                    yearsToGoal: '',
+                    yearsToGoal: initialYearsToGoal,
                     inflationRate: tmpl.defaultInflation,
                     courseDuration: 1,
                 };
@@ -484,51 +495,56 @@ const SummaryGoals = () => {
                         {screen === DETAILS && pendingGoals.length > 0 && (
                             <div className="question-container">
                                 <h2 className="question-title">
-                                    Tell us the timing and present cost for each goal
+                                    Goal Timing & Cost
                                 </h2>
                                 <p className="question-helper" style={{ marginBottom: '1.5rem' }}>
-                                    Years Remaining and Present Value are both required for accurate future value calculations.
+                                    Fill in the details for each goal to calculate its future value.
                                 </p>
 
-                                <div className="question-fields" style={{ maxWidth: '520px', margin: '0 auto' }}>
+                                <div className="question-fields" style={{ maxWidth: '650px', margin: '0 auto' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1.5fr', gap: '1rem', alignItems: 'center', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border)', marginBottom: '1.5rem' }}>
+                                        <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-muted)' }}>Goal</div>
+                                        <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-muted)', textAlign: 'center' }}>
+                                            Years <span className="tooltip-wrapper" data-tooltip="Years until you need the funds for this goal" style={{ cursor: 'help', color: 'var(--primary)' }}>ⓘ</span>
+                                        </div>
+                                        <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-muted)', textAlign: 'center' }}>
+                                            Present Cost <span className="tooltip-wrapper" data-tooltip="What this goal would cost if you were to pay for it today" style={{ cursor: 'help', color: 'var(--primary)' }}>ⓘ</span>
+                                        </div>
+                                    </div>
+
                                     {pendingGoals.map((goal) => {
                                         const Icon = getGoalIcon(goal.name);
                                         return (
                                             <div
                                                 key={goal.id}
-                                                style={{
-                                                    marginBottom: '1.5rem',
-                                                    paddingBottom: '1.25rem',
-                                                    borderBottom: '1px solid var(--border)',
-                                                }}
+                                                style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1.5fr', gap: '1rem', alignItems: 'center', marginBottom: '1.25rem' }}
                                             >
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                                                    <Icon size={18} style={{ color: 'var(--primary)' }} />
-                                                    <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{goal.name}</span>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                    <Icon size={20} style={{ color: 'var(--primary)' }} />
+                                                    <div>
+                                                        <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{goal.name}</div>
+                                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Inflation: {goal.inflationRate || 6}%</div>
+                                                    </div>
                                                 </div>
-                                                <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.2rem', display: 'block' }}>
-                                                    Years Remaining
-                                                </label>
-                                                <YearsInput
-                                                    className="conversational-input"
-                                                    placeholder="e.g. 10"
-                                                    value={goal.yearsToGoal || ''}
-                                                    onValueChange={(v) => updateGoal(goal.id, 'yearsToGoal', v == null ? '' : String(v))}
-                                                    style={{ textAlign: 'center', fontSize: '1.1rem', fontWeight: 600, marginBottom: '0.75rem' }}
-                                                    enterKeyHint="next"
-                                                />
-                                                <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.2rem', display: 'block' }}>
-                                                    Present Value of Goal
-                                                </label>
-                                                <CurrencyInput
-                                                    className="conversational-input"
-                                                    placeholder="e.g. 500000"
-                                                    value={goal.presentValue || ''}
-                                                    onValueChange={(v) => updateGoal(goal.id, 'presentValue', v == null ? '' : String(v))}
-                                                    enterKeyHint="done"
-                                                />
-                                                <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-                                                    Assumed Inflation Rate: <strong style={{ color: 'var(--primary)' }}>{goal.inflationRate || 6}%</strong>
+                                                <div>
+                                                    <YearsInput
+                                                        className="conversational-input"
+                                                        placeholder="Yrs"
+                                                        value={goal.yearsToGoal || ''}
+                                                        onValueChange={(v) => updateGoal(goal.id, 'yearsToGoal', v == null ? '' : String(v))}
+                                                        style={{ textAlign: 'center', fontSize: '1rem', fontWeight: 600, margin: 0 }}
+                                                        enterKeyHint="next"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <CurrencyInput
+                                                        className="conversational-input"
+                                                        placeholder="Cost"
+                                                        value={goal.presentValue || ''}
+                                                        onValueChange={(v) => updateGoal(goal.id, 'presentValue', v == null ? '' : String(v))}
+                                                        style={{ margin: 0 }}
+                                                        enterKeyHint="done"
+                                                    />
                                                 </div>
                                             </div>
                                         );

@@ -15,11 +15,8 @@ const SavingsInvestmentsScreen = ({ expenseCategories, handleSummaryChange }) =>
                 Wealth is built through consistent saving and investing.
             </p>
             <h2 className="question-title">
-                How much are you currently investing every month towards your future?
+                Monthly Investments <span className="tooltip-wrapper" data-tooltip="SIPs, Mutual Funds, Stocks, Retirement Investments, etc." style={{ cursor: 'help', color: 'var(--primary)', fontSize: '0.8em', verticalAlign: 'middle' }}>ⓘ</span>
             </h2>
-            <p className="question-helper">
-                SIPs, Mutual Funds, Stocks, Retirement Investments, etc.
-            </p>
 
             <div className="question-fields" style={{ maxWidth: '420px', margin: '0 auto' }}>
                 <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.2rem', display: 'block' }}>
@@ -43,11 +40,8 @@ const SavingsInvestmentsScreen = ({ expenseCategories, handleSummaryChange }) =>
             </div>
 
             <h2 className="question-title" style={{ marginTop: '2rem' }}>
-                Apart from investments, do you also keep money aside in safer savings instruments?
+                Other Monthly Savings <span className="tooltip-wrapper" data-tooltip="FDs, RDs, recurring savings, deposits, etc." style={{ cursor: 'help', color: 'var(--primary)', fontSize: '0.8em', verticalAlign: 'middle' }}>ⓘ</span>
             </h2>
-            <p className="question-helper">
-                FDs, RDs, recurring savings, deposits, etc.
-            </p>
 
             <div className="question-fields" style={{ maxWidth: '420px', margin: '0 auto' }}>
                 <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.2rem', display: 'block' }}>
@@ -95,7 +89,7 @@ const InsuranceProtectionScreen = ({
             </p>
 
             <h2 className="question-title">
-                Do you currently have any Life Insurance coverage?
+                Life Insurance Coverage <span className="tooltip-wrapper" data-tooltip="Coverage that financially protects your dependents in case of your absence." style={{ cursor: 'help', color: 'var(--primary)', fontSize: '0.8em', verticalAlign: 'middle' }}>ⓘ</span>
             </h2>
 
             <div className="coverage-chips" style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginBottom: '1.5rem', marginTop: '0.5rem' }}>
@@ -123,11 +117,8 @@ const InsuranceProtectionScreen = ({
             <div className={`conditional-field ${hasLifeInsurance === true ? 'visible' : ''}`}>
                 <div className="question-fields" style={{ maxWidth: '420px', margin: '0 auto' }}>
                     <label style={{ fontSize: '0.92rem', fontWeight: 500, color: 'var(--text-main)', textAlign: 'center', display: 'block', marginBottom: '0.5rem' }}>
-                        What is the total life cover (Sum Assured) available across all your policies?
+                        Total Life Insurance Cover <span className="tooltip-wrapper" data-tooltip="Total Sum Assured across Term Insurance, Traditional Policies, Employer Coverage, etc." style={{ cursor: 'help', color: 'var(--primary)', fontSize: '0.8em', verticalAlign: 'middle' }}>ⓘ</span>
                     </label>
-                    <p className="question-helper" style={{ marginBottom: '1rem' }}>
-                        Include Term Insurance, Traditional Policies, Employer Coverage, etc.
-                    </p>
                     <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.2rem', display: 'block' }}>
                         Total Life Insurance Cover
                     </label>
@@ -150,7 +141,7 @@ const InsuranceProtectionScreen = ({
             </div>
 
             <h2 className="question-title" style={{ marginTop: '2rem' }}>
-                Do you currently have Health Insurance coverage for yourself or your family?
+                Health Insurance Coverage <span className="tooltip-wrapper" data-tooltip="Coverage for medical emergencies and hospital bills." style={{ cursor: 'help', color: 'var(--primary)', fontSize: '0.8em', verticalAlign: 'middle' }}>ⓘ</span>
             </h2>
 
             <div className="coverage-chips" style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginBottom: '1.5rem', marginTop: '0.5rem' }}>
@@ -182,11 +173,8 @@ const InsuranceProtectionScreen = ({
             <div className={`conditional-field ${hasHealthInsurance === true ? 'visible' : ''}`}>
                 <div className="question-fields" style={{ maxWidth: '420px', margin: '0 auto' }}>
                     <label style={{ fontSize: '0.92rem', fontWeight: 500, color: 'var(--text-main)', textAlign: 'center', display: 'block', marginBottom: '0.5rem' }}>
-                        What is the total health cover available to your family today?
+                        Total Health Insurance Cover <span className="tooltip-wrapper" data-tooltip="Include personal policies, family floater plans, and employer-provided cover." style={{ cursor: 'help', color: 'var(--primary)', fontSize: '0.8em', verticalAlign: 'middle' }}>ⓘ</span>
                     </label>
-                    <p className="question-helper" style={{ marginBottom: '1rem' }}>
-                        Include personal policies, family floater plans, and employer-provided cover.
-                    </p>
                     <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.2rem', display: 'block' }}>
                         Total Health Insurance Cover
                     </label>

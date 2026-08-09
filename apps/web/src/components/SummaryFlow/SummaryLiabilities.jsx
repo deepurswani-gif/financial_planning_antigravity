@@ -16,11 +16,8 @@ const CurrentLiabilitiesScreen = ({ hasEMI, liabilityCategories, handleSnapshotC
                         To understand your financial commitments better,
                     </p>
                     <h2 className="question-title">
-                        What is your total outstanding loan amount today?
+                        Total Outstanding Loans <span className="tooltip-wrapper" data-tooltip="Total balance remaining on Home Loans, Personal Loans, Vehicle Loans, Education Loans, etc." style={{ cursor: 'help', color: 'var(--primary)', fontSize: '0.8em', verticalAlign: 'middle' }}>ⓘ</span>
                     </h2>
-                    <p className="question-helper">
-                        Home Loan, Personal Loan, Vehicle Loan, Education Loan, etc.
-                    </p>
 
                     <div className="question-fields" style={{ maxWidth: '420px', margin: '0 auto' }}>
                         <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.2rem', display: 'block' }}>
@@ -46,7 +43,7 @@ const CurrentLiabilitiesScreen = ({ hasEMI, liabilityCategories, handleSnapshotC
             )}
 
             <h2 className="question-title" style={{ marginTop: hasEMI ? '2rem' : undefined }}>
-                Do you currently have any pending credit card dues?
+                Pending Credit Card Dues <span className="tooltip-wrapper" data-tooltip="Total current outstanding balance on all your credit cards." style={{ cursor: 'help', color: 'var(--primary)', fontSize: '0.8em', verticalAlign: 'middle' }}>ⓘ</span>
             </h2>
 
             <div className="question-fields" style={{ maxWidth: '420px', margin: '0 auto' }}>
@@ -71,11 +68,8 @@ const CurrentLiabilitiesScreen = ({ hasEMI, liabilityCategories, handleSnapshotC
             </div>
 
             <h2 className="question-title" style={{ marginTop: '2rem' }}>
-                Apart from formal loans, is there any other amount that you may need to repay to someone?
+                Other Payables <span className="tooltip-wrapper" data-tooltip="Borrowed funds from family, friends, business obligations, or any informal loans." style={{ cursor: 'help', color: 'var(--primary)', fontSize: '0.8em', verticalAlign: 'middle' }}>ⓘ</span>
             </h2>
-            <p className="question-helper">
-                Borrowed funds from family, friends, business obligations, etc.
-            </p>
 
             <div className="question-fields" style={{ maxWidth: '420px', margin: '0 auto' }}>
                 <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.2rem', display: 'block' }}>

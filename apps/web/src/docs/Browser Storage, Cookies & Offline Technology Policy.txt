@@ -1,0 +1,88 @@
+Browser Storage, Cookies & Offline Technology Policy
+Version: 1.0
+Effective Date: 05 August 2026
+Last Updated: 05 August 2026
+
+1. Introduction
+This Browser Storage, Cookies & Offline Technology Policy ("Policy") explains how Finbrella uses browser-based technologies to support WealthMap, Financial Workspace, and other Services provided through its website and Progressive Web App (PWA).
+The purpose of this Policy is to help users understand:
+•	Why browser technologies are used.
+•	How they improve the functionality of the Services.
+•	The choices available to users.
+•	How these technologies relate to your privacy.
+This Policy should be read together with Finbrella's Privacy Policy and other applicable policies.
+
+2. Why We Use Browser Technologies
+To provide a secure, reliable, and responsive experience, Finbrella uses browser technologies that support the operation of its Services.
+Depending on the features you use, these technologies may help to:
+•	Remember your preferences and settings.
+•	Support secure access to your account.
+•	Improve application performance and reliability.
+•	Enhance your browsing experience.
+•	Enable Progressive Web App functionality.
+•	Support offline features, where available.
+•	Improve the overall usability of WealthMap and Financial Workspace.
+Finbrella uses these technologies only to the extent reasonably necessary to operate, maintain, and improve its Services.
+
+3. Browser Storage Technologies
+Modern web browsers provide technologies that allow websites and Progressive Web Apps to function more efficiently.
+Finbrella may use browser storage and similar technologies to support the normal operation of its Services.
+These technologies may assist in:
+•	Maintaining application functionality.
+•	Remembering user preferences.
+•	Improving performance.
+•	Supporting secure sessions.
+•	Enabling offline capabilities, where available.
+•	Delivering a smoother and more consistent user experience.
+The browser technologies used by Finbrella may evolve as web standards and platform capabilities develop.
+
+4. Browser Cookies
+Cookies are small pieces of information that may be stored by a website within a user's browser.
+At present, Finbrella makes limited or no use of browser cookies for tracking or advertising purposes.
+Where browser cookies are used, they are intended to support the operation, security, performance, or functionality of the Services.
+If Finbrella introduces additional cookie-based functionality that materially affects users, this Policy will be updated accordingly.
+Where required by applicable law, Finbrella will obtain appropriate consent before using cookies that require such consent.
+
+5. Relationship with Personal Data
+Some browser technologies may process information that relates to an identified or identifiable individual.
+Where such processing involves Personal Data, Finbrella will handle that information in accordance with its Privacy Policy and applicable law.
+Browser technologies are used to support the operation of the Services and are not intended to collect more Personal Data than is reasonably necessary for those purposes.
+
+6. Your Choices
+Most modern web browsers allow users to manage browser storage, cookies, website permissions, and other browser-related settings.
+You may choose to:
+•	Manage or clear browser-stored information.
+•	Control browser notification permissions.
+•	Adjust privacy and security settings.
+•	Remove stored website data.
+•	Restrict certain browser technologies, where supported.
+Please note that changing these settings may affect the availability or performance of certain Finbrella features.
+Clearing browser data from your device does not automatically delete information stored securely on Finbrella's systems. If you wish to request deletion of your account or Personal Data, please refer to Finbrella's Data Retention & Deletion Policy.
+
+7. Third-Party Technologies
+Finbrella may use trusted third-party technologies that support the operation, security, performance, or improvement of its Services.
+Where these technologies process Personal Data on Finbrella's behalf, they are expected to do so in accordance with applicable contractual, security, and privacy obligations.
+The use of such technologies does not change Finbrella's commitment to protecting your Personal Data in accordance with its Privacy Policy.
+
+8. Changes to this Policy
+Finbrella may update this Browser Storage, Cookies & Offline Technology Policy from time to time to reflect:
+•	Changes in applicable laws or regulations.
+•	Improvements to WealthMap and Financial Workspace.
+•	Changes in browser technologies or web standards.
+•	Security enhancements.
+•	New platform features.
+•	Operational improvements.
+The updated Policy will include a revised Version and Last Updated date.
+Where material changes affect users' rights or privacy, Finbrella may provide notice through the Finbrella website, WealthMap, Financial Workspace, email, or other appropriate communication channels.
+Continued use of the Services after the updated Policy becomes effective constitutes acceptance of the revised Policy, to the extent permitted by applicable law.
+9. Contact Us
+If you have any questions regarding this Policy or the browser technologies used by Finbrella, you may contact us using the contact details published in the Legal Information section of the Finbrella website or within the Financial Workspace.
+
+10. Acceptance of this Policy
+By accessing or using Finbrella's website, WealthMap, Financial Workspace, or other Services, you acknowledge that you have read and understood this Browser Storage, Cookies & Offline Technology Policy.
+You understand that browser technologies help support the operation, security, and performance of the Services, and that your browser settings may affect certain features or functionality.
+If you do not agree with this Policy, you may discontinue using the Services or adjust your browser settings where appropriate.
+
+11. Final Statement
+Finbrella uses browser technologies responsibly to provide a secure, reliable, and efficient experience across its website and Progressive Web App.
+We are committed to maintaining transparency regarding these technologies while respecting user privacy and continually improving the quality of our Services.
