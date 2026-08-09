@@ -64,7 +64,6 @@ const DetailedReportView = () => {
                 padding: '0',
                 maxWidth: '100%',
                 margin: '0 auto',
-                paddingBottom: '6rem',
             }}
         >
             <h1 style={{ textAlign: 'center', marginBottom: '2rem' }}>Detailed Report</h1>

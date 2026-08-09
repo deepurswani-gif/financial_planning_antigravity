@@ -1,0 +1,314 @@
+User Content, Document Upload & Financial Records Policy
+Version: 1.0
+Effective Date: 05 August 2026
+Last Updated: 05 August 2026
+
+1. Introduction
+This User Content, Document Upload & Financial Records Policy ("Policy") explains how Finbrella manages information, documents, and other content voluntarily provided by users through WealthMap, Financial Workspace, and other Services.
+The purpose of this Policy is to help users understand:
+•	What constitutes User Content.
+•	How User Content is used.
+•	How uploaded financial documents are handled.
+•	The responsibilities of users when providing information.
+•	The rights retained by users in relation to their content.
+•	The limited rights granted to Finbrella for providing the Services.
+This Policy should be read together with Finbrella's Privacy Policy, Terms of Use, Data Retention & Deletion Policy, and other applicable policies.
+
+2. Purpose of User Content
+Finbrella is designed to help users organise, understand, and improve their financial lives.
+To provide meaningful financial planning, users may voluntarily provide financial information, upload documents, or maintain financial records within WealthMap and Financial Workspace.
+This information enables Finbrella to:
+•	Prepare personalised financial plans.
+•	Generate WealthMap reports.
+•	Maintain Financial Workspace records.
+•	Analyse financial progress over time.
+•	Review insurance coverage.
+•	Support investment planning.
+•	Generate retirement projections.
+•	Produce cash flow and net worth analysis.
+•	Provide educational insights.
+•	Generate AI-assisted summaries and planning outputs.
+•	Improve the overall financial planning experience.
+Finbrella requests only such information as is reasonably necessary to provide the Services requested by the user.
+
+3. What is User Content?
+For the purposes of this Policy, User Content includes any information, documents, files, images, records, or other material voluntarily submitted, uploaded, entered, or otherwise provided by users through the Services.
+User Content may include, for example:
+Personal Information
+•	Name.
+•	Contact details.
+•	Date of birth.
+•	Occupation.
+•	Family information.
+•	Other profile information.
+
+Financial Information
+•	Income.
+•	Household expenses.
+•	Savings.
+•	Investments.
+•	Assets.
+•	Liabilities.
+•	Insurance information.
+•	Financial goals.
+•	Retirement planning information.
+•	Other financial planning inputs.
+
+Uploaded Documents
+Examples include:
+•	Life insurance policies.
+•	Health insurance policies.
+•	Motor insurance policies.
+•	Mutual fund statements.
+•	Investment statements.
+•	Bank statements.
+•	Salary slips.
+•	Tax-related documents.
+•	Loan statements.
+•	Pension-related documents.
+•	Property-related financial documents, where supported.
+•	Other financial records voluntarily uploaded by users.
+
+Other User Content
+Examples include:
+•	Notes.
+•	Responses to financial planning questions.
+•	Supporting information.
+•	Images.
+•	Files.
+•	Attachments.
+•	Information submitted through customer support.
+•	Other content voluntarily provided while using the Services.
+
+4. Ownership of User Content
+Users retain ownership of the User Content they submit through Finbrella.
+Uploading or submitting User Content does not transfer ownership of that content to Finbrella.
+Finbrella does not claim ownership of users' financial documents, insurance policies, financial records, or other User Content solely because such content has been uploaded to or stored within the Services.
+
+5. Licence Granted to Finbrella
+To enable Finbrella to provide the requested Services, users grant Finbrella a limited, non-exclusive, revocable (subject to applicable law and operational requirements), royalty-free licence to use User Content solely for purposes reasonably necessary to operate the Services.
+This licence permits Finbrella to:
+•	Store User Content.
+•	Process User Content.
+•	Analyse User Content.
+•	Display User Content within WealthMap and Financial Workspace.
+•	Generate financial reports.
+•	Produce planning recommendations.
+•	Review insurance information.
+•	Generate AI-assisted insights.
+•	Improve financial planning functionality.
+•	Protect platform security.
+•	Comply with applicable legal obligations.
+This licence exists only to the extent reasonably necessary to provide the Services requested by the user and does not permit Finbrella to exploit User Content for unrelated commercial purposes.
+
+6. User Responsibilities
+Users are responsible for ensuring that the User Content they provide is, to the best of their knowledge:
+•	Accurate.
+•	Complete.
+•	Up to date.
+•	Lawfully obtained.
+•	Suitable for the intended purpose.
+Users should promptly update their financial information whenever there is a significant change in their financial circumstances so that WealthMap and Financial Workspace can generate more meaningful and relevant planning outputs.
+Users should also ensure that they have the necessary rights, permissions, or authority to submit any User Content provided through the Services.
+
+7. Why Finbrella Requests Financial Documents
+Certain Services offered through Finbrella are more effective when supported by relevant financial documents.
+For example, users may choose to upload insurance policies, financial statements, or other records to assist with financial planning and review.
+Providing such documents may enable Finbrella to:
+•	Better understand the user's financial position.
+•	Review existing insurance coverage.
+•	Identify potential protection gaps.
+•	Reduce manual data entry.
+•	Improve planning accuracy.
+•	Maintain historical financial records.
+•	Generate more meaningful reports.
+•	Produce more relevant AI-assisted insights.
+•	Support long-term financial planning.
+Uploading financial documents is generally voluntary unless a particular Service specifically requires them.
+Users may continue to use many Finbrella features without uploading supporting documents, although some planning features or analyses may be limited where relevant information is unavailable.
+
+8. Supported Documents
+Depending on the Services used, Finbrella may permit users to upload various financial documents and records.
+Examples include:
+•	Life insurance policies.
+•	Health insurance policies.
+•	Motor insurance policies.
+•	Mutual fund statements.
+•	Investment portfolio statements.
+•	Bank statements.
+•	Salary slips.
+•	Form 16 and tax-related documents.
+•	Loan statements.
+•	Pension documents.
+•	Property-related financial documents, where supported.
+•	Identity or verification documents, where specifically requested.
+•	Other financial records relevant to the Services.
+The types of documents accepted may change as Finbrella introduces new products, features, or services.
+
+9. Uploading Financial Documents
+Users may voluntarily upload financial documents to support financial planning, insurance review, investment planning, retirement planning, or other Services.
+When uploading documents, users should ensure that:
+•	The documents belong to them or they have appropriate authority to upload them.
+•	The documents are complete and legible.
+•	The information provided is accurate to the best of their knowledge.
+•	The documents have not been materially altered in a misleading manner.
+•	The uploaded files are free from malicious software or other harmful content.
+Incomplete, illegible, corrupted, or inaccurate documents may affect the quality of Generated Financial Outputs.
+
+10. Review of Uploaded Documents
+Where supported by the Services, Finbrella may review uploaded financial documents to assist users in understanding their financial position.
+Depending on the document, reviews may include:
+•	Insurance coverage summaries.
+•	Protection gap analysis.
+•	Financial planning observations.
+•	Investment allocation summaries.
+•	Retirement planning inputs.
+•	Financial record organisation.
+•	Educational explanations.
+•	AI-assisted summaries.
+•	Other planning-related insights.
+Such reviews are intended to support financial planning and should not be interpreted as legal opinions, underwriting decisions, tax advice, investment guarantees, claim assessments, or certifications of document accuracy.
+Where any inconsistency exists between a Finbrella-generated summary and the original document, the original document shall prevail.
+
+11. AI-Assisted Analysis and Information Extraction
+Finbrella may use Artificial Intelligence (AI), Optical Character Recognition (OCR), machine learning, or other automated technologies to assist in processing uploaded documents.
+These technologies may be used to:
+•	Extract relevant financial information.
+•	Reduce manual data entry.
+•	Organise financial records.
+•	Generate summaries.
+•	Support insurance reviews.
+•	Improve financial planning.
+•	Produce planning insights.
+•	Enhance the overall user experience.
+Automated extraction and analysis are designed to assist users and improve efficiency. They may not identify every relevant detail or accurately interpret every document.
+Users should review extracted information and Generated Financial Outputs for accuracy before relying upon them.
+
+12. Confidentiality of Uploaded Documents
+Finbrella recognises that uploaded financial documents often contain highly confidential information.
+Accordingly, Finbrella is committed to handling uploaded documents with appropriate technical and organisational safeguards designed to reduce the risk of unauthorised access, disclosure, alteration, or misuse.
+Access to uploaded documents is generally limited to:
+•	The user.
+•	Authorised Finbrella personnel who reasonably require access to provide the requested Services.
+•	Trusted service providers acting on Finbrella's behalf, where necessary and subject to appropriate confidentiality and security obligations.
+•	Other persons or authorities where disclosure is required or permitted by applicable law.
+Finbrella does not publicly display uploaded financial documents.
+
+13. Storage and Organisation of Financial Records
+Uploaded documents may be associated with your WealthMap profile and Financial Workspace to support ongoing financial planning.
+Where supported, Finbrella may:
+•	Organise documents into relevant categories.
+•	Associate documents with financial products or goals.
+•	Link documents to Generated Financial Outputs.
+•	Maintain document history.
+•	Allow replacement of outdated documents.
+•	Support future planning using historical records.
+The organisation of documents is intended to improve usability and long-term financial management.
+
+14. Updating, Replacing and Removing Documents
+Users are encouraged to keep uploaded documents current.
+Where supported by the Services, users may:
+•	Upload updated versions of documents.
+•	Replace outdated documents.
+•	Remove documents that are no longer relevant.
+•	Add additional supporting records.
+Removing or replacing documents may affect WealthMap reports, Financial Workspace analyses, AI-assisted insights, and other Generated Financial Outputs that rely upon those documents.
+Finbrella may retain limited records of document-related activity where reasonably necessary for security, operational integrity, dispute resolution, or compliance with applicable law.
+
+15. Retention and Deletion of Uploaded Documents
+Uploaded documents are generally retained in accordance with Finbrella's Data Retention & Deletion Policy.
+When an account remains active, documents may be retained to support ongoing financial planning, historical analysis, and continuity of the Services.
+If a user requests account deletion, uploaded documents will generally form part of the account deletion process, subject to:
+•	Applicable legal or regulatory obligations.
+•	Legitimate security requirements.
+•	Fraud prevention.
+•	Backup and disaster recovery processes.
+•	Other lawful retention requirements.
+Once permanently deleted, uploaded documents may no longer be recoverable, and Finbrella may be unable to restore historical analyses or planning records that depended on those documents.
+
+16. Prohibited Content
+To protect users, maintain platform integrity, and comply with applicable laws, users must not upload, submit, or transmit any content that:
+•	Is false, fraudulent, or intentionally misleading.
+•	Has been materially altered to deceive or misrepresent facts.
+•	Infringes the intellectual property or other legal rights of any person.
+•	Contains malicious software, viruses, ransomware, or other harmful code.
+•	Is unlawful, defamatory, abusive, obscene, or otherwise prohibited by applicable law.
+•	Is intended to interfere with the operation, security, or reliability of the Services.
+•	Contains confidential information belonging to another person without appropriate authority or permission.
+•	Is unrelated to the intended financial planning or Services where such uploads could adversely affect platform operations.
+Finbrella reserves the right to restrict, reject, remove, or suspend access to content that reasonably appears to violate this Policy, applicable law, or the Terms of Use.
+
+17. Intellectual Property and Third-Party Rights
+Users remain responsible for ensuring that they have the legal right or appropriate authority to upload any User Content.
+Where User Content includes documents relating to family members, jointly owned financial products, employers, businesses, or other third parties, users should ensure that providing such information is lawful and appropriately authorised.
+Nothing in this Policy transfers ownership of any intellectual property or proprietary rights from users or third parties to Finbrella.
+Users remain solely responsible for any consequences arising from the unauthorised submission of third-party information or documents.
+
+18. Platform Security and Integrity
+Finbrella implements reasonable technical and organisational measures to protect User Content and uploaded financial records.
+Users also play an important role in maintaining platform security.
+Users should:
+•	Protect their account credentials.
+•	Upload documents only through authorised Finbrella interfaces.
+•	Avoid sharing account access with others.
+•	Promptly report suspected unauthorised access or security incidents.
+•	Keep their contact information updated to facilitate important security communications.
+Users should not attempt to:
+•	Circumvent platform security measures.
+•	Access another user's information without authorisation.
+•	Interfere with document storage or processing systems.
+•	Test or exploit vulnerabilities without Finbrella's prior written permission.
+
+19. Suspension or Removal of User Content
+Finbrella may restrict access to, remove, or decline to process User Content where reasonably necessary to:
+•	Protect users.
+•	Protect platform security.
+•	Comply with applicable law.
+•	Respond to lawful requests from competent authorities.
+•	Investigate suspected fraud or misuse.
+•	Enforce the Terms of Use or other applicable policies.
+•	Maintain the integrity and reliability of the Services.
+Where appropriate and reasonably practicable, Finbrella may notify users of such actions. However, immediate action may be taken without prior notice where necessary to address security, legal, or operational risks.
+
+20. Relationship with Other Policies
+This Policy should be read together with:
+•	Finbrella Privacy Policy.
+•	Finbrella Terms of Use.
+•	Finbrella Financial Disclaimer & Risk Disclosure.
+•	Finbrella Data Retention & Deletion Policy.
+•	Finbrella Communication & Notification Policy.
+•	Other policies published by Finbrella from time to time.
+Where a particular issue is specifically addressed by another policy, that policy shall apply in conjunction with this Policy.
+
+21. Changes to this Policy
+Finbrella may update this User Content, Document Upload & Financial Records Policy from time to time to reflect:
+•	Changes in applicable laws or regulations.
+•	New document types.
+•	Improvements to WealthMap and Financial Workspace.
+•	New financial planning capabilities.
+•	AI or document processing enhancements.
+•	Security improvements.
+•	Operational changes.
+The updated Policy will include a revised Version and Last Updated date.
+Where material changes affect users' rights or responsibilities, Finbrella may provide notice through the Finbrella website, WealthMap, Financial Workspace, email, or other appropriate communication channels.
+Continued use of the Services after the revised Policy becomes effective constitutes acceptance of the updated Policy, to the extent permitted by applicable law.
+
+22. Contact Us
+If you have questions regarding this Policy or the handling of User Content and uploaded financial documents, you may contact us using the contact details published in the Legal Information section of the Finbrella website or within the Financial Workspace.
+We encourage users to contact us whenever they require clarification regarding document handling, financial record management, or any feature related to User Content.
+
+23. Acceptance of this Policy
+By creating an account, uploading documents, submitting User Content, or using Finbrella's Services, you acknowledge that:
+•	You have read this User Content, Document Upload & Financial Records Policy.
+•	You understand your responsibilities when providing User Content.
+•	You retain ownership of your User Content.
+•	You grant Finbrella the limited rights necessary to provide the requested Services.
+•	You understand how uploaded financial documents may be processed, reviewed, and retained.
+•	You agree to use the document upload and financial record features responsibly and in accordance with this Policy and Finbrella's other applicable policies.
+If you do not agree with this Policy, you should not upload User Content or use the related features of the Services.
+
+24. Final Statement
+Finbrella believes that effective financial planning is built on accurate information, organised financial records, and mutual trust.
+Our document upload and financial record features are designed to help users simplify financial management, preserve important financial information, and receive more meaningful planning insights over time.
+We are committed to handling User Content responsibly, respecting users' ownership of their information, and continuously improving the way financial records support long-term planning through WealthMap and Financial Workspace.
+

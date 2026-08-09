@@ -701,7 +701,8 @@ export default function FinancialWorkspaceView() {
         />
       )}
 
-      <main className="fw-main">
+      <div style={{ display: 'block', position: 'relative', width: '100%', minHeight: '100vh' }}>
+        <main className="fw-main" style={{ minHeight: 'calc(100vh - 6.75rem)' }}>
         <ActiveWorkspace>
           {editingSection ? (
             <WorkspaceSectionEditor sectionId={editSectionId} />
@@ -750,6 +751,7 @@ export default function FinancialWorkspaceView() {
         showContinueDetailed={summaryMode}
         onContinueDetailed={goToDetailedPlanning}
       />
+      </div>
 
       {lg ? (
         <SmartEditDrawer

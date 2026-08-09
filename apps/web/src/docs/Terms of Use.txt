@@ -1,0 +1,322 @@
+Terms of Use
+Version: 1.0
+Effective Date: 05 August 2026
+Last Updated: 05 August 2026
+
+1. Introduction
+Welcome to Finbrella.
+These Terms of Use ("Terms") govern your access to and use of the Finbrella website, the WealthMap Progressive Web App (PWA), Financial Workspace, and all related products, services, reports, tools, calculators, educational content, and digital experiences provided by Finbrella (collectively referred to as the "Services").
+These Terms constitute a legally binding agreement between you and Finbrella.
+By creating an account, accessing, or using any of our Services, you acknowledge that you have read, understood, and agree to be bound by these Terms and our Privacy Policy.
+If you do not agree with these Terms, you should not access or use our Services.
+
+2. About Finbrella
+Finbrella is a financial services platform designed to help individuals and families better understand, organize, protect, and grow their financial lives.
+Our flagship experience, WealthMap, enables users to organise financial information, evaluate their financial position, set financial goals, review insurance coverage, monitor progress, and access financial planning insights through an interactive Financial Workspace.
+Depending on the Services you choose to use, Finbrella may also facilitate access to regulated financial products and services through authorised partners, including mutual fund distribution, insurance distribution, and other financial services introduced from time to time.
+Nothing in these Terms shall be interpreted as creating a fiduciary relationship, investment management agreement, or discretionary portfolio management arrangement between you and Finbrella unless expressly agreed through a separate written agreement.
+
+3. Acceptance of these Terms
+By accessing or using the Services, you confirm that:
+•	You have the legal capacity to enter into a binding agreement under applicable law.
+•	The information provided by you is accurate, complete, and current to the best of your knowledge.
+•	You will use the Services only for lawful purposes.
+•	You will comply with these Terms and all applicable laws and regulations.
+If you access or use the Services on behalf of another individual, family member, business, or other legal entity, you represent that you have the authority to do so and to bind that person or entity to these Terms.
+
+4. Eligibility
+Unless otherwise permitted by applicable law, you must be legally competent to enter into a binding agreement in order to use the Services.
+If you create or manage financial information relating to your spouse, children, dependants, or other family members within WealthMap, you represent that you are authorised to provide such information for the purposes of financial planning.
+Finbrella reserves the right to refuse, suspend, or terminate access where it reasonably believes that a user is not eligible to use the Services.
+
+5. Your Finbrella Account
+Certain Services require you to create a Finbrella account.
+You are responsible for:
+•	Maintaining the confidentiality of your account credentials.
+•	Restricting unauthorised access to your account.
+•	Keeping your contact details and profile information up to date.
+•	Ensuring that information entered into WealthMap and Financial Workspace remains reasonably accurate.
+•	Promptly notifying Finbrella if you believe your account has been compromised.
+You are responsible for all activities that occur through your account unless such activities result solely from our failure to maintain reasonable security measures.
+Finbrella reserves the right to suspend or restrict access where account security has been compromised or where misuse is reasonably suspected.
+
+6. Use of the Services
+Finbrella grants you a limited, non-exclusive, non-transferable, revocable licence to access and use the Services for your personal, lawful, and non-commercial financial planning purposes.
+Your use of the Services must always comply with these Terms and applicable laws.
+You agree that you will not:
+•	Use the Services for any unlawful, fraudulent, or deceptive purpose.
+•	Attempt to gain unauthorised access to any part of the platform.
+•	Interfere with the operation, security, or availability of the Services.
+•	Upload malicious software, viruses, or harmful code.
+•	Reverse engineer, decompile, copy, modify, or attempt to extract the source code of the platform except where permitted by applicable law.
+•	Circumvent security measures or access controls.
+•	Misrepresent your identity or provide false information.
+•	Use automated tools, bots, or scripts in a manner that disrupts or places an unreasonable burden on the Services.
+•	Infringe the intellectual property rights of Finbrella or any third party.
+•	Use the Services in any manner that could damage Finbrella's reputation or interfere with other users' ability to access the platform.
+Finbrella may investigate suspected violations of these Terms and take appropriate action, including suspension or termination of access where justified.
+
+7. Financial Information Provided by You
+WealthMap and Financial Workspace rely upon information voluntarily provided by you.
+You acknowledge that:
+•	You are responsible for the accuracy and completeness of the information you provide.
+•	Financial reports and insights generated by Finbrella are based on the information available at the time of analysis.
+•	Inaccurate, incomplete, or outdated information may affect the quality, relevance, or accuracy of generated insights.
+•	You are responsible for updating your financial information as your circumstances change.
+Finbrella is not responsible for conclusions or recommendations that are affected by inaccurate or incomplete information supplied by you.
+
+8. Uploaded Documents
+Certain Services allow you to upload documents including insurance policies, investment statements, financial records, and other supporting documents.
+By uploading such documents, you represent that:
+•	You own the documents or have the legal authority to upload them.
+•	Uploading the documents does not violate any applicable law or the rights of any third party.
+•	The documents are uploaded solely for the purposes of using Finbrella's Services.
+You retain ownership of your uploaded documents.
+By uploading documents, you grant Finbrella a limited licence to store, process, analyse, and use those documents solely for the purpose of providing the Services requested by you, maintaining your account, improving your Financial Workspace experience, and complying with applicable legal obligations.
+Finbrella does not claim ownership of your uploaded documents.
+
+9. Intellectual Property
+Unless otherwise stated, all rights, title, and interest in the Services are owned by or licensed to Finbrella.
+This includes, without limitation:
+•	WealthMap
+•	Financial Workspace
+•	Software and application code
+•	User interface and visual design
+•	Logos, trademarks, trade names, and branding
+•	Financial planning methodologies
+•	Algorithms and calculation models
+•	Reports, layouts, and visualisations
+•	Educational content
+•	Graphics, icons, illustrations, and documentation
+•	Databases and compilations
+•	All related intellectual property rights
+These Terms do not transfer ownership of any intellectual property to you.
+You may use the Services solely as permitted under these Terms.
+Except as expressly permitted by applicable law or with Finbrella's prior written permission, you must not:
+•	Copy, reproduce, distribute, publish, or commercially exploit any part of the Services.
+•	Modify or create derivative works.
+•	Reverse engineer, decompile, or disassemble the platform.
+•	Remove or alter copyright, trademark, or proprietary notices.
+•	Use Finbrella's branding in a manner that implies endorsement or partnership without prior written approval.
+
+10. Generated Financial Outputs
+WealthMap and Financial Workspace generate financial reports, summaries, analyses, charts, projections, scores, recommendations, and other outputs based on information provided by you together with Finbrella's methodologies.
+You acknowledge that:
+•	Generated Financial Outputs are intended to support financial understanding and planning.
+•	They are based on the information available at the time of generation.
+•	They may change whenever you update your financial information or when Finbrella enhances its methodologies.
+•	They should be interpreted together with your overall financial circumstances.
+Generated Financial Outputs remain part of your account experience and may be stored to enable historical comparisons, progress tracking, and continuous financial planning.
+The methodologies, calculation engines, report structures, scoring systems, and analytical models used to generate these outputs remain the intellectual property of Finbrella.
+
+11. Financial Planning and Educational Information
+The Services are designed to assist users in understanding their financial position and making informed financial decisions.
+Unless expressly stated otherwise through a separate written engagement, the information available through the Services:
+•	Is educational and informational in nature.
+•	Supports financial planning and financial awareness.
+•	Is not personalised legal advice.
+•	Is not personalised tax advice.
+•	Is not accounting advice.
+•	Is not a guarantee of financial outcomes.
+Users remain solely responsible for evaluating whether any recommendation, strategy, or financial decision is appropriate for their own circumstances.
+Where appropriate, users should consult qualified professionals before making significant financial, legal, taxation, or investment decisions.
+
+12. Mutual Fund, Insurance and Other Financial Products
+Finbrella may facilitate access to financial products and services offered by regulated financial institutions or authorised partners.
+These may include, among others:
+•	Mutual funds.
+•	Life insurance.
+•	Health insurance.
+•	General insurance.
+•	Other financial products introduced from time to time.
+Availability of any product is subject to:
+•	Applicable laws.
+•	Regulatory requirements.
+•	Product eligibility.
+•	Partner acceptance.
+•	Completion of required documentation and verification.
+Submission of information through Finbrella does not guarantee approval, issuance, allocation, or acceptance of any financial product.
+The terms, conditions, benefits, exclusions, pricing, and performance of financial products are determined by the respective product providers.
+
+13. Third-Party Services
+Certain features of the Services may integrate with or provide access to third-party platforms, websites, products, or services.
+Such third-party services remain governed by their own terms, privacy policies, and contractual arrangements.
+Finbrella is not responsible for:
+•	The availability of third-party services.
+•	The accuracy of third-party information.
+•	Decisions made by third-party institutions.
+•	Changes made by third-party providers.
+•	The performance of third-party products or services.
+Your interactions with third-party providers are governed by your relationship with those providers.
+
+14. Artificial Intelligence and Automated Features
+Finbrella may use Artificial Intelligence (AI), machine learning, analytical models, automation, or other computational techniques to enhance user experience and generate financial insights.
+These technologies may assist in:
+•	Financial summaries.
+•	Goal tracking.
+•	Educational explanations.
+•	Insurance reviews.
+•	Financial planning insights.
+•	Personalised user experiences.
+•	Other platform features introduced over time.
+AI-assisted outputs:
+•	Are generated using available information and predefined methodologies.
+•	May evolve as Finbrella improves its technology.
+•	Should not be considered guaranteed, complete, or error-free.
+•	Are intended to assist—not replace—human judgment.
+Users remain responsible for reviewing AI-assisted outputs before making financial decisions.
+
+15. Availability of the Services
+Finbrella aims to provide reliable and uninterrupted Services.
+However, availability may occasionally be affected by:
+•	Scheduled maintenance.
+•	Platform upgrades.
+•	Security enhancements.
+•	Technical issues.
+•	Network interruptions.
+•	Events beyond our reasonable control.
+Finbrella does not guarantee that the Services will always be uninterrupted, error-free, or available at every moment.
+We may modify, improve, suspend, or discontinue any feature where reasonably necessary for operational, legal, regulatory, security, or business reasons.
+Where practical, we will endeavour to provide reasonable notice of material planned interruptions.
+
+16. Beta Features and New Services
+From time to time, Finbrella may introduce beta features, pilot programmes, experimental tools, or early-access Services.
+Such features may:
+•	Be incomplete.
+•	Change substantially before final release.
+•	Be modified or withdrawn without notice.
+•	Produce unexpected results.
+Your use of beta features is voluntary.
+Feedback received during beta programmes helps us improve the Services but does not create any obligation on Finbrella to continue or commercially release those features.
+
+17. Feedback and Suggestions
+We welcome feedback, ideas, suggestions, and recommendations that help improve Finbrella.
+If you voluntarily submit feedback regarding the Services, you agree that Finbrella may use, evaluate, modify, implement, publish, or incorporate such feedback without restriction and without any obligation to compensate you.
+This provision does not affect your ownership of Personal Data or Uploaded Documents, which continue to be governed by these Terms and our Privacy Policy.
+
+18. Suspension and Termination
+Finbrella may suspend, restrict, or terminate access to the Services where reasonably necessary, including where:
+•	These Terms are materially violated.
+•	Fraudulent or unlawful activity is suspected.
+•	Account security is compromised.
+•	Required legal or regulatory obligations must be complied with.
+•	Continued access may adversely affect the security, integrity, or operation of the platform.
+Where reasonably practicable, Finbrella may provide notice before suspension or termination.
+Users may discontinue using the Services or request account closure at any time, subject to applicable legal, contractual, and regulatory requirements relating to data retention and record keeping.
+Termination of access does not affect rights or obligations that, by their nature, are intended to survive termination, including provisions relating to intellectual property, limitations of liability, dispute resolution, and applicable law.
+
+19. Disclaimer of Warranties
+The Services are provided on an "as is" and "as available" basis, to the extent permitted by applicable law.
+While Finbrella strives to provide accurate, reliable, and continuously improving Services, we do not guarantee that:
+•	The Services will always be uninterrupted or error-free.
+•	Every report, calculation, projection, or insight will be accurate in every circumstance.
+•	The Services will always meet every user's individual expectations or requirements.
+•	All defects or technical issues will be corrected immediately.
+•	The Services will remain available without interruption due to maintenance, technical failures, security events, or circumstances beyond our reasonable control.
+Financial planning involves assumptions, estimates, and information provided by users. Accordingly, users acknowledge that generated reports, projections, and recommendations may change over time as financial circumstances, market conditions, regulations, or methodologies evolve.
+Nothing in this section excludes any statutory rights that cannot be excluded under applicable law.
+
+20. Limitation of Liability
+To the fullest extent permitted by applicable law, Finbrella shall not be liable for any indirect, incidental, consequential, special, exemplary, or punitive damages arising from or relating to the use of the Services.
+This includes, without limitation:
+•	Loss of profits.
+•	Loss of business opportunities.
+•	Loss of anticipated savings.
+•	Loss of data resulting from circumstances beyond our reasonable control.
+•	Decisions made based on user-provided information.
+•	Decisions made using financial reports, projections, or educational insights available through the Services.
+•	Interruptions in platform availability caused by third-party service providers or events beyond our reasonable control.
+Nothing in these Terms limits or excludes liability where such limitation or exclusion is prohibited under applicable law, including liability arising from fraud, wilful misconduct, or other liabilities that cannot legally be excluded.
+
+21. User Responsibilities
+By using the Services, you agree to:
+•	Provide information that is accurate, complete, and updated to the best of your knowledge.
+•	Maintain the confidentiality of your account credentials.
+•	Review financial reports before acting upon them.
+•	Use the Services responsibly and lawfully.
+•	Promptly notify Finbrella of any suspected unauthorised access to your account.
+•	Comply with all applicable laws while using the Services.
+You remain responsible for all financial, investment, insurance, tax, and legal decisions made by you, regardless of whether you use insights generated by the Services.
+
+22. Indemnity
+You agree to indemnify and hold harmless Finbrella, its founders, directors, employees, affiliates, partners, and authorised representatives from any reasonable losses, claims, liabilities, damages, costs, or expenses arising directly from:
+•	Your breach of these Terms.
+•	Your unlawful use of the Services.
+•	Information or documents uploaded by you in violation of applicable law or third-party rights.
+•	Your misuse of the Services.
+•	Your infringement of another person's intellectual property or legal rights.
+This obligation applies only to the extent permitted by applicable law.
+
+23. Force Majeure
+Finbrella shall not be responsible for delays or failures in performing its obligations where such delays or failures result from events beyond its reasonable control.
+These events may include:
+•	Natural disasters.
+•	Floods.
+•	Fires.
+•	Earthquakes.
+•	Epidemics or pandemics.
+•	War.
+•	Civil unrest.
+•	Government actions.
+•	Internet outages.
+•	Power failures.
+•	Cybersecurity incidents affecting infrastructure.
+•	Failure of third-party service providers.
+•	Other unforeseen circumstances beyond reasonable control.
+Finbrella will make reasonable efforts to restore affected Services as soon as practicable.
+
+24. Changes to the Services
+Finbrella continuously improves and evolves its platform.
+Accordingly, we may:
+•	Introduce new features.
+•	Modify existing functionality.
+•	Improve financial methodologies.
+•	Enhance reports and planning tools.
+•	Remove obsolete features.
+•	Improve security measures.
+•	Update supported technologies.
+Where practical, material changes affecting users will be communicated through appropriate channels such as WealthMap, the Finbrella website, email, or other official communications.
+
+25. Changes to these Terms
+Finbrella may update these Terms from time to time to reflect:
+•	Changes in applicable law.
+•	Regulatory requirements.
+•	New Services or products.
+•	Business developments.
+•	Technological improvements.
+•	Security enhancements.
+The updated Terms will include a revised Version and Last Updated date.
+Where changes materially affect users' rights or obligations, Finbrella may provide reasonable notice before the revised Terms become effective.
+Continued use of the Services after the effective date of the updated Terms constitutes acceptance of the revised Terms, to the extent permitted by applicable law.
+
+26. Governing Law
+These Terms shall be governed by and construed in accordance with the laws of India.
+
+27. Dispute Resolution
+If you have any concern regarding the Services, we encourage you to contact Finbrella first so that we have an opportunity to resolve the matter amicably.
+If a dispute cannot be resolved through mutual discussions, it shall be subject to the jurisdiction of the competent courts having jurisdiction over Finbrella's registered office, unless otherwise required by applicable law.
+Nothing in this section limits any statutory rights or remedies available under applicable law.
+
+28. Contact Us
+If you have questions regarding these Terms or the Services, you may contact us using the contact details published in the Legal Information section of the Finbrella website or within the Financial Workspace.
+We encourage users to contact us before initiating formal proceedings so that we may attempt to resolve concerns promptly and fairly.
+
+29. Severability
+If any provision of these Terms is held to be invalid, illegal, or unenforceable by a court or competent authority, the remaining provisions shall continue in full force and effect to the maximum extent permitted by law.
+
+30. No Waiver
+Failure by Finbrella to enforce any provision of these Terms shall not constitute a waiver of that provision or any other right available under these Terms or applicable law.
+
+31. Entire Agreement
+These Terms, together with the Privacy Policy and any additional terms expressly incorporated by reference for specific Services, constitute the entire agreement between you and Finbrella regarding your use of the Services.
+They supersede all prior understandings, communications, or agreements relating to the same subject matter.
+
+32. Acceptance of these Terms
+By creating an account, accessing, or using the Services, you acknowledge that:
+•	You have read these Terms.
+•	You understand these Terms.
+•	You agree to be legally bound by these Terms.
+•	You agree to comply with all applicable laws while using the Services.
+If you do not agree with these Terms, you must discontinue using the Services.
+Your continued use of Finbrella after any revised Terms become effective constitutes acceptance of those revised Terms, to the extent permitted by applicable law.
+

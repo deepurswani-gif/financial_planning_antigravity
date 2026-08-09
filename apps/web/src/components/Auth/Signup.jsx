@@ -255,6 +255,9 @@ const Signup = ({ onSwitchToLogin }) => {
               Sign In
             </button>
           </p>
+          <p className="legal-disclaimer">
+            By signing in or creating an account, you confirm that you have read and agree to the <a href="/legal/terms-of-use" target="_blank" rel="noreferrer" className="legal-policy-link">Terms of Use</a> and acknowledge the <a href="/legal/privacy-policy" target="_blank" rel="noreferrer" className="legal-policy-link">Privacy Policy</a>.
+          </p>
         </div>
       </div>
 
@@ -382,6 +385,24 @@ const Signup = ({ onSwitchToLogin }) => {
         .link-button:disabled {
           opacity: 0.5;
           cursor: not-allowed;
+        }
+
+        .legal-disclaimer {
+          font-size: 0.75rem;
+          color: var(--text-muted);
+          font-style: italic;
+          margin-top: 1.5rem;
+          line-height: 1.6;
+        }
+
+        .legal-policy-link {
+          color: var(--text-main);
+          text-decoration: underline;
+          font-weight: 500;
+        }
+        
+        .legal-policy-link:hover {
+          color: var(--primary);
         }
       `}</style>
     </div>

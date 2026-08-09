@@ -30,6 +30,10 @@ import DetailedGrowthExpectations from './components/DetailedFlow/DetailedGrowth
 // Legacy Existing App Flow
 import DetailedFlowLayout from './DetailedFlowLayout';
 
+import GlobalFooter from './components/common/GlobalFooter';
+import AboutLegalSupport from './components/common/AboutLegalSupport';
+import PolicyViewer from './components/common/PolicyViewer';
+
 // DEV-only Question Registry Explorer (not an end-user product surface)
 const RegistryExplorer = import.meta.env.DEV
   ? React.lazy(() => import('./questionRegistry/explorer/RegistryExplorer'))
@@ -48,8 +52,9 @@ function App() {
 
   return (
     <RoleBasedRouting>
-      <Routes>
-        <Route
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+        <Routes>
+          <Route
           path="/"
           element={
             <ProtectedRoute>
@@ -146,7 +151,11 @@ function App() {
             }
           />
         )}
+        <Route path="/about_legal_support" element={<AboutLegalSupport />} />
+        <Route path="/legal/:policyId" element={<PolicyViewer />} />
       </Routes>
+      <GlobalFooter />
+      </div>
     </RoleBasedRouting>
   );
 }

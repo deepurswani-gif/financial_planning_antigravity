@@ -1,0 +1,331 @@
+Financial Disclaimer & Risk Disclosure
+Version: 1.0
+Effective Date: 05 August 2026
+Last Updated: 05 August 2026
+
+1. Introduction
+Welcome to Finbrella.
+This Financial Disclaimer & Risk Disclosure ("Disclaimer") explains the nature, scope, and limitations of the financial information, planning tools, reports, insights, and other Services provided through Finbrella.
+The purpose of this Disclaimer is to help users understand how WealthMap and other Finbrella Services should be interpreted and used when making financial decisions.
+This Disclaimer should be read together with Finbrella's Terms of Use and Privacy Policy, which together govern your use of the Services.
+By accessing or using Finbrella's Services, you acknowledge that you have read, understood, and accepted this Disclaimer.
+
+2. Purpose of Finbrella
+Finbrella is a financial planning and financial services platform designed to help individuals and families better understand, organize, protect, and grow their financial lives.
+Our platform provides tools, reports, educational resources, and planning experiences intended to improve financial awareness and support informed decision-making.
+Depending on the Services you choose to use, Finbrella may provide or facilitate:
+•	Personal financial planning.
+•	Goal-based financial planning.
+•	Retirement planning.
+•	Cash flow analysis.
+•	Net worth analysis.
+•	Emergency fund planning.
+•	Insurance review.
+•	Protection gap analysis.
+•	Investment planning insights.
+•	Mutual fund distribution services.
+•	Insurance distribution services.
+•	Financial education.
+•	Other financial planning tools and Services introduced from time to time.
+Finbrella's objective is to help users make better-informed financial decisions by presenting relevant information, structured analysis, and educational guidance. The final decision regarding any financial action remains entirely with the user.
+
+3. Understanding WealthMap and Financial Workspace
+WealthMap is Finbrella's flagship financial planning experience.
+It is designed to provide users with a consolidated and structured view of their financial position by analysing information voluntarily provided by them.
+Using this information, WealthMap may generate:
+•	Financial summaries.
+•	Cash flow analysis.
+•	Net worth analysis.
+•	Goal planning reports.
+•	Retirement projections.
+•	Protection gap analysis.
+•	Insurance review summaries.
+•	Financial health indicators.
+•	Planning recommendations.
+•	Educational financial insights.
+•	Charts and visualisations.
+•	Other Generated Financial Outputs.
+The Financial Workspace enables users to maintain, review, update, and monitor their financial information and generated reports over time.
+The quality, relevance, and usefulness of these Generated Financial Outputs depend upon several factors, including:
+•	The accuracy and completeness of information provided by the user.
+•	Assumptions used in financial planning methodologies.
+•	Market conditions.
+•	Inflation.
+•	Interest rates.
+•	Applicable tax laws.
+•	Regulatory changes.
+•	Future economic conditions.
+•	Other factors beyond Finbrella's control.
+Accordingly, Generated Financial Outputs should be viewed as planning tools and decision-support resources rather than guaranteed predictions or outcomes.
+
+4. Nature of Financial Information and Planning Insights
+The financial information, reports, projections, analyses, recommendations, educational content, and other outputs provided through Finbrella are intended to support financial awareness and informed decision-making.
+Unless expressly stated otherwise through a separate written engagement, Finbrella's Services:
+•	Are educational and informational in nature.
+•	Are designed to assist users in understanding their financial position.
+•	Support financial planning through structured methodologies.
+•	Help users evaluate financial priorities and alternatives.
+•	Do not guarantee financial success or achievement of any financial objective.
+Financial planning is inherently based on assumptions regarding future events, many of which cannot be predicted with certainty.
+Examples include:
+•	Future income.
+•	Employment stability.
+•	Inflation.
+•	Investment returns.
+•	Market performance.
+•	Interest rates.
+•	Insurance availability.
+•	Tax laws.
+•	Personal circumstances.
+•	Economic conditions.
+Because these assumptions may change over time, financial plans and Generated Financial Outputs should be reviewed periodically and updated whenever there is a significant change in your financial circumstances.
+
+5. Scope of this Disclaimer
+This Disclaimer applies to all financial information, planning tools, reports, calculators, methodologies, Generated Financial Outputs, educational materials, and other Services made available by Finbrella, including but not limited to:
+•	WealthMap.
+•	Financial Workspace.
+•	Financial planning reports.
+•	Goal planning tools.
+•	Retirement planning tools.
+•	Cash flow analysis.
+•	Net worth analysis.
+•	Protection gap analysis.
+•	Insurance review services.
+•	Mutual fund planning insights.
+•	Investment planning tools.
+•	Financial calculators.
+•	Educational articles and content.
+•	AI-assisted insights and summaries.
+•	Browser-based and web-based features.
+•	Future Services introduced by Finbrella.
+This Disclaimer applies regardless of whether the Services are accessed through the Finbrella website, the WealthMap Progressive Web App (PWA), Financial Workspace, or any other digital platform operated by Finbrella.
+
+6. Relationship Between You and Finbrella
+Your use of Finbrella's Services does not, by itself, create:
+•	A discretionary portfolio management relationship.
+•	An investment management agreement.
+•	A fiduciary relationship.
+•	A legal advisory relationship.
+•	A tax advisory relationship.
+•	An accounting engagement.
+•	An insurance underwriting relationship.
+Unless separately agreed in writing, Finbrella provides digital financial planning tools, educational resources, and financial services within the scope of its applicable registrations, licences, and business activities.
+Nothing in this Disclaimer should be interpreted as creating any relationship beyond those expressly established through the specific Services you choose to use.
+
+7. No Guarantee of Financial Outcomes
+Financial planning is intended to improve decision-making, not to predict or guarantee future outcomes.
+Accordingly, Finbrella does not guarantee:
+•	Achievement of any financial goal.
+•	Growth of wealth.
+•	Investment returns.
+•	Retirement readiness.
+•	Financial independence.
+•	Capital appreciation.
+•	Protection against financial loss.
+•	Insurance claim approval.
+•	Tax savings.
+•	Any specific financial outcome.
+Any reports, projections, recommendations, scores, timelines, or Generated Financial Outputs available through the Services are based upon information available at the time of analysis together with financial planning methodologies and assumptions.
+Actual outcomes may differ significantly due to changes in personal circumstances, market conditions, economic events, taxation, regulation, inflation, interest rates, or other factors beyond Finbrella's control.
+
+8. Financial Planning Assumptions
+Financial planning necessarily involves assumptions regarding future events that cannot be predicted with certainty.
+Depending on the Service being used, WealthMap may incorporate assumptions relating to:
+•	Inflation.
+•	Expected investment returns.
+•	Salary growth.
+•	Business income growth.
+•	Interest rates.
+•	Retirement age.
+•	Life expectancy.
+•	Goal timelines.
+•	Future expenses.
+•	Taxation.
+•	Insurance coverage.
+•	Savings behaviour.
+•	Other financial planning variables.
+These assumptions are intended to facilitate planning and scenario analysis. They should not be interpreted as predictions, guarantees, or assurances of future performance.
+Users should periodically review and update their financial information and planning assumptions to reflect changes in their circumstances.
+
+9. Investment Risk Disclosure
+Investments involve risk, and the value of investments may increase or decrease over time.
+Depending on the financial products selected, users may be exposed to various risks, including:
+•	Market risk.
+•	Volatility risk.
+•	Interest rate risk.
+•	Credit risk.
+•	Liquidity risk.
+•	Inflation risk.
+•	Reinvestment risk.
+•	Concentration risk.
+•	Business risk.
+•	Regulatory risk.
+•	Currency risk (where applicable).
+•	Other risks associated with specific investment products.
+Past performance is not a reliable indicator or guarantee of future performance.
+Investment decisions should be made after carefully considering your financial objectives, investment horizon, liquidity requirements, and risk tolerance.
+Where appropriate, users should carefully read all applicable scheme documents, offer documents, key information documents, and other product disclosures before investing.
+
+10. Mutual Fund Risk Disclosure
+Where Finbrella facilitates mutual fund investments as an authorised Mutual Fund Distributor, users acknowledge that:
+•	Mutual fund investments are subject to market risks.
+•	Net Asset Values (NAVs) fluctuate based on market conditions.
+•	Returns are not guaranteed unless specifically stated under applicable regulations for a particular product.
+•	Different categories of mutual funds carry different levels of risk.
+•	Tax treatment may change from time to time.
+•	Scheme objectives may not always be achieved.
+Users should read all scheme-related documents carefully before making an investment decision.
+Finbrella may assist users in understanding mutual fund products and aligning investments with their financial goals, but the final investment decision always remains with the user.
+
+11. Insurance Risk Disclosure
+Insurance planning and insurance reviews provided through Finbrella are intended to help users better understand their insurance needs and existing coverage.
+Insurance-related insights may include:
+•	Coverage analysis.
+•	Protection gap analysis.
+•	Policy comparisons.
+•	Premium analysis.
+•	Educational explanations.
+•	Insurance planning recommendations.
+These insights are based upon information provided by users together with Finbrella's planning methodologies.
+Users acknowledge that:
+•	Insurance recommendations are not guarantees of claim settlement.
+•	Insurance coverage remains subject to the terms, conditions, exclusions, waiting periods, and limitations contained in the relevant policy documents.
+•	Premiums may change in accordance with insurer rules and applicable regulations.
+•	Policy issuance, underwriting, acceptance, renewal, endorsements, and claim decisions are solely determined by the respective insurance company.
+Where any inconsistency exists between a Finbrella-generated summary and the official policy issued by the insurer, the insurer's policy documents shall prevail.
+
+12. Insurance Document Review
+Finbrella allows users to upload existing insurance policies and related documents for review and analysis.
+The purpose of these reviews is to:
+•	Help users better understand their existing insurance portfolio.
+•	Explain policy features in simpler language.
+•	Identify potential protection gaps.
+•	Highlight areas that may require further consideration.
+•	Support more informed insurance planning.
+Document reviews are based on the documents provided by the user and the information reasonably available at the time of review.
+Unless expressly stated otherwise, an insurance document review:
+•	Is not a legal opinion.
+•	Is not a claim assessment.
+•	Is not an underwriting decision.
+•	Does not certify policy validity.
+•	Does not replace the official policy wording issued by the insurer.
+Users should refer to the original policy documents and consult the insurer where clarification regarding policy terms or claim eligibility is required.
+
+13. AI-Assisted Insights and Automated Analysis
+Finbrella may use Artificial Intelligence (AI), machine learning, analytical models, automation, or similar technologies to assist in generating financial insights, educational explanations, summaries, alerts, and other Generated Financial Outputs.
+These technologies are intended to enhance user understanding and improve the overall planning experience.
+Users acknowledge that AI-assisted outputs:
+•	Are generated using available information and predefined methodologies.
+•	Depend upon the accuracy and completeness of information provided by the user.
+•	May not identify every relevant financial consideration.
+•	May evolve as Finbrella improves its technology and methodologies.
+•	Should be reviewed carefully before acting upon them.
+AI-assisted outputs are designed to support—not replace—human judgment and informed decision-making.
+
+14. Changes in Financial, Regulatory and Economic Conditions
+Financial planning is influenced by numerous external factors that are outside Finbrella's control.
+These may include:
+•	Changes in financial markets.
+•	Inflation.
+•	Interest rates.
+•	Government policies.
+•	Tax laws.
+•	Regulatory frameworks.
+•	Insurance regulations.
+•	Mutual fund regulations.
+•	Economic cycles.
+•	Geopolitical events.
+•	Technological developments.
+•	Other unforeseen events.
+As these factors evolve, previously generated financial reports, projections, recommendations, or planning assumptions may become less relevant or require revision.
+Users are encouraged to review their financial plans periodically and update their information whenever there is a material change in their financial circumstances or the broader economic environment.
+
+15. User Responsibilities
+Effective financial planning requires active participation by the user.
+By using Finbrella's Services, you acknowledge and agree that you are responsible for:
+•	Providing information that is accurate, complete, and updated to the best of your knowledge.
+•	Reviewing and updating your financial information whenever your circumstances change.
+•	Carefully reviewing Generated Financial Outputs before acting upon them.
+•	Reading official product documents before purchasing any financial product.
+•	Understanding the risks associated with investments and insurance products.
+•	Maintaining the confidentiality of your account credentials.
+•	Complying with all applicable laws while using the Services.
+The quality of financial planning depends significantly on the quality and accuracy of the information provided by you.
+
+16. Third-Party Financial Products and Services
+Finbrella may facilitate access to financial products and services offered by regulated third-party institutions.
+These may include:
+•	Mutual funds.
+•	Life insurance.
+•	Health insurance.
+•	General insurance.
+•	Banking-related services.
+•	Other financial products introduced from time to time.
+These products are offered by their respective providers and remain subject to:
+•	Their own terms and conditions.
+•	Product-specific documentation.
+•	Applicable regulatory requirements.
+•	Eligibility criteria.
+•	Underwriting and approval processes, where applicable.
+Finbrella does not control the decisions of third-party financial institutions regarding product approval, pricing, underwriting, policy issuance, investment performance, claim settlement, or other matters determined by those institutions.
+
+17. Regulatory Disclosures
+Where required under applicable laws or regulations, users should note the following:
+Mutual Funds
+•	Mutual fund investments are subject to market risks.
+•	Please read all scheme-related documents carefully before investing.
+Insurance
+•	Insurance products are subject to policy terms, conditions, exclusions, waiting periods, and underwriting guidelines issued by the respective insurer.
+•	Claim settlement decisions are made solely by the insurance company in accordance with the applicable policy and law.
+Taxation
+•	Tax benefits, exemptions, deductions, and liabilities depend upon applicable tax laws and your individual circumstances.
+•	Tax laws and interpretations may change from time to time.
+Financial Regulations
+•	Financial products and services are governed by applicable laws and regulations, which may change over time.
+•	Regulatory changes may affect financial planning assumptions, product availability, taxation, disclosures, or other aspects of the Services.
+
+18. Methodology Updates
+Finbrella continuously reviews and improves its financial planning methodologies, analytical models, calculation engines, assumptions, and Generated Financial Outputs.
+Accordingly:
+•	Financial reports generated at different points in time may differ.
+•	New planning methodologies may replace earlier methodologies.
+•	Additional financial factors may be incorporated into future analyses.
+•	Existing reports may be recalculated when users update their financial information or when significant methodology improvements are introduced.
+Such updates are intended to improve the quality, relevance, and usefulness of the Services and should not be interpreted as indicating that earlier reports were necessarily incorrect.
+
+19. Changes to this Disclaimer
+Finbrella may revise this Financial Disclaimer & Risk Disclosure from time to time to reflect:
+•	Changes in applicable laws or regulations.
+•	New financial products or Services.
+•	Improvements to WealthMap and Financial Workspace.
+•	Updates to planning methodologies.
+•	Technological developments, including AI-assisted features.
+•	Business or operational changes.
+The updated Disclaimer will include a revised Version and Last Updated date.
+Where material changes affect users' understanding of the Services, Finbrella may provide notice through the Finbrella website, WealthMap, Financial Workspace, email, or other official communication channels.
+Continued use of the Services after the revised Disclaimer becomes effective constitutes acceptance of the updated Disclaimer, to the extent permitted by applicable law.
+
+20. Contact Us
+If you have questions regarding this Financial Disclaimer & Risk Disclosure or would like clarification regarding any financial planning feature available through Finbrella, you may contact us using the contact details published in the Legal Information section of the Finbrella website or within the Financial Workspace.
+We encourage users to contact us whenever they require clarification regarding the interpretation of financial reports, planning methodologies, or the Services provided through Finbrella.
+
+21. Governing Law
+This Financial Disclaimer & Risk Disclosure shall be governed by and interpreted in accordance with the laws of India.
+Nothing in this Disclaimer limits or excludes any rights or remedies available to users under applicable law.
+
+22. Acceptance of this Disclaimer
+By creating an account, accessing, or using Finbrella's Services, you acknowledge that:
+•	You have read this Financial Disclaimer & Risk Disclosure.
+•	You understand the nature and limitations of the Services provided by Finbrella.
+•	You understand that financial planning is based upon assumptions and evolving circumstances.
+•	You understand that investments, insurance products, and other financial products involve inherent risks.
+•	You accept responsibility for evaluating financial decisions in light of your own objectives, circumstances, and risk tolerance.
+•	You agree to use Finbrella's Services responsibly and in accordance with the Terms of Use and Privacy Policy.
+If you do not agree with this Financial Disclaimer & Risk Disclosure, you should discontinue using the Services.
+
+23. Final Statement
+Finbrella is committed to helping individuals and families make better financial decisions through technology, structured planning, and financial education.
+Our objective is not to predict the future, eliminate financial risk, or guarantee financial outcomes. Rather, we aim to empower users with meaningful insights, practical planning tools, and a clearer understanding of their financial lives.
+Financial success ultimately depends on many factors, including personal decisions, discipline, changing circumstances, market conditions, regulatory developments, and events beyond anyone's control.
+We encourage every user to review their financial plans regularly, stay informed, seek professional advice where appropriate, and use Finbrella as a trusted companion in their long-term financial journey.
+

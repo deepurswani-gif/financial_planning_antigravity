@@ -1,0 +1,258 @@
+Data Retention & Deletion Policy
+Version: 1.0
+Effective Date: 05 August 2026
+Last Updated: 05 August 2026
+________________________________________
+1. Introduction
+This Data Retention & Deletion Policy ("Policy") explains how Finbrella retains, manages, archives, and deletes information collected through its Services.
+The purpose of this Policy is to provide transparency regarding the lifecycle of information stored within Finbrella, including personal information, financial information, uploaded documents, Generated Financial Outputs, and other data associated with your account.
+This Policy should be read together with Finbrella's Privacy Policy and Terms of Use.
+________________________________________
+2. Purpose of Data Retention
+Finbrella retains information for legitimate business, operational, security, legal, regulatory, and user experience purposes.
+Appropriate data retention enables Finbrella to:
+•	Provide WealthMap and Financial Workspace services.
+•	Preserve historical financial information and planning records.
+•	Track long-term financial progress.
+•	Generate meaningful trend analysis.
+•	Maintain continuity of financial planning.
+•	Protect user accounts.
+•	Detect fraud or misuse.
+•	Resolve disputes.
+•	Comply with applicable legal and regulatory obligations.
+•	Improve platform performance and user experience.
+Finbrella does not retain information for longer than is reasonably necessary for the purposes for which it was collected, unless a longer retention period is required or permitted by applicable law.
+________________________________________
+3. Categories of Information Covered
+This Policy applies to information processed through Finbrella, including but not limited to:
+Personal Information
+Examples include:
+•	Name.
+•	Mobile number.
+•	Email address.
+•	Date of birth.
+•	Occupation.
+•	Other profile information voluntarily provided by you.
+________________________________________
+Financial Information
+Examples include:
+•	Income details.
+•	Household expenses.
+•	Savings information.
+•	Investment information.
+•	Asset information.
+•	Liability information.
+•	Insurance information.
+•	Financial goals.
+•	Retirement planning information.
+•	Cash flow information.
+•	Net worth information.
+________________________________________
+Uploaded Documents
+Examples include:
+•	Life insurance policies.
+•	Health insurance policies.
+•	Motor insurance policies.
+•	Investment statements.
+•	Financial statements.
+•	Tax-related documents.
+•	Salary documents.
+•	Other financial documents uploaded by users.
+________________________________________
+Generated Financial Outputs
+Examples include:
+•	WealthMap reports.
+•	Financial Workspace reports.
+•	Cash flow analysis.
+•	Net worth analysis.
+•	Goal planning reports.
+•	Retirement projections.
+•	Protection gap analysis.
+•	Insurance review summaries.
+•	Financial health indicators.
+•	Charts.
+•	Trend analysis.
+•	AI-assisted summaries.
+•	Planning recommendations.
+________________________________________
+Technical Information
+Examples include:
+•	Device information.
+•	Browser information.
+•	IP address.
+•	Login history.
+•	Security logs.
+•	Error logs.
+•	Usage analytics.
+•	Browser storage information.
+•	Other technical information necessary for operation and security.
+________________________________________
+4. General Retention Principles
+Finbrella follows the following principles when determining how long information is retained.
+Purpose Limitation
+Information is retained only for purposes that are reasonably necessary to provide the Services, comply with legal obligations, maintain platform security, or improve user experience.
+________________________________________
+Data Minimisation
+Finbrella seeks to avoid retaining unnecessary information and periodically reviews retention practices.
+________________________________________
+Accuracy
+Users are encouraged to keep their financial information updated so that historical records and Generated Financial Outputs remain meaningful and relevant.
+________________________________________
+Security
+Retained information is protected using appropriate technical and organisational security measures designed to reduce the risk of unauthorised access, disclosure, alteration, or destruction.
+________________________________________
+Regulatory Compliance
+Certain information may be retained for longer periods where required by applicable laws, regulations, court orders, lawful requests from competent authorities, or legitimate business obligations.
+________________________________________
+5. Retention of Active Accounts
+While your account remains active, Finbrella generally retains information associated with your account in order to:
+•	Deliver WealthMap and Financial Workspace services.
+•	Maintain historical financial records.
+•	Track financial progress over time.
+•	Generate trend analysis and comparisons.
+•	Enable long-term financial planning.
+•	Improve planning accuracy based on updated information.
+•	Support insurance review and financial planning features.
+•	Provide customer support.
+•	Maintain platform security.
+Historical information forms an important part of WealthMap's long-term planning experience.
+Accordingly, information associated with an active account is ordinarily retained for as long as your account remains active, unless deletion is requested or retention is no longer necessary.
+________________________________________
+6. Account Deletion and Deactivation
+Users may request deletion of their Finbrella account in accordance with the options made available through the Services or by contacting Finbrella.
+When an account deletion request is received, Finbrella may first place the account into a deactivated state.
+During this period:
+•	The user will generally no longer be able to access the account.
+•	The account will no longer be available for normal use.
+•	Personal Data will no longer be actively processed except where necessary for security, legal compliance, fraud prevention, operational continuity, or restoration if requested by the user during the applicable retention period.
+The purpose of this deactivation period is to:
+•	Prevent accidental loss of long-term financial history.
+•	Allow users an opportunity to restore their account if the deletion request was made unintentionally.
+•	Protect the integrity of historical financial planning records during the applicable retention period.
+Finbrella may retain deactivated account information for a reasonable period before permanent deletion, subject to applicable legal, regulatory, security, and operational requirements.
+Once the applicable retention period expires and permanent deletion has been completed, restoration of the account and its historical information may no longer be possible. If the user creates a new account thereafter, it will generally be treated as a new Financial Workspace without access to previously deleted account data.
+________________________________________
+7. Retention of Financial Information
+Financial planning is most valuable when users can review their progress over time.
+Accordingly, while your account remains active, Finbrella generally retains financial information to:
+•	Maintain historical financial records.
+•	Compare financial progress across different periods.
+•	Generate trend analysis.
+•	Support long-term goal planning.
+•	Improve retirement planning.
+•	Maintain historical cash flow and net worth analysis.
+•	Preserve financial planning continuity.
+•	Enable future planning based on historical information.
+Examples include:
+•	Income history.
+•	Household expense history.
+•	Savings history.
+•	Investment information.
+•	Asset history.
+•	Liability history.
+•	Insurance information.
+•	Goal planning history.
+•	Retirement planning information.
+•	Generated Financial Outputs.
+Historical financial information is retained primarily to improve the quality, usefulness, and continuity of WealthMap and Financial Workspace.
+________________________________________
+8. Retention of Uploaded Documents
+Finbrella allows users to upload financial documents to support financial planning and insurance review.
+Examples include:
+•	Life insurance policies.
+•	Health insurance policies.
+•	Motor insurance policies.
+•	Investment statements.
+•	Tax-related documents.
+•	Salary documents.
+•	Other financial records.
+Uploaded documents are generally retained while they remain relevant to the Services requested by the user.
+Users may update, replace, or remove uploaded documents through available platform features, where supported.
+Where an account is permanently deleted, uploaded documents will generally be deleted as part of the account deletion process unless retention is required or permitted by applicable law.
+________________________________________
+9. Generated Financial Outputs
+Generated Financial Outputs include reports, analyses, projections, summaries, charts, scores, recommendations, and other planning results produced through WealthMap and Financial Workspace.
+These outputs are generally retained while your account remains active in order to:
+•	Preserve historical planning records.
+•	Track financial progress over time.
+•	Compare previous and current financial positions.
+•	Measure progress towards financial goals.
+•	Improve long-term planning continuity.
+•	Provide a consistent user experience.
+Generated Financial Outputs may change when:
+•	You update your financial information.
+•	Planning methodologies are improved.
+•	Regulatory assumptions change.
+•	New financial planning features are introduced.
+Earlier reports may therefore differ from more recent reports generated using updated information or methodologies.
+________________________________________
+10. Backup, Archival and Disaster Recovery
+To support platform reliability, business continuity, and disaster recovery, Finbrella may maintain secure backup copies of certain information.
+Backup copies are maintained solely for legitimate operational purposes, including:
+•	Disaster recovery.
+•	System restoration.
+•	Security investigations.
+•	Data integrity verification.
+•	Business continuity.
+Backup information is subject to appropriate security measures and is not ordinarily used for routine operational processing.
+Where technically feasible and legally appropriate, deleted information will also be removed from backup systems in accordance with Finbrella's backup management processes. Due to the nature of backup systems, this may not occur immediately.
+________________________________________
+11. Legal and Regulatory Retention
+Certain information may be retained beyond normal operational periods where required or permitted by applicable law.
+Examples include retention necessary for:
+•	Compliance with legal or regulatory obligations.
+•	Court orders or lawful directions.
+•	Taxation or accounting requirements.
+•	Fraud prevention and security investigations.
+•	Dispute resolution.
+•	Exercise or defence of legal claims.
+•	Compliance with financial sector obligations.
+•	Other lawful business purposes.
+Where such obligations apply, Finbrella may retain only the information reasonably necessary for those purposes.
+________________________________________
+12. Secure Deletion Practices
+When information is no longer required for the purposes for which it was collected, and no legal or regulatory obligation requires continued retention, Finbrella will take reasonable steps to securely delete or anonymise that information.
+Depending on the nature of the information and the systems involved, deletion may include:
+•	Permanent removal from active systems.
+•	Secure deletion of uploaded documents.
+•	Removal from production databases.
+•	Scheduled deletion from backup systems, where applicable.
+•	Irreversible anonymisation where continued analytical use is appropriate and permitted by applicable law.
+Deletion processes may occur over a reasonable period as part of normal operational and security procedures.
+________________________________________
+13. Anonymised and Aggregated Information
+After Personal Data has been removed or irreversibly anonymised, Finbrella may retain and use anonymised or aggregated information for legitimate purposes such as:
+•	Improving WealthMap.
+•	Improving Financial Workspace.
+•	Enhancing planning methodologies.
+•	Statistical analysis.
+•	Product development.
+•	Research.
+•	Performance measurement.
+•	Security monitoring.
+•	Business analytics.
+Such information does not identify individual users and is not intended to be used to re-identify any person.
+________________________________________
+14. Partial Deletion Requests
+In some situations, users may wish to delete or replace only specific information rather than closing their entire account.
+Where supported by the Services and subject to applicable legal, regulatory, and operational requirements, users may request deletion or replacement of particular categories of information, such as:
+•	Uploaded documents.
+•	Financial records.
+•	Profile information.
+•	Contact information.
+•	Other user-provided information.
+Finbrella will evaluate such requests in accordance with applicable law, platform functionality, and any legitimate need to retain information for legal, security, fraud prevention, or operational purposes.
+Where deletion of specific information would materially affect the functioning of certain features, reports, or Generated Financial Outputs, those features may become unavailable or may produce different results.
+________________________________________
+15. Information Retained After Account Closure
+Following permanent account deletion, certain limited information may continue to be retained where required or permitted by applicable law or for legitimate operational purposes.
+Examples may include records reasonably necessary for:
+•	Compliance with legal obligations.
+•	Financial reporting and accounting.
+•	Fraud prevention.
+•	Security monitoring.
+•	Protection of legal rights.
+•	Resolution of disputes.
+•	Demonstrating compliance with applicable laws.
+Any information retained after account closure will be limited to what is reasonably necessary for those purposes and will continue to be protected in accordance with Finbrella's Privacy Policy and applicable legal requirements.
+
