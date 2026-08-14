@@ -114,9 +114,6 @@ export function useWealthSnapshotQuestions() {
 
     const handleAssetChange = useCallback((category, key, value) => {
         setAssetCategories((prev) => {
-            if (category === 'cash' && key === 'savings') {
-                return syncEmergencyFundAmount(prev, value);
-            }
             return {
                 ...prev,
                 [category]: { ...prev[category], [key]: value },
@@ -559,5 +556,15 @@ export function useWealthSnapshotQuestions() {
         fdInstances: fdArray,
         openFd,
         addFd,
+        addCustomAsset,
+        updateCustomAsset,
+        removeCustomAsset,
+        handleAssetChange,
+        addCustomLiability,
+        updateCustomLiability,
+        removeCustomLiability,
+        handleLiabilityChange,
+        assetCategories,
+        liabilityCategories,
     };
 }

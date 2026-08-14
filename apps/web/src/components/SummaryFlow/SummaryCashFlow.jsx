@@ -270,25 +270,22 @@ const SummaryCashFlow = () => {
 
     const questions = [
         {
-            id: 'household-income',
+            id: 'cashflow-all',
             content: (
-                <HouseholdIncomeScreen
-                    income={income}
-                    hasSpouseIncome={hasSpouseIncome}
-                    setHasSpouseIncome={setHasSpouseIncome}
-                    handleIncomeChange={handleIncomeChange}
-                />
-            )
-        },
-        {
-            id: 'monthly-outflows',
-            content: (
-                <MonthlyOutflowsScreen
-                    expenseCategories={expenseCategories}
-                    setExpenseCategories={setExpenseCategories}
-                    hasEMI={hasEMI}
-                    setHasEMI={setHasEMI}
-                />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
+                    <HouseholdIncomeScreen
+                        income={income}
+                        hasSpouseIncome={hasSpouseIncome}
+                        setHasSpouseIncome={setHasSpouseIncome}
+                        handleIncomeChange={handleIncomeChange}
+                    />
+                    <MonthlyOutflowsScreen
+                        expenseCategories={expenseCategories}
+                        setExpenseCategories={setExpenseCategories}
+                        hasEMI={hasEMI}
+                        setHasEMI={setHasEMI}
+                    />
+                </div>
             )
         }
     ];

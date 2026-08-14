@@ -16,6 +16,8 @@ import {
 } from './MoneyStoryLogic';
 import { calculateProtectionData, calculateContingencyData } from './SafetyNetLogic';
 import { getEmergencyFundAmount } from '../DetailedFlow/wealthDetailSync';
+import { getHouseholdBreakdownTotal } from '../DetailedFlow/expenseDetailSync';
+import DetailedHubCTA from '../DetailedHub/DetailedHubCTA';
 
 /* ─────────────── Animated Counter ─────────────── */
 const AnimatedCounter = ({ value, prefix = '₹', duration = 1500 }) => {
@@ -205,6 +207,15 @@ const MoneyStorySection = () => {
                     Here's how your money flows — and where it settles.
                 </p>
             </RevealSection>
+
+            {!(getHouseholdBreakdownTotal(expenseCategories, familyMembers) > 0) && (
+                <div style={{ padding: '0 2rem', maxWidth: '800px', margin: '0 auto' }}>
+                    <DetailedHubCTA 
+                        message="Want a more accurate Money Story? Update your expenses in your Financial Profile."
+                        buttonText="Update Now"
+                    />
+                </div>
+            )}
 
             {/* ══════════════════════════════════════════════
                 THE RIVER — MONTHLY CASH FLOW

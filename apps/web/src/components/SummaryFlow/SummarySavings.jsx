@@ -219,27 +219,24 @@ const SummarySavings = () => {
 
     const questions = [
         {
-            id: 'savings-investments',
+            id: 'savings-all',
             content: (
-                <SavingsInvestmentsScreen
-                    expenseCategories={expenseCategories}
-                    handleSummaryChange={handleSummaryChange}
-                />
-            )
-        },
-        {
-            id: 'insurance-protection',
-            content: (
-                <InsuranceProtectionScreen
-                    hasLifeInsurance={hasLifeInsurance}
-                    setHasLifeInsurance={setHasLifeInsurance}
-                    hasHealthInsurance={hasHealthInsurance}
-                    setHasHealthInsurance={setHasHealthInsurance}
-                    summaryLifeCover={summaryLifeCover}
-                    setSummaryLifeCover={setSummaryLifeCover}
-                    summaryHealthCover={summaryHealthCover}
-                    setSummaryHealthCover={setSummaryHealthCover}
-                />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
+                    <SavingsInvestmentsScreen
+                        expenseCategories={expenseCategories}
+                        handleSummaryChange={handleSummaryChange}
+                    />
+                    <InsuranceProtectionScreen
+                        hasLifeInsurance={hasLifeInsurance}
+                        setHasLifeInsurance={setHasLifeInsurance}
+                        hasHealthInsurance={hasHealthInsurance}
+                        setHasHealthInsurance={setHasHealthInsurance}
+                        summaryLifeCover={summaryLifeCover}
+                        setSummaryLifeCover={setSummaryLifeCover}
+                        summaryHealthCover={summaryHealthCover}
+                        setSummaryHealthCover={setSummaryHealthCover}
+                    />
+                </div>
             )
         }
     ];

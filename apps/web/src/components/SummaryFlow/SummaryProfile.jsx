@@ -148,23 +148,20 @@ const SummaryProfile = () => {
 
     const questions = [
         {
-            id: 'personal-details',
+            id: 'profile-all',
             content: (
-                <PersonalDetailsWithAdvance
-                    selfMember={selfMember}
-                    handleSelfChange={handleSelfChange}
-                    retireAge={retireAge}
-                    sliderPercent={sliderPercent}
-                />
-            )
-        },
-        {
-            id: 'occupation',
-            content: (
-                <OccupationWithAdvance
-                    selfMember={selfMember}
-                    handleSelfChange={handleSelfChange}
-                />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
+                    <PersonalDetailsWithAdvance
+                        selfMember={selfMember}
+                        handleSelfChange={handleSelfChange}
+                        retireAge={retireAge}
+                        sliderPercent={sliderPercent}
+                    />
+                    <OccupationWithAdvance
+                        selfMember={selfMember}
+                        handleSelfChange={handleSelfChange}
+                    />
+                </div>
             )
         }
     ];

@@ -15,6 +15,8 @@ import { buildSafetyNetSignals } from '../../recommendationRegistry/adapters/saf
 import { useRecommendationStore } from '../../recommendationOrchestration';
 import { RecommendationList } from '../../recommendationPresentation';
 import { useLaunchRecommendationAction } from '../FinancialWorkspace/FinancialWorkspaceContext';
+import { getInsuranceMonthlyTotal } from '../DetailedFlow/insuranceDetailSync';
+import DetailedHubCTA from '../DetailedHub/DetailedHubCTA';
 
 // Scope the orchestration store to this report so incomplete (safety-net-only)
 // signals never surface unrelated recommendations. Module-level constant keeps a
@@ -343,6 +345,15 @@ const SafetyNetSection = () => {
                     </>
                 )}
             </RevealSection>
+
+            {!getInsuranceMonthlyTotal(expenseCategories?.insurance || {}) && (
+                <div style={{ padding: '0 2rem', maxWidth: '800px', margin: '0 auto' }}>
+                    <DetailedHubCTA 
+                        message="Want a more accurate Safety Net? Update your insurance details in your Financial Profile."
+                        buttonText="Update Now"
+                    />
+                </div>
+            )}
 
             {/* ══════════════════════════════════════════════
                 SECTION 1 — LONG-TERM SECURITY (PROTECTION)

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Lightbulb,
@@ -19,6 +19,7 @@ import {
 import { getDetailReportPath } from './reportNavigation';
 import TransposedJourneyTable from './TransposedJourneyTable';
 import LifeJourneyVisuals from './LifeJourneyVisuals';
+import GrowthAssumptionsModal from './GrowthAssumptionsModal';
 
 const HeroKpi = ({ label, value, icon: Icon, suffix = '' }) => (
     <div className="lj-kpi-pill">
@@ -39,6 +40,7 @@ const InsightIcon = ({ tone }) => {
 
 const LifeJourneySection = () => {
     const navigate = useNavigate();
+    const [isGrowthModalOpen, setIsGrowthModalOpen] = useState(false);
     const { familyMembers, journeyProjections, goals, inflationRates } = useFinancialPlan();
 
     const report = useMemo(
@@ -64,15 +66,15 @@ const LifeJourneySection = () => {
     const educationGrowth = formatRate(inflationRates?.educationInflation);
 
     const openGrowthAssumptions = () => {
-        // Resolve return path on click so an active host adapter (workspace) is applied.
-        const returnTo = getDetailReportPath('your_money_flow', { section: 'life-journey' });
-        navigate(
-            `${GROWTH_EXPECTATIONS_PATH}?returnTo=${encodeURIComponent(returnTo)}`
-        );
+        setIsGrowthModalOpen(true);
     };
 
     return (
         <div className="lj-section" id="life-journey">
+            <GrowthAssumptionsModal 
+                isOpen={isGrowthModalOpen} 
+                onClose={() => setIsGrowthModalOpen(false)} 
+            />
             <div className="lj-hero card">
                 <div className="lj-hero-top">
                     <div>

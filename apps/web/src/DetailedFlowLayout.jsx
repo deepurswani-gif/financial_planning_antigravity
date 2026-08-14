@@ -577,6 +577,7 @@ function DetailedFlowLayout() {
                 <IncomeTaxModule
                   familyMembers={familyMembers}
                   income={income}
+                  setIncome={setIncome}
                   isCalculatorMode={true}
                 />
               )}

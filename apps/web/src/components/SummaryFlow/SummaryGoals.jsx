@@ -1,628 +1,69 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-    ChevronLeft, ChevronRight, ArrowRight, ArrowLeft, Sparkles,
-    Plus, Trash2, Home, Car, Plane, GraduationCap, Heart,
-    Award, PenLine, Target, Check
-} from 'lucide-react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
-import { useAuth } from '../../contexts/AuthContext';
-import { loadSummaryUiDraft, patchSummaryUiDraft } from '../../lib/summaryFlowStorage';
-import { calculateFutureCost } from '../GoalModule/GoalLogic';
-import QuestionProgressBar from './QuestionProgressBar';
 import { useProgressiveShellWidth } from './useProgressiveShellWidth';
-import { calculateAge } from '../ProfileModule/ProfileLogic';
 import {
     DEFAULT_SUMMARY_REPORT_ID,
     financialWorkspacePath,
 } from '../FinancialWorkspace/workspaceNavConfig';
-import { formatInrInWords } from '../../lib/formatInrInWords';
-import CurrencyInput from '../common/CurrencyInput';
-import YearsInput from '../common/YearsInput';
 import { scrollProgressiveFlowToTop } from './scrollProgressiveFlowToTop';
+import GoalsDashboard from '../DetailedHub/GoalsDashboard';
+import QuestionProgressBar from './QuestionProgressBar';
 
-/* ─── Screen constants (3 screens) ─── */
-const SELECT  = 0;
-const DETAILS = 1;
-const SUMMARY = 2;
-const SCREEN_COUNT = 3;
-
-/** Migrate persisted wizard screen indices from the old 5-screen flow. */
-const migrateGoalsScreen = (savedGoalsUi, validGoalsCount) => {
-    const savedScreen = savedGoalsUi?.screen;
-    if (typeof savedScreen !== 'number') {
-        return validGoalsCount > 0 ? SUMMARY : SELECT;
-    }
-    if (savedGoalsUi?.wizardVersion >= 2) {
-        return Math.min(Math.max(savedScreen, 0), SUMMARY);
-    }
-    // Old: INTRO=0, SELECT=1, YEARS=2, VALUE=3, SUMMARY=4
-    if (savedScreen >= 4) return SUMMARY;
-    if (savedScreen >= 2) return DETAILS;
-    return SELECT;
-};
-
-/* ─── Goal templates ─── */
-const goalTemplates = [
-    { id: 'education', label: 'Child Education', icon: GraduationCap, defaultInflation: 8 },
-    { id: 'retirement', label: 'Retirement', icon: Award, defaultInflation: 6 },
-    { id: 'car', label: 'Car Purchase', icon: Car, defaultInflation: 6 },
-    { id: 'vacation', label: 'Vacation', icon: Plane, defaultInflation: 6 },
-    { id: 'home', label: 'Buying a Home', icon: Home, defaultInflation: 6 },
-    { id: 'marriage', label: 'Marriage Planning', icon: Heart, defaultInflation: 8 },
-];
-
-const getGoalIcon = (name) => {
-    const lower = (name || '').toLowerCase();
-    if (lower.includes('educat')) return GraduationCap;
-    if (lower.includes('retire')) return Award;
-    if (lower.includes('car') || lower.includes('vehic')) return Car;
-    if (lower.includes('vacat') || lower.includes('tour') || lower.includes('trip')) return Plane;
-    if (lower.includes('home') || lower.includes('flat') || lower.includes('house')) return Home;
-    if (lower.includes('marriage') || lower.includes('wed')) return Heart;
-    return Target;
-};
-
-const isValidGoal = (g) => g.presentValue && g.yearsToGoal;
-
-const migrateSelectedTemplateIds = (saved) => {
-    if (Array.isArray(saved?.selectedTemplateIds)) return saved.selectedTemplateIds;
-    if (saved?.selectedTemplateId) return [saved.selectedTemplateId];
-    return [];
-};
-
-/* ─── PAN transition variants ─── */
-const panVariants = {
-    enter: (dir) => ({ x: dir > 0 ? '100%' : '-100%', opacity: 0 }),
-    center: { x: 0, opacity: 1 },
-    exit: (dir) => ({ x: dir < 0 ? '100%' : '-100%', opacity: 0 }),
-};
-const panTransition = { duration: 0.5, ease: [0.45, 0, 0.15, 1] };
-
-/* ─── Typewriter hook ─── */
-const useTypewriter = (text, speed = 25) => {
-    const [displayed, setDisplayed] = useState('');
-    const [isComplete, setIsComplete] = useState(false);
-    useEffect(() => {
-        setDisplayed(''); setIsComplete(false);
-        if (!text) return;
-        let i = 0;
-        const t = setInterval(() => { setDisplayed(text.slice(0, ++i)); if (i >= text.length) { clearInterval(t); setIsComplete(true); } }, speed);
-        return () => clearInterval(t);
-    }, [text, speed]);
-    return { displayed, isComplete };
-};
-
-/* ─── Narrative overlay ─── */
-const NarrativeOverlay = ({ text, onContinue }) => {
-    const { displayed, isComplete } = useTypewriter(text);
-    return (
-        <div className="narrative-overlay">
-            <div className="narrative-card">
-                <div className="narrative-icon"><Sparkles size={28} /></div>
-                <p className="narrative-text">
-                    "{displayed}"
-                    {!isComplete && <span className="typewriter-cursor" />}
-                </p>
-                {isComplete && (
-                    <motion.button className="narrative-continue-btn" onClick={onContinue}
-                        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-                        Continue <ArrowRight size={18} />
-                    </motion.button>
-                )}
-            </div>
-        </div>
-    );
-};
-
-/* ═══════════════════════════════════════════════════
-   MAIN COMPONENT
-   ═══════════════════════════════════════════════════ */
 const SummaryGoals = () => {
-    const { goals, setGoals, savePlanData, summaryReportGeneratedAt, markReportGenerated, familyMembers } = useFinancialPlan();
-    const { user } = useAuth();
+    const { savePlanData, summaryReportGeneratedAt, markReportGenerated } = useFinancialPlan();
     const navigate = useNavigate();
-    const userId = user?.id ?? null;
     const shellClassName = useProgressiveShellWidth('wide');
-
-    const validGoals = goals.filter(isValidGoal);
-    const savedGoalsUi = loadSummaryUiDraft(userId)?.goalsWizard;
-
-    const [screen, setScreen] = useState(() =>
-        migrateGoalsScreen(savedGoalsUi, validGoals.length),
-    );
-    const [direction, setDirection] = useState(1);
-    const [selectedTemplateIds, setSelectedTemplateIds] = useState(() => migrateSelectedTemplateIds(savedGoalsUi));
-    const [selectedCustomGoalIds, setSelectedCustomGoalIds] = useState(
-        () => (Array.isArray(savedGoalsUi?.selectedCustomGoalIds) ? savedGoalsUi.selectedCustomGoalIds : []),
-    );
-    const [pendingGoalIds, setPendingGoalIds] = useState(
-        () => (Array.isArray(savedGoalsUi?.pendingGoalIds) ? savedGoalsUi.pendingGoalIds : []),
-    );
-    const [customGoalName, setCustomGoalName] = useState(savedGoalsUi?.customGoalName ?? '');
-    const [showCustomInput, setShowCustomInput] = useState(Boolean(savedGoalsUi?.showCustomInput));
-    const [showNarrative, setShowNarrative] = useState(false);
-
-    useEffect(() => {
-        patchSummaryUiDraft(userId, {
-            goalsWizard: {
-                wizardVersion: 2,
-                screen,
-                selectedTemplateIds,
-                selectedCustomGoalIds,
-                pendingGoalIds,
-                customGoalName,
-                showCustomInput,
-            },
-            lastSummaryPath: '/summary-flow/goals',
-        });
-    }, [userId, screen, selectedTemplateIds, selectedCustomGoalIds, pendingGoalIds, customGoalName, showCustomInput]);
-
-    const pendingGoals = useMemo(
-        () => pendingGoalIds.map((id) => goals.find((g) => g.id === id)).filter(Boolean),
-        [pendingGoalIds, goals],
-    );
-
-    const customGoals = useMemo(
-        () => goals.filter((g) => !g.templateId),
-        [goals],
-    );
-
-    /* ── Navigation helpers ── */
-    const goTo = useCallback((target, dir = 1) => {
-        setDirection(dir);
-        setScreen(target);
-        scrollProgressiveFlowToTop();
-    }, []);
-
-    /* ── Goal CRUD ── */
-    const toggleTemplateSelection = (tmplId) => {
-        setSelectedTemplateIds((prev) =>
-            prev.includes(tmplId) ? prev.filter((id) => id !== tmplId) : [...prev, tmplId],
-        );
-    };
-
-    const addCustomGoal = () => {
-        if (!customGoalName.trim()) return;
-        const id = `goal_${Date.now()}`;
-        const newGoal = {
-            id,
-            name: customGoalName.trim(),
-            presentValue: '',
-            yearsToGoal: '',
-            inflationRate: 6,
-            courseDuration: 1,
-        };
-        setGoals([...goals, newGoal]);
-        setSelectedCustomGoalIds((prev) => [...prev, id]);
-        setShowCustomInput(false);
-        setCustomGoalName('');
-    };
-
-    const toggleCustomGoalSelection = (goalId) => {
-        setSelectedCustomGoalIds((prev) =>
-            prev.includes(goalId) ? prev.filter((id) => id !== goalId) : [...prev, goalId],
-        );
-    };
-
-    const materializeSelectedGoals = () => {
-        const updated = [...goals];
-        const newPendingIds = [];
-
-        selectedTemplateIds.forEach((tmplId) => {
-            const tmpl = goalTemplates.find((t) => t.id === tmplId);
-            if (!tmpl) return;
-
-            let existing = updated.find((g) => g.templateId === tmplId);
-            if (!existing) {
-                let initialYearsToGoal = '';
-                if (tmplId === 'retirement') {
-                    const selfMember = familyMembers?.find(m => m.relation === 'Self') || familyMembers?.[0];
-                    if (selfMember?.dob && selfMember?.retirementAge) {
-                        const currentAge = calculateAge(selfMember.dob);
-                        const years = parseInt(selfMember.retirementAge, 10) - currentAge;
-                        if (years > 0) initialYearsToGoal = String(years);
-                    }
-                }
-
-                existing = {
-                    id: `goal_${Date.now()}_${tmplId}`,
-                    name: tmpl.label,
-                    templateId: tmpl.id,
-                    presentValue: '',
-                    yearsToGoal: initialYearsToGoal,
-                    inflationRate: tmpl.defaultInflation,
-                    courseDuration: 1,
-                };
-                updated.push(existing);
-            }
-            newPendingIds.push(existing.id);
-        });
-
-        selectedCustomGoalIds.forEach((goalId) => {
-            if (updated.find((g) => g.id === goalId)) {
-                newPendingIds.push(goalId);
-            }
-        });
-
-        setGoals(updated);
-        setPendingGoalIds(newPendingIds);
-    };
-
-    const updateGoal = (goalId, field, value) => {
-        setGoals(goals.map((g) => (g.id === goalId ? { ...g, [field]: value } : g)));
-    };
-
-    const removeGoal = (goalId) => {
-        setGoals(goals.filter((g) => g.id !== goalId));
-        setSelectedCustomGoalIds((prev) => prev.filter((id) => id !== goalId));
-        setPendingGoalIds((prev) => prev.filter((id) => id !== goalId));
-        const removed = goals.find((g) => g.id === goalId);
-        if (removed?.templateId) {
-            setSelectedTemplateIds((prev) => prev.filter((id) => id !== removed.templateId));
-        }
-    };
-
-    const handleAddAnother = () => {
-        setSelectedTemplateIds([]);
-        setSelectedCustomGoalIds([]);
-        setPendingGoalIds([]);
-        setShowCustomInput(false);
-        setCustomGoalName('');
-        goTo(SELECT);
-    };
 
     const hasGeneratedReport = Boolean(summaryReportGeneratedAt);
 
-    const handleViewSummary = () => {
-        if (hasGeneratedReport) {
-            handleOpenReport(false);
-            return;
-        }
-        setShowNarrative(true);
-    };
-
-    const handleOpenReport = async (markGenerated = true) => {
+    const handleOpenReport = async () => {
         if (savePlanData) {
             try { await savePlanData(); } catch (e) { console.error('Save failed on nav', e); }
         }
-        if (markGenerated) {
+        if (!hasGeneratedReport) {
             await markReportGenerated();
         }
-        setShowNarrative(false);
         navigate(financialWorkspacePath('summary', { report: DEFAULT_SUMMARY_REPORT_ID }));
     };
 
-    const handleNarrativeDone = () => handleOpenReport(true);
-
-    /* ── Chevron logic ── */
-    const hasSelection = selectedTemplateIds.length > 0 || selectedCustomGoalIds.length > 0;
-    const allDetailsFilled = pendingGoals.length > 0
-        && pendingGoals.every((g) => g.yearsToGoal && g.presentValue);
-
-    const canGoLeft = screen > SELECT;
-    const canGoRight = (() => {
-        if (screen >= SUMMARY) return false;
-        if (screen === SELECT) return hasSelection;
-        if (screen === DETAILS) return allDetailsFilled;
-        return true;
-    })();
-
-    const handleLeft = () => {
-        if (!canGoLeft) return;
-        if (screen === SUMMARY) {
-            if (pendingGoalIds.length > 0) {
-                goTo(DETAILS, -1);
-            } else {
-                setSelectedTemplateIds(
-                    validGoals.map((g) => g.templateId).filter(Boolean),
-                );
-                setSelectedCustomGoalIds(
-                    validGoals.filter((g) => !g.templateId).map((g) => g.id),
-                );
-                goTo(SELECT, -1);
-            }
-        } else if (screen === DETAILS) {
-            goTo(SELECT, -1);
+    const handlePrevious = async () => {
+        if (savePlanData) {
+            try { await savePlanData(); } catch (e) { console.error('Save failed on nav', e); }
         }
+        scrollProgressiveFlowToTop();
+        navigate('/summary-flow/liabilities');
     };
 
-    const handleRight = () => {
-        if (!canGoRight) return;
-        if (screen === SELECT) {
-            materializeSelectedGoals();
-            goTo(DETAILS);
-        } else if (screen === DETAILS) {
-            setPendingGoalIds([]);
-            goTo(SUMMARY);
-        }
-    };
-
-    /* ── Keyboard nav ── */
-    useEffect(() => {
-        const onKey = (e) => {
-            if (showNarrative) return;
-            if (e.key === 'ArrowRight' && canGoRight) handleRight();
-            if (e.key === 'ArrowLeft' && canGoLeft) handleLeft();
-        };
-        window.addEventListener('keydown', onKey);
-        return () => window.removeEventListener('keydown', onKey);
-    });
-
-    const narrativeText = "Awesome! Your financial snapshot is ready. Let's generate your WealthMap.";
-
-    /* ═══════════ RENDER ═══════════ */
     return (
         <>
-            <AnimatePresence>
-                {showNarrative && <NarrativeOverlay text={narrativeText} onContinue={handleNarrativeDone} />}
-            </AnimatePresence>
+            <QuestionProgressBar />
+            <div className="progressive-shell fade-in" style={{ maxWidth: '1200px', width: '100%', padding: '0 1rem' }}>
+                <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+                    <h1 style={{ fontSize: '1.75rem', fontWeight: 'bold', marginBottom: '0.5rem', color: 'var(--text-main)' }}>
+                        What are you saving for?
+                    </h1>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '1.05rem', margin: 0 }}>
+                        Select your top goals to get a quick estimate. You can always add more later.
+                    </p>
+                </div>
 
-            <button
-                className={`nav-chevron nav-chevron-left ${!canGoLeft ? 'hidden' : ''}`}
-                onClick={handleLeft}
-                aria-label="Previous"
-            >
-                <ChevronLeft size={24} />
-            </button>
-            <button
-                className={`nav-chevron nav-chevron-right ${!canGoRight ? 'hidden' : ''}`}
-                onClick={handleRight}
-                aria-label="Next"
-            >
-                <ChevronRight size={24} />
-            </button>
+                <div style={{ marginBottom: '3rem' }}>
+                    <GoalsDashboard hideTitle={true} />
+                </div>
 
-            <div className={shellClassName}>
-                <QuestionProgressBar totalQuestions={SCREEN_COUNT} currentIndex={screen} />
-
-                <AnimatePresence mode="wait" custom={direction}>
-                    <motion.div
-                        key={screen}
-                        custom={direction}
-                        variants={panVariants}
-                        initial="enter"
-                        animate="center"
-                        exit="exit"
-                        transition={panTransition}
-                        style={{ width: '100%' }}
-                    >
-                        {screen === SELECT && (
-                            <div className="question-container">
-                                <p className="question-narrative">
-                                    Every financial decision becomes meaningful when connected to a life goal.
-                                    Now let&apos;s map the dreams and milestones you want your money to support.
-                                </p>
-                                <h2 className="question-title">
-                                    Which goals would you like to plan?
-                                </h2>
-                                <p className="question-helper" style={{ marginBottom: '1.5rem' }}>
-                                    Select all that apply. You&apos;ll enter timing and cost for each selected goal next.
-                                </p>
-
-                                <div className="goals-selection-grid">
-                                    {goalTemplates.map((tmpl) => {
-                                        const Icon = tmpl.icon;
-                                        const isSelected = selectedTemplateIds.includes(tmpl.id);
-                                        const existingGoal = goals.find((g) => g.templateId === tmpl.id);
-                                        const isConfigured = existingGoal && isValidGoal(existingGoal);
-                                        return (
-                                            <div
-                                                key={tmpl.id}
-                                                className={`option-card ${isSelected ? 'selected' : ''}`}
-                                                style={{ padding: '1.15rem 0.75rem', minWidth: 'auto', maxWidth: 'none', position: 'relative', cursor: 'pointer' }}
-                                                onClick={() => toggleTemplateSelection(tmpl.id)}
-                                            >
-                                                {isSelected && (
-                                                    <div style={{
-                                                        position: 'absolute', top: 8, right: 8,
-                                                        width: 22, height: 22, borderRadius: '50%',
-                                                        background: isConfigured ? 'var(--positive)' : 'var(--primary)',
-                                                        color: 'white',
-                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                    }}>
-                                                        <Check size={14} />
-                                                    </div>
-                                                )}
-                                                <div style={{ color: isSelected ? 'var(--positive)' : 'var(--primary)' }}>
-                                                    <Icon size={22} />
-                                                </div>
-                                                <div className="option-card-title" style={{ fontSize: '0.82rem' }}>
-                                                    {tmpl.label}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-
-                                    <div
-                                        className={`option-card ${showCustomInput ? 'selected' : ''}`}
-                                        style={{ padding: '1.15rem 0.75rem', minWidth: 'auto', maxWidth: 'none', cursor: 'pointer' }}
-                                        onClick={() => setShowCustomInput(true)}
-                                    >
-                                        <div style={{ color: 'var(--color-3, #787CFE)' }}><PenLine size={22} /></div>
-                                        <div className="option-card-title" style={{ fontSize: '0.82rem' }}>Any Other Goal</div>
-                                    </div>
-                                </div>
-
-                                {customGoals.length > 0 && (
-                                    <div className="goals-catalog-panel" style={{ marginBottom: '1rem' }}>
-                                        <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.65rem' }}>
-                                            Your custom goals
-                                        </div>
-                                        {customGoals.map((goal) => {
-                                            const isSelected = selectedCustomGoalIds.includes(goal.id);
-                                            return (
-                                                <div
-                                                    key={goal.id}
-                                                    className={`option-card ${isSelected ? 'selected' : ''}`}
-                                                    style={{ padding: '0.75rem 1rem', marginBottom: '0.5rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-                                                    onClick={() => toggleCustomGoalSelection(goal.id)}
-                                                >
-                                                    <Target size={18} />
-                                                    <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{goal.name}</span>
-                                                    {isSelected && <Check size={14} style={{ marginLeft: 'auto', color: 'var(--positive)' }} />}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-
-                                {showCustomInput && (
-                                    <div className="question-fields" style={{ margin: '0 auto', display: 'flex', gap: '0.75rem' }}>
-                                        <input
-                                            type="text"
-                                            className="conversational-input"
-                                            placeholder="Enter your goal name..."
-                                            value={customGoalName}
-                                            onChange={(e) => setCustomGoalName(e.target.value)}
-                                            onKeyDown={(e) => e.key === 'Enter' && addCustomGoal()}
-                                            autoFocus
-                                        />
-                                        <button
-                                            className="step-nav-btn primary"
-                                            onClick={addCustomGoal}
-                                            disabled={!customGoalName.trim()}
-                                            style={{ whiteSpace: 'nowrap', opacity: customGoalName.trim() ? 1 : 0.5 }}
-                                        >
-                                            Add <Plus size={16} />
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {screen === DETAILS && pendingGoals.length > 0 && (
-                            <div className="question-container">
-                                <h2 className="question-title">
-                                    Goal Timing & Cost
-                                </h2>
-                                <p className="question-helper" style={{ marginBottom: '1.5rem' }}>
-                                    Fill in the details for each goal to calculate its future value.
-                                </p>
-
-                                <div className="question-fields" style={{ maxWidth: '650px', margin: '0 auto' }}>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1.5fr', gap: '1rem', alignItems: 'center', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border)', marginBottom: '1.5rem' }}>
-                                        <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-muted)' }}>Goal</div>
-                                        <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-muted)', textAlign: 'center' }}>
-                                            Years <span className="tooltip-wrapper" data-tooltip="Years until you need the funds for this goal" style={{ cursor: 'help', color: 'var(--primary)' }}>ⓘ</span>
-                                        </div>
-                                        <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-muted)', textAlign: 'center' }}>
-                                            Present Cost <span className="tooltip-wrapper" data-tooltip="What this goal would cost if you were to pay for it today" style={{ cursor: 'help', color: 'var(--primary)' }}>ⓘ</span>
-                                        </div>
-                                    </div>
-
-                                    {pendingGoals.map((goal) => {
-                                        const Icon = getGoalIcon(goal.name);
-                                        return (
-                                            <div
-                                                key={goal.id}
-                                                style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1.5fr', gap: '1rem', alignItems: 'center', marginBottom: '1.25rem' }}
-                                            >
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                    <Icon size={20} style={{ color: 'var(--primary)' }} />
-                                                    <div>
-                                                        <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{goal.name}</div>
-                                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Inflation: {goal.inflationRate || 6}%</div>
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <YearsInput
-                                                        className="conversational-input"
-                                                        placeholder="Yrs"
-                                                        value={goal.yearsToGoal || ''}
-                                                        onValueChange={(v) => updateGoal(goal.id, 'yearsToGoal', v == null ? '' : String(v))}
-                                                        style={{ textAlign: 'center', fontSize: '1rem', fontWeight: 600, margin: 0 }}
-                                                        enterKeyHint="next"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <CurrencyInput
-                                                        className="conversational-input"
-                                                        placeholder="Cost"
-                                                        value={goal.presentValue || ''}
-                                                        onValueChange={(v) => updateGoal(goal.id, 'presentValue', v == null ? '' : String(v))}
-                                                        style={{ margin: 0 }}
-                                                        enterKeyHint="done"
-                                                    />
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        )}
-
-                        {screen === SUMMARY && (
-                            <div className="question-container">
-                                <h2 className="question-title" style={{ fontSize: '1.4rem', marginBottom: '1.5rem' }}>
-                                    Your Financial Goals
-                                </h2>
-
-                                {validGoals.length === 0 ? (
-                                    <div style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
-                                        No goals added yet. Add your first goal to continue.
-                                    </div>
-                                ) : (
-                                    <div className="goals-review-panel">
-                                        {validGoals.map((goal) => {
-                                            const Icon = getGoalIcon(goal.name);
-                                            const futureCost = calculateFutureCost(goal.presentValue, goal.yearsToGoal, goal.inflationRate);
-                                            return (
-                                                <div key={goal.id} className="goal-summary-card">
-                                                    <div className="goal-summary-info">
-                                                        <div className="goal-summary-icon"><Icon size={18} /></div>
-                                                        <div>
-                                                            <div className="goal-summary-name">{goal.name}</div>
-                                                            <div className="goal-summary-meta">
-                                                                {goal.yearsToGoal ? `${goal.yearsToGoal} years` : ''}
-                                                                {goal.presentValue ? ` • ${formatInrInWords(goal.presentValue)}` : ''}
-                                                            </div>
-                                                            {futureCost > 0 && (
-                                                                <div style={{ fontSize: '0.8rem', color: 'var(--positive)', marginTop: '0.2rem' }}>
-                                                                    Estimated Future Cost: {formatInrInWords(futureCost)}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                    <button className="goal-remove-btn" onClick={() => removeGoal(goal.id)} title="Remove goal">
-                                                        <Trash2 size={16} />
-                                                    </button>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-
-                                <button className="add-goal-btn" onClick={handleAddAnother}>
-                                    <Plus size={18} /> Add Another Goal
-                                </button>
-                            </div>
-                        )}
-                    </motion.div>
-                </AnimatePresence>
-
-                <div className="step-nav-bar">
+                <div className="step-nav-bar" style={{ maxWidth: '600px', margin: '0 auto' }}>
                     <div>
-                        {(screen === SELECT || screen === SUMMARY) && (
-                            <button className="step-nav-btn" onClick={async () => {
-                                if (savePlanData) {
-                                    try { await savePlanData(); } catch (e) { console.error('Save failed on nav', e); }
-                                }
-                                scrollProgressiveFlowToTop();
-                                navigate('/summary-flow/liabilities');
-                            }}>
-                                <ArrowLeft size={16} /> Previous Section
-                            </button>
-                        )}
+                        <button className="step-nav-btn" onClick={handlePrevious}>
+                            <ArrowLeft size={16} /> Previous Section
+                        </button>
                     </div>
                     <div>
-                        {screen === SUMMARY && (
-                            <button className="step-nav-btn primary" onClick={handleViewSummary}>
-                                {hasGeneratedReport ? 'View Summary Report' : 'Generate Summary Report'}
-                                <ArrowRight size={16} />
-                            </button>
-                        )}
+                        <button className="step-nav-btn primary" onClick={handleOpenReport}>
+                            {hasGeneratedReport ? 'View Summary Report' : 'See My Plan'}
+                            <ArrowRight size={16} />
+                        </button>
                     </div>
                 </div>
             </div>
