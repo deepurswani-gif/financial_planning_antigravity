@@ -10,6 +10,11 @@ export function getActiveGoals(goals = []) {
     return goals.filter(isConfiguredGoal);
 }
 
+// Dummy exports for legacy components that have not been deleted yet
+export function getSummaryFlowGoals(goals = []) { return []; }
+export function isSummaryStyleGoal(goal) { return false; }
+export function isSummaryOriginGoal(goal) { return false; }
+
 export function getChildMembers(familyMembers = []) {
     return familyMembers.filter((m) => m.relation === 'Child');
 }
@@ -23,103 +28,12 @@ export function getChildIndexForGoal(goal) {
     return -1;
 }
 
-export function detectSummaryBundledGoal(goal) {
-    if (goal.templateId) return goal.templateId;
-    const name = (goal.name || '').toLowerCase();
-    if (name.includes('child educat') || name === 'child education') return 'education';
-    if (name.includes('higher educat')) return 'education';
-    if (name.includes('marriage') || name.includes('wedd')) return 'marriage';
-    if (name.includes('vacat') || name.includes('tour') || name.includes('trip')) return 'vacation';
-    if (name.includes('bike')) return 'bike';
-    if (name.includes('car') || name.includes('vehic')) return 'car';
-    if (name.includes('construct')) return 'construction';
-    if (name.includes('flat')) return 'flat';
-    if (name.includes('renovat')) return 'renovation';
-    if (name.includes('home') || name.includes('house')) return 'home';
-    if (name.includes('retire')) return 'retirement';
-    return null;
-}
-
-export function isSummaryStyleGoal(goal) {
-    if (goal.isPredefined) return false;
-    if (goal.templateId) return true;
-    if (goal.id?.startsWith('goal_')) return true;
-    return Boolean(detectSummaryBundledGoal(goal));
-}
-
-/** Goals captured in summary flow (including legacy catalog migrations). */
-export function isSummaryOriginGoal(goal) {
-    if (!goal) return false;
-    if (goal.fromSummary) return true;
-    if (isSummaryStyleGoal(goal)) return true;
-    // Legacy: summary values were copied onto a predefined catalog slot
-    if (goal.isPredefined && (goal.summaryPresentValue || goal.summaryYearsToGoal)) return true;
-    return false;
-}
-
-export function getSummaryFlowGoals(goals = []) {
-    return goals.filter(isSummaryOriginGoal);
-}
-
 export function getDetailedFlowGoals(goals = [], plannedGoalIds = []) {
     const planned = new Set(plannedGoalIds);
     return goals.filter((g) => {
-        if (isSummaryOriginGoal(g)) return false;
         if (planned.has(g.id)) return true;
         return isConfiguredGoal(g);
     });
-}
-
-/** Predefined catalog ids that overlap a summary-flow goal template. */
-export function getPredefinedIdsCoveredBySummaryGoal(summaryGoal, predefinedGoals = []) {
-    const template = summaryGoal.templateId || detectSummaryBundledGoal(summaryGoal);
-    if (!template) return [];
-
-    switch (template) {
-        case 'education': {
-            const eduGoals = predefinedGoals.filter((g) => g.id.startsWith('edu_'));
-            const target = eduGoals.find((g) => g.summaryPresentValue) || eduGoals.find((g) => !isConfiguredGoal(g)) || eduGoals[0];
-            return target ? [target.id] : [];
-        }
-        case 'marriage': {
-            const marriageGoals = predefinedGoals.filter((g) => g.id.startsWith('marriage_'));
-            const target = marriageGoals.find((g) => g.summaryPresentValue) || marriageGoals.find((g) => !isConfiguredGoal(g)) || marriageGoals[0];
-            return target ? [target.id] : [];
-        }
-        case 'vacation':
-            return predefinedGoals.some((g) => g.id === 'domestic_tour') ? ['domestic_tour'] : [];
-        case 'car':
-            return predefinedGoals.some((g) => g.id === 'car') ? ['car'] : [];
-        case 'bike':
-            return predefinedGoals.some((g) => g.id === 'bike') ? ['bike'] : [];
-        case 'construction':
-        case 'flat':
-        case 'renovation':
-            return predefinedGoals.some((g) => g.id === template) ? [template] : [];
-        case 'home':
-            return predefinedGoals.some((g) => g.id === 'flat') ? ['flat'] : [];
-        case 'retirement':
-            return predefinedGoals.some((g) => g.id === 'retirement') ? ['retirement'] : [];
-        default:
-            return [];
-    }
-}
-
-/** Catalog ids that should not be offered again because summary already covered them. */
-export function getBlockedCatalogGoalIds(goals = []) {
-    const blocked = new Set();
-    const predefined = goals.filter((g) => g.isPredefined);
-
-    for (const g of goals) {
-        if (isSummaryStyleGoal(g)) {
-            getPredefinedIdsCoveredBySummaryGoal(g, predefined).forEach((id) => blocked.add(id));
-        }
-        if (g.isPredefined && (g.summaryPresentValue || g.summaryYearsToGoal || g.fromSummary)) {
-            blocked.add(g.id);
-        }
-    }
-
-    return blocked;
 }
 
 function applyValuesToTarget(target, source) {
@@ -201,92 +115,53 @@ function attachPredefinedMetadata(goal) {
     };
 }
 
-export function migrateSummaryGoalIntoCatalog(bundledGoal, predefinedGoals, familyMembers) {
-    const template = detectSummaryBundledGoal(bundledGoal);
-    if (!template || !isConfiguredGoal(bundledGoal)) return predefinedGoals;
-
-    let result = [...predefinedGoals];
-
-    switch (template) {
-        case 'education': {
-            const eduGoals = result.filter((g) => g.id.startsWith('edu_'));
-            if (eduGoals.length === 0) break;
-            const target = eduGoals.find((g) => !isConfiguredGoal(g)) || eduGoals[0];
-            result = result.map((g) => (g.id === target.id ? applyValuesToTarget(g, bundledGoal) : g));
-            break;
-        }
-        case 'marriage': {
-            const marriageGoals = result.filter((g) => g.id.startsWith('marriage_'));
-            if (marriageGoals.length === 0) break;
-            const target = marriageGoals.find((g) => !isConfiguredGoal(g)) || marriageGoals[0];
-            result = result.map((g) => (g.id === target.id ? applyValuesToTarget(g, bundledGoal) : g));
-            break;
-        }
-        case 'vacation':
-            result = result.map((g) => (
-                g.id === 'domestic_tour' && !isConfiguredGoal(g)
-                    ? applyValuesToTarget(g, bundledGoal)
-                    : g
-            ));
-            break;
-        case 'car':
-            result = result.map((g) => (
-                g.id === 'car' && !isConfiguredGoal(g)
-                    ? applyValuesToTarget(g, bundledGoal)
-                    : g
-            ));
-            break;
-        case 'bike':
-            result = result.map((g) => (
-                g.id === 'bike' && !isConfiguredGoal(g)
-                    ? applyValuesToTarget(g, bundledGoal)
-                    : g
-            ));
-            break;
-        case 'construction':
-        case 'flat':
-        case 'renovation':
-            result = result.map((g) => (
-                g.id === template && !isConfiguredGoal(g)
-                    ? applyValuesToTarget(g, bundledGoal)
-                    : g
-            ));
-            break;
-        case 'home':
-            result = result.map((g) => (
-                g.id === 'flat' && !isConfiguredGoal(g)
-                    ? applyValuesToTarget(g, bundledGoal)
-                    : g
-            ));
-            break;
-        case 'retirement':
-            result = result.map((g) => (
-                g.id === 'retirement' ? applyValuesToTarget(g, bundledGoal) : g
-            ));
-            break;
-        default:
-            break;
-    }
-
-    return result.map((g) => enrichEducationGoalFromFamily(g, familyMembers));
-}
-
 export function mergeGoalsWithPredefined(familyMembers, existingGoals = []) {
     const freshPredefined = getPredefinedGoals(familyMembers).map(attachPredefinedMetadata);
 
-    const customGoals = existingGoals.filter(
-        (g) => !g.isPredefined && !isSummaryStyleGoal(g),
-    );
-    // Keep summary-flow goals as distinct entries (do not absorb into catalog slots).
-    const summaryGoals = existingGoals
-        .filter(isSummaryStyleGoal)
-        .map((g) => ({ ...g, isPredefined: false, fromSummary: true }));
+    const customGoals = existingGoals.filter((g) => {
+        if (g.isPredefined) return false;
+        // Legacy migration: hide legacy summary goals as they will be absorbed
+        if (g.templateId && ['retirement', 'car', 'bike', 'home', 'vacation', 'education', 'marriage'].includes(g.templateId)) {
+            return false;
+        }
+        return true;
+    });
 
-    let mergedPredefined = freshPredefined.map((newGoal) => {
-        const existing = existingGoals.find((p) => p.id === newGoal.id);
-        if (!existing) return newGoal;
+    const mergedPredefined = freshPredefined.map((newGoal) => {
+        let existing = existingGoals.find((p) => p.id === newGoal.id);
+        
+        // Legacy migration: find if there is an old summary goal that should map to this predefined slot
+        if (!existing) {
+            existing = existingGoals.find(g => {
+                if (g.isPredefined) return false;
+                if (!g.templateId) return false;
+                
+                if (newGoal.id === 'retirement' && g.templateId === 'retirement') return true;
+                if (newGoal.id === 'car' && g.templateId === 'car') return true;
+                if (newGoal.id === 'bike' && g.templateId === 'bike') return true;
+                if (newGoal.id === 'flat' && g.templateId === 'home') return true;
+                if (newGoal.id === 'domestic_tour' && g.templateId === 'vacation') return true;
+                if (newGoal.id.startsWith('edu_') && g.templateId === 'education') return true;
+                if (newGoal.id.startsWith('marriage_') && g.templateId === 'marriage') return true;
+                
+                return false;
+            });
+        }
 
-        return {
+        if (!existing) {
+            const enriched = enrichEducationGoalFromFamily(newGoal, familyMembers);
+            if (enriched.id === 'retirement' && !enriched.yearsToGoal) {
+                const self = familyMembers.find((m) => m.relation === 'Self');
+                if (self?.dob && self?.retirementAge) {
+                    const age = calculateAge(self.dob);
+                    const years = parseInt(self.retirementAge, 10) - age;
+                    if (years > 0) return { ...enriched, yearsToGoal: String(years) };
+                }
+            }
+            return enriched;
+        }
+
+        const next = {
             ...newGoal,
             yearsToGoal: existing.yearsToGoal ?? newGoal.yearsToGoal,
             presentValue: existing.presentValue ?? newGoal.presentValue,
@@ -294,54 +169,22 @@ export function mergeGoalsWithPredefined(familyMembers, existingGoals = []) {
             profession: existing.profession ?? newGoal.profession,
             courseDuration: existing.courseDuration ?? newGoal.courseDuration,
             totalCourseCost: existing.totalCourseCost ?? newGoal.totalCourseCost,
-            summaryPresentValue: existing.summaryPresentValue ?? newGoal.summaryPresentValue,
-            summaryYearsToGoal: existing.summaryYearsToGoal ?? newGoal.summaryYearsToGoal,
-            fromSummary: existing.fromSummary ?? newGoal.fromSummary,
             name: newGoal.name,
         };
-    });
 
-    const blockedBySummary = new Set();
-    for (const g of summaryGoals) {
-        getPredefinedIdsCoveredBySummaryGoal(g, mergedPredefined).forEach((id) => blockedBySummary.add(id));
-    }
-
-    // Legacy only: if a summary goal was previously absorbed into a catalog slot,
-    // the predefined entry already carries summaryPresentValue — leave it alone.
-    // New summary goals stay in summaryGoals and are not migrated.
-
-    mergedPredefined = mergedPredefined.map((g) => {
-        // Do not auto-fill catalog slots already represented by a summary-flow goal
-        if (blockedBySummary.has(g.id) && !isSummaryOriginGoal(g)) {
-            return {
-                ...g,
-                yearsToGoal: '',
-                presentValue: '',
-                totalCourseCost: undefined,
-            };
-        }
-
-        let next = enrichEducationGoalFromFamily(g, familyMembers);
-        if (g.id === 'retirement' && !next.yearsToGoal && !isSummaryOriginGoal(next)) {
+        let enriched = enrichEducationGoalFromFamily(next, familyMembers);
+        if (enriched.id === 'retirement' && !enriched.yearsToGoal) {
             const self = familyMembers.find((m) => m.relation === 'Self');
             if (self?.dob && self?.retirementAge) {
                 const age = calculateAge(self.dob);
                 const years = parseInt(self.retirementAge, 10) - age;
-                if (years > 0) next = { ...next, yearsToGoal: String(years) };
+                if (years > 0) enriched = { ...enriched, yearsToGoal: String(years) };
             }
         }
-        return next;
+        return enriched;
     });
 
-    return [...mergedPredefined, ...customGoals, ...summaryGoals].map((g) => {
-        if (!isSummaryStyleGoal(g) && !g.fromSummary) return g;
-        if (!g.presentValue || g.summaryPresentValue) return g;
-        return {
-            ...g,
-            summaryPresentValue: g.presentValue,
-            summaryYearsToGoal: g.yearsToGoal || g.summaryYearsToGoal,
-        };
-    });
+    return [...mergedPredefined, ...customGoals];
 }
 
 export function initializeGoalsFromFamily(familyMembers, existingGoals = []) {
@@ -380,8 +223,7 @@ export function groupPredefinedGoals(predefinedGoals) {
 }
 
 export function getAvailableCatalogGroups(predefinedGoals = [], allGoals = []) {
-    const blocked = getBlockedCatalogGoalIds(allGoals);
-    const available = predefinedGoals.filter((g) => g.isPredefined && !blocked.has(g.id));
+    const available = predefinedGoals.filter((g) => g.isPredefined);
     return groupPredefinedGoals(available);
 }
 

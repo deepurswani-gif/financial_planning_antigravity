@@ -6,9 +6,12 @@ import ClientFinancialDossier from './ClientFinancialDossier';
 import BusinessAnalyticsShell from './analytics/BusinessAnalyticsShell';
 import CohortsTab from './cohorts/CohortsTab';
 import PushCampaignsTab from './pushCampaigns/PushCampaignsTab';
+import TeamTab from './TeamTab';
 import { openAdminFinancialPlanPrint } from '../../utils/adminFinancialPlanPrint';
 
 const AdminDashboard = () => {
+  const [currentUserProfile, setCurrentUserProfile] = useState(null);
+  const [teamMembers, setTeamMembers] = useState([]);
   const [clients, setClients] = useState([]);
   const [reports, setReports] = useState([]);
   const [coupons, setCoupons] = useState([]);
@@ -24,11 +27,20 @@ const AdminDashboard = () => {
   const loadAdminData = async () => {
     setLoading(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+         const { data: profile } = await supabase.from('user_profiles').select('*').eq('id', user.id).single();
+         setCurrentUserProfile(profile);
+      }
+
       // Get all clients (user_profiles)
       const { data: clientsData } = await supabase
         .from('user_profiles')
         .select('*')
         .order('created_at', { ascending: false });
+        
+      const team = clientsData?.filter(c => c.role === 'admin') || [];
+      setTeamMembers(team);
 
       // Get all reports
       const { data: reportsData, error: reportsError } = await supabase
@@ -136,6 +148,27 @@ const AdminDashboard = () => {
     );
   }
 
+  const hasPermission = (perm) => {
+    if (!currentUserProfile) return false;
+    if (currentUserProfile.admin_permissions === null) return true;
+    return Array.isArray(currentUserProfile.admin_permissions) && currentUserProfile.admin_permissions.includes(perm);
+  };
+
+  const isMasterAdmin = currentUserProfile?.admin_permissions === null;
+
+  // Auto-redirect if activeTab is not permitted
+  useEffect(() => {
+    if (currentUserProfile && !loading) {
+      if (activeTab === 'team' && !isMasterAdmin) {
+        setActiveTab('analytics');
+      } else if (activeTab !== 'team' && !hasPermission(activeTab)) {
+        const available = ['analytics', 'overview', 'clients', 'reports', 'coupons', 'cohorts', 'push-campaigns'].find(hasPermission);
+        if (available) setActiveTab(available);
+        else if (isMasterAdmin) setActiveTab('team');
+      }
+    }
+  }, [currentUserProfile, activeTab, loading]);
+
   return (
     <div className="admin-dashboard">
       <header className="admin-header">
@@ -159,8 +192,16 @@ const AdminDashboard = () => {
         </button>
       </header>
 
-      {/* Stats Overview — hide on analytics to keep CEO view clean */}
-      {activeTab !== 'analytics' && (
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '4rem 2rem' }}>
+          <div style={{ display: 'inline-block', padding: '1.5rem 2.5rem', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+            <p style={{ margin: 0, fontWeight: 600, color: 'var(--text-muted)' }}>Authenticating & Loading Dashboard...</p>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Stats Overview — hide on analytics to keep CEO view clean */}
+          {activeTab !== 'analytics' && activeTab !== 'team' && (
       <div className="stats-grid">
         <div className="stat-card">
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -202,70 +243,93 @@ const AdminDashboard = () => {
 
       {/* Tabs */}
       <div className="admin-tabs">
-        <button 
-          className={`tab-button ${activeTab === 'analytics' ? 'active' : ''}`}
-          onClick={() => setActiveTab('analytics')}
-        >
-          <LayoutDashboard size={18} /> Business Analytics
-        </button>
-        <button 
-          className={`tab-button ${activeTab === 'overview' ? 'active' : ''}`}
-          onClick={() => setActiveTab('overview')}
-        >
-          <BarChart3 size={18} /> Overview
-        </button>
-        <button 
-          className={`tab-button ${activeTab === 'clients' ? 'active' : ''}`}
-          onClick={() => setActiveTab('clients')}
-        >
-          <Users size={18} /> Clients ({stats.totalClients})
-        </button>
-        <button 
-          className={`tab-button ${activeTab === 'reports' ? 'active' : ''}`}
-          onClick={() => setActiveTab('reports')}
-        >
-          <FileText size={18} /> Reports ({stats.totalReports})
-        </button>
-        <button 
-          className={`tab-button ${activeTab === 'coupons' ? 'active' : ''}`}
-          onClick={() => setActiveTab('coupons')}
-        >
-          <Tag size={18} /> Coupon Manager
-        </button>
-        <button
-          className={`tab-button ${activeTab === 'cohorts' ? 'active' : ''}`}
-          onClick={() => setActiveTab('cohorts')}
-        >
-          <Layers size={18} /> Cohorts
-        </button>
-        <button
-          className={`tab-button ${activeTab === 'push-campaigns' ? 'active' : ''}`}
-          onClick={() => setActiveTab('push-campaigns')}
-        >
-          <Bell size={18} /> Push Campaigns
-        </button>
+        {hasPermission('analytics') && (
+          <button 
+            className={`tab-button ${activeTab === 'analytics' ? 'active' : ''}`}
+            onClick={() => setActiveTab('analytics')}
+          >
+            <LayoutDashboard size={18} /> Business Analytics
+          </button>
+        )}
+        {hasPermission('overview') && (
+          <button 
+            className={`tab-button ${activeTab === 'overview' ? 'active' : ''}`}
+            onClick={() => setActiveTab('overview')}
+          >
+            <BarChart3 size={18} /> Overview
+          </button>
+        )}
+        {hasPermission('clients') && (
+          <button 
+            className={`tab-button ${activeTab === 'clients' ? 'active' : ''}`}
+            onClick={() => setActiveTab('clients')}
+          >
+            <Users size={18} /> Clients ({stats.totalClients})
+          </button>
+        )}
+        {hasPermission('reports') && (
+          <button 
+            className={`tab-button ${activeTab === 'reports' ? 'active' : ''}`}
+            onClick={() => setActiveTab('reports')}
+          >
+            <FileText size={18} /> Reports ({stats.totalReports})
+          </button>
+        )}
+        {hasPermission('coupons') && (
+          <button 
+            className={`tab-button ${activeTab === 'coupons' ? 'active' : ''}`}
+            onClick={() => setActiveTab('coupons')}
+          >
+            <Tag size={18} /> Coupon Manager
+          </button>
+        )}
+        {hasPermission('cohorts') && (
+          <button
+            className={`tab-button ${activeTab === 'cohorts' ? 'active' : ''}`}
+            onClick={() => setActiveTab('cohorts')}
+          >
+            <Layers size={18} /> Cohorts
+          </button>
+        )}
+        {hasPermission('push-campaigns') && (
+          <button
+            className={`tab-button ${activeTab === 'push-campaigns' ? 'active' : ''}`}
+            onClick={() => setActiveTab('push-campaigns')}
+          >
+            <Bell size={18} /> Push Campaigns
+          </button>
+        )}
+        {isMasterAdmin && (
+          <button
+            className={`tab-button ${activeTab === 'team' ? 'active' : ''}`}
+            onClick={() => setActiveTab('team')}
+          >
+            <Shield size={18} /> Team
+          </button>
+        )}
       </div>
 
       {/* Tab Content */}
       <div className="admin-content">
-        {activeTab === 'analytics' ? (
+        {activeTab === 'team' && isMasterAdmin ? (
+          <TeamTab teamMembers={teamMembers} currentUserProfile={currentUserProfile} loadAdminData={loadAdminData} />
+        ) : activeTab === 'analytics' ? (
           <BusinessAnalyticsShell onOpenClient={openAnalyticsClient} />
         ) : activeTab === 'cohorts' ? (
           <CohortsTab />
         ) : activeTab === 'push-campaigns' ? (
           <PushCampaignsTab />
-        ) : loading ? (
-          <div style={{ textAlign: 'center', padding: '3rem' }}>Loading...</div>
         ) : activeTab === 'overview' ? (
           <OverviewTab stats={stats} reports={reports} clients={clients} coupons={coupons} />
         ) : activeTab === 'clients' ? (
           <ClientsTab clients={clients} />
         ) : activeTab === 'reports' ? (
           <ReportsTab reports={reports} clients={clients} />
-        ) : (
+        ) : activeTab === 'coupons' ? (
           <CouponsTab coupons={coupons} loadAdminData={loadAdminData} />
-        )}
+        ) : null}
       </div>
+      </>)}
 
       <style jsx>{`
         .admin-dashboard {

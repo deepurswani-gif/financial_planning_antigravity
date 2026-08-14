@@ -1,0 +1,46 @@
+.summary-comparison-container {
+    background-color: #f9f9f9;
+    border: 1px solid #eaeaea;
+    border-radius: 8px;
+    padding: 1rem 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.summary-comparison-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.summary-comparison-row:last-child {
+    margin-bottom: 0;
+}
+
+.summary-comparison-label {
+    font-size: 0.9rem;
+    color: #555;
+    font-weight: 500;
+}
+
+.summary-comparison-value {
+    font-size: 1rem;
+    color: #111;
+    font-weight: 600;
+}
+
+.summary-comparison-row.error .summary-comparison-label,
+.summary-comparison-row.error .summary-comparison-value {
+    color: #d32f2f;
+}
+
+.summary-comparison-warning {
+    margin-top: 0.75rem;
+    font-size: 0.8rem;
+    color: #d32f2f;
+    font-weight: 500;
+}
+
+.summary-comparison-warning.warning-orange {
+    color: #f59e0b;
+}

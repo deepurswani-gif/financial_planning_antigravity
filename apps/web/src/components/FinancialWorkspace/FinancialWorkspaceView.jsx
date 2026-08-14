@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 import { signOut } from '../../services/authService';
@@ -19,6 +19,7 @@ import UnlockPlanningDialog from './UnlockPlanningDialog';
 import ScrollToTopButton from './ScrollToTopButton';
 import WorkspaceProductTour from './WorkspaceProductTour';
 import NotificationSettingsPanel from './NotificationSettingsPanel';
+import { DetailedHub } from '../DetailedHub';
 import {
   DETAILED_FLOW_ENTRY_PATH,
   DEFAULT_DETAIL_TAB_ID,
@@ -81,6 +82,7 @@ function scrollWorkspaceSectionIntoView(sectionId) {
  */
 export default function FinancialWorkspaceView() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const { lg } = useBreakpoints();
   const { user } = useAuth();
@@ -571,12 +573,11 @@ export default function FinancialWorkspaceView() {
 
   const handleSummaryReportSelect = (reportId) => {
     selectSummaryReport(reportId);
-    if (!editingSection) return;
+    const currentIsProfileHub = window.location.pathname.endsWith('/full_profile');
+    if (!editingSection && !currentIsProfileHub) return;
 
-    const nextQuery = new URLSearchParams(searchParams);
+    const nextQuery = new URLSearchParams(window.location.search);
     nextQuery.delete('edit');
-    // In Summary Mode, the URL report param represents summary report id.
-    // In Full Mode, the URL report param represents a detail tab id, so we must not overwrite it.
     if (mode === 'summary') {
       nextQuery.set('report', reportId);
     }
@@ -585,11 +586,11 @@ export default function FinancialWorkspaceView() {
 
   const handleDetailTabSelect = (reportId) => {
     selectDetailReport(reportId);
-    if (!editingSection) return;
+    const currentIsProfileHub = window.location.pathname.endsWith('/full_profile');
+    if (!editingSection && !currentIsProfileHub) return;
 
-    const nextQuery = new URLSearchParams(searchParams);
+    const nextQuery = new URLSearchParams(window.location.search);
     nextQuery.delete('edit');
-    // In Full Mode, the URL report param represents the detail tab id.
     if (mode === 'full') {
       nextQuery.set('report', reportId);
     }
@@ -597,11 +598,12 @@ export default function FinancialWorkspaceView() {
   };
 
   const exitEditingToReports = useCallback(() => {
-    if (!editingSection) return;
-    const nextQuery = new URLSearchParams(searchParams);
+    const currentIsProfileHub = window.location.pathname.endsWith('/full_profile');
+    if (!editingSection && !currentIsProfileHub) return;
+    const nextQuery = new URLSearchParams(window.location.search);
     nextQuery.delete('edit');
     navigate(`${FINANCIAL_WORKSPACE_PATH}?${nextQuery.toString()}`);
-  }, [editingSection, navigate, searchParams]);
+  }, [editingSection, navigate]);
 
   const showLegacyDevButton =
     import.meta.env.DEV &&
@@ -636,7 +638,6 @@ export default function FinancialWorkspaceView() {
     } else {
       handleDetailTabSelect(reportId);
     }
-    exitEditingToReports();
   };
 
   return (
@@ -704,7 +705,9 @@ export default function FinancialWorkspaceView() {
       <div style={{ display: 'block', position: 'relative', width: '100%', minHeight: '100vh' }}>
         <main className="fw-main" style={{ minHeight: 'calc(100vh - 6.75rem)' }}>
         <ActiveWorkspace>
-          {editingSection ? (
+          {location.pathname.endsWith('/full_profile') ? (
+            <DetailedHub />
+          ) : editingSection ? (
             <WorkspaceSectionEditor sectionId={editSectionId} />
           ) : (
             <WorkspaceContent />

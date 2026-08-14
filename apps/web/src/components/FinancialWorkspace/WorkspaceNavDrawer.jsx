@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { X, ChevronDown, ChevronRight, Lock } from 'lucide-react';
 import { DRAWER_GROUPS } from './workspaceNavConfig';
 import { isDrawerItemLocked } from './workspaceCapabilities';
+import { useProfileCompletion } from '../DetailedHub/useProfileCompletion';
 
 /**
  * Navigation drawer — opens from hamburger; items navigate or show unlock dialog.
@@ -14,6 +15,8 @@ export default function WorkspaceNavDrawer({
   onItemSelect,
   mode = 'full',
 }) {
+  const { incompleteCount } = useProfileCompletion();
+
   useEffect(() => {
     if (!open) return undefined;
 
@@ -35,6 +38,7 @@ export default function WorkspaceNavDrawer({
 
   const renderItem = (item) => {
     const locked = isDrawerItemLocked(mode, item.id);
+    const showBadge = item.id === 'full_profile' && incompleteCount > 0;
     return (
       <li key={item.id}>
         <button
@@ -47,7 +51,21 @@ export default function WorkspaceNavDrawer({
           title={locked ? 'Available after Detailed Planning' : undefined}
         >
           {locked ? <Lock size={14} className="fw-lock-icon" aria-hidden="true" /> : null}
-          <span>{item.label}</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            {item.label}
+            {showBadge && (
+              <span className="fw-badge" style={{
+                background: '#ef4444',
+                color: 'white',
+                fontSize: '0.7rem',
+                padding: '2px 6px',
+                borderRadius: '10px',
+                fontWeight: 'bold'
+              }}>
+                {incompleteCount} New
+              </span>
+            )}
+          </span>
         </button>
       </li>
     );

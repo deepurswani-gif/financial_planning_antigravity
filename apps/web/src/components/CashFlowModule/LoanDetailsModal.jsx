@@ -105,7 +105,7 @@ const LoanDetailsModal = ({ isOpen, onClose, onSave, initialData, loanTypeTitle 
             position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
             background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
             display: 'flex', justifyContent: 'center', alignItems: 'center',
-            zIndex: 1000, padding: '1rem'
+            zIndex: 3000, padding: '1rem'
         }}>
             <div className="card fade-in" style={{
                 background: 'var(--bg-main)', width: '100%', maxWidth: '550px',

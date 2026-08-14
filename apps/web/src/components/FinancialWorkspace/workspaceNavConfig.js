@@ -110,6 +110,7 @@ export const DRAWER_ITEM_ACTIONS = {
   [SECTION_IDS.MONEY_IN_MONEY_OUT]: { type: 'open_section', sectionId: SECTION_IDS.MONEY_IN_MONEY_OUT },
   [SECTION_IDS.WEALTH_SNAPSHOT]: { type: 'open_section', sectionId: SECTION_IDS.WEALTH_SNAPSHOT },
   [SECTION_IDS.DREAMS_AND_GOALS]: { type: 'open_section', sectionId: SECTION_IDS.DREAMS_AND_GOALS },
+  full_profile: { type: 'open_profile' },
   income_tax_planner: { type: 'open_calculator', calculatorId: 'income_tax' },
   settings: { type: 'none' },
   logout: { type: 'logout' },
@@ -136,6 +137,7 @@ export const DRAWER_GROUPS = [
     collapsible: true,
     defaultExpanded: true,
     items: [
+      { id: 'full_profile', label: 'Financial Profile / Data Hub' },
       { id: SECTION_IDS.FAMILY_INFORMATION, label: 'Family Information' },
       { id: SECTION_IDS.MONEY_IN_MONEY_OUT, label: 'Money In & Money Out' },
       { id: SECTION_IDS.WEALTH_SNAPSHOT, label: 'My Wealth Snapshot' },

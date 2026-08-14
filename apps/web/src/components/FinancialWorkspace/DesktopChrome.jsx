@@ -1,11 +1,13 @@
 import React from 'react';
-import { Menu } from 'lucide-react';
+import { Menu, User } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import finbrellaLogo from '../../assets/finbrella_logo.png';
 import { WORKSPACE_TITLE, WORKSPACE_DASHBOARD_LABEL } from './workspaceNavConfig';
 import DesktopToolsMenu from './DesktopToolsMenu';
 import DesktopReportLane from './DesktopReportLane';
 import WorkspaceInfoMenu from './WorkspaceInfoMenu';
 import WorkspaceProfileMenu from './WorkspaceProfileMenu';
+import { useProfileCompletion } from '../DetailedHub/useProfileCompletion';
 
 /**
  * Slim desktop chrome: brand + dashboard label left; title → Tools + Info + profile right; report lane.
@@ -32,6 +34,8 @@ export default function DesktopChrome({
   detailLocked = false,
   contextFields = [],
 }) {
+  const { incompleteCount } = useProfileCompletion();
+
   return (
     <div className="fw-chrome fw-chrome--desktop">
       <header className="fw-top-app-bar">
@@ -66,8 +70,29 @@ export default function DesktopChrome({
                 onOpenCalculator={onOpenCalculator}
                 onLockedSelect={onLockedSelect}
               />
+              <Link 
+                to="/financial-workspace/full_profile"
+                className="fw-tools-menu-btn"
+                style={{ marginLeft: '0.75rem', textDecoration: 'none', position: 'relative' }}
+              >
+                <User size={15} aria-hidden="true" />
+                <span>Financial Profile</span>
+                {incompleteCount > 0 && (
+                  <span className="fw-badge" style={{
+                    background: '#ef4444',
+                    color: 'white',
+                    fontSize: '0.65rem',
+                    padding: '2px 5px',
+                    borderRadius: '10px',
+                    fontWeight: 'bold',
+                    marginLeft: '0.25rem'
+                  }}>
+                    {incompleteCount} New
+                  </span>
+                )}
+              </Link>
             </div>
-            <WorkspaceInfoMenu fields={contextFields} />
+            <WorkspaceInfoMenu fields={contextFields} iconOnly />
             <WorkspaceProfileMenu
               userInitials={userInitials}
               userEmail={userEmail}

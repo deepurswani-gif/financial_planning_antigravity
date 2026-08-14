@@ -68,7 +68,7 @@ export function isOnlyLegacySummaryLiabilities(liabilityCategories = {}) {
         || getAssetAmount(loans.creditCard) > 0
         || getAssetAmount(loans.personal) > 0;
     if (!hasSummaryScalars) return false;
-    return ['car', 'education', 'otherEmis'].every((key) => getAssetAmount(loans[key]) <= 0)
+    return ['car', 'twoWheeler', 'education', 'otherEmis'].every((key) => getAssetAmount(loans[key]) <= 0)
         && !(Array.isArray(liabilityCategories.custom) && liabilityCategories.custom.length > 0);
 }
 
@@ -77,7 +77,7 @@ export function hasLiabilityDetailEntered(liabilityCategories = {}) {
         return true;
     }
     const loans = liabilityCategories.loans || {};
-    if (['car', 'education', 'otherEmis'].some((key) => getAssetAmount(loans[key]) > 0)) {
+    if (['car', 'twoWheeler', 'education', 'otherEmis'].some((key) => getAssetAmount(loans[key]) > 0)) {
         return true;
     }
     const hasScalar = ['home', 'personal', 'creditCard'].some((key) => getAssetAmount(loans[key]) > 0);
@@ -206,6 +206,7 @@ function blankLiabilityDetailFields() {
             home: '',
             personal: '',
             car: '',
+            twoWheeler: '',
             education: '',
             otherEmis: '',
             creditCard: '',
@@ -378,7 +379,7 @@ export function getTotalAssetBreakdownTotal(assetCategories = {}) {
 /** Outstanding loan balances from detailed liability fields (excl. credit card & other payables). */
 export function getOutstandingLoansBreakdownTotal(liabilityCategories = {}) {
     const loans = liabilityCategories.loans || {};
-    return ['home', 'car', 'education', 'otherEmis'].reduce(
+    return ['home', 'car', 'twoWheeler', 'education', 'otherEmis'].reduce(
         (sum, key) => sum + getAssetAmount(loans[key]),
         0,
     );

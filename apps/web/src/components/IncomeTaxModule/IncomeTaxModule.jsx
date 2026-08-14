@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
     calculateIncomeTaxFromDetail,
     showPensionerTaxNote,
@@ -10,13 +10,40 @@ import {
 } from './IncomeTaxLogic';
 import IncomeTaxOutput from './IncomeTaxOutput';
 import { guessEmploymentTypeFromSummaryOccupation } from '../DetailedFlow/employmentTypeSync';
-import { createEmptyIncomeDetail } from '../DetailedFlow/incomeDetailSync';
+import { createEmptyIncomeDetail, isSalariedEmployment, isGovernmentSector, applyDetailSyncToIncome } from '../DetailedFlow/incomeDetailSync';
+import CurrencyInput from '../common/CurrencyInput';
+
+const toStored = (v) => (v == null ? '' : String(v));
+
+const CurrencyField = ({ label, value, onChange, placeholder = '0', readOnly = false }) => (
+    <div>
+        {label && (
+            <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.4rem', display: 'block' }}>
+                {label}
+            </label>
+        )}
+        <CurrencyInput
+            className="conversational-input"
+            placeholder={placeholder}
+            value={value ?? ''}
+            readOnly={readOnly}
+            onValueChange={(v) => {
+                if (!readOnly) onChange(toStored(v));
+            }}
+            style={readOnly ? {
+                background: 'var(--bg-main)',
+                color: 'var(--text-muted)',
+                cursor: 'default',
+            } : undefined}
+        />
+    </div>
+);
 
 const resolveEmploymentType = (member) => (
     member?.employmentType || guessEmploymentTypeFromSummaryOccupation(member?.occupation) || 'Private Sector'
 );
 
-const IncomeTaxModule = ({ familyMembers, income, onNext, onBack, isCalculatorMode = false }) => {
+const IncomeTaxModule = ({ familyMembers, income, onNext, onBack, isCalculatorMode = false, setIncome }) => {
     const selfMember = familyMembers.find(m => m.relation?.toLowerCase() === 'self') || { name: 'Self', occupation: 'Salaried' };
     const spouseMember = familyMembers.find(m => m.relation?.toLowerCase() === 'spouse');
 
@@ -35,50 +62,159 @@ const IncomeTaxModule = ({ familyMembers, income, onNext, onBack, isCalculatorMo
         spouseTaxResults = calculateIncomeTaxFromDetail(spouseDetail, spouseEmploymentType);
     }
 
-    const renderMemberTax = (member, employmentType, detail, taxResults) => (
-        <>
-            {showTaxPlanningDisabledNote(detail, employmentType) && (
-                <div style={{
-                    padding: '0.75rem 1rem',
-                    background: '#f0f9ff',
-                    borderLeft: '4px solid #0284c7',
-                    borderRadius: '4px',
-                    marginBottom: '1rem',
-                    fontSize: '0.85rem',
-                    color: '#0c4a6e',
-                }}>
-                    {TAX_PLANNING_DISABLED_NOTE}
+    const updateTaxField = useCallback((memberKey, section, field, value) => {
+        if (!setIncome) return;
+        setIncome(prev => {
+            const detailKey = memberKey === 'self' ? 'selfDetail' : 'spouseDetail';
+            const currentDetail = prev[detailKey] || createEmptyIncomeDetail();
+            const updatedDetail = {
+                ...currentDetail,
+                needTaxPlanning: true,
+                taxPlanning: {
+                    ...currentDetail.taxPlanning,
+                    [section]: {
+                        ...currentDetail.taxPlanning?.[section],
+                        [field]: value,
+                    },
+                },
+            };
+            const nextIncome = {
+                ...prev,
+                [detailKey]: updatedDetail
+            };
+            return applyDetailSyncToIncome(
+                nextIncome,
+                selfEmploymentType,
+                spouseMember ? spouseEmploymentType : null
+            );
+        });
+    }, [setIncome, selfEmploymentType, spouseEmploymentType, spouseMember]);
+
+    const buildTaxEarningsFields = (memberKey, detail, employmentType) => {
+        const isGov = isGovernmentSector(employmentType);
+        const e = detail.taxPlanning?.earnings || {};
+
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <CurrencyField label="Basic Pay" value={e.basicPay} onChange={(v) => updateTaxField(memberKey, 'earnings', 'basicPay', v)} />
+                <CurrencyField label="Dearness Allowance" value={e.dearnessAllowance} onChange={(v) => updateTaxField(memberKey, 'earnings', 'dearnessAllowance', v)} />
+                <CurrencyField label="House Rent Allowance" value={e.houseRentAllowance} onChange={(v) => updateTaxField(memberKey, 'earnings', 'houseRentAllowance', v)} />
+                <CurrencyField label="Allowances (All)" value={e.allowances} onChange={(v) => updateTaxField(memberKey, 'earnings', 'allowances', v)} />
+                {isGov ? (
+                    <>
+                        <CurrencyField label="Leave Encashment (Annual)" value={e.leaveEncashment} onChange={(v) => updateTaxField(memberKey, 'earnings', 'leaveEncashment', v)} />
+                        <CurrencyField label="Annual Bonus" value={e.bonus} onChange={(v) => updateTaxField(memberKey, 'earnings', 'bonus', v)} />
+                    </>
+                ) : (
+                    <CurrencyField label="Annual Performance Bonus" value={e.performanceBonus} onChange={(v) => updateTaxField(memberKey, 'earnings', 'performanceBonus', v)} />
+                )}
+                <div>
+                    <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.4rem', display: 'block' }}>Other Earning</label>
+                    <input
+                        type="text"
+                        className="conversational-input"
+                        style={{ marginBottom: '0.5rem' }}
+                        placeholder="Other earning name"
+                        value={e.other?.name || ''}
+                        onChange={(ev) => updateTaxField(memberKey, 'earnings', 'other', { ...e.other, name: ev.target.value })}
+                    />
+                    <CurrencyField
+                        value={e.other?.amount}
+                        onChange={(v) => updateTaxField(memberKey, 'earnings', 'other', { ...e.other, amount: v })}
+                        placeholder="Annual amount"
+                    />
                 </div>
-            )}
-            {showTaxSlipRequiredNote(detail, employmentType) && (
-                <div style={{
-                    padding: '0.75rem 1rem',
-                    background: '#fefce8',
-                    borderLeft: '4px solid #ca8a04',
-                    borderRadius: '4px',
-                    marginBottom: '1rem',
-                    fontSize: '0.85rem',
-                    color: '#854d0e',
-                }}>
-                    {TAX_SLIP_REQUIRED_NOTE}
+            </div>
+        );
+    };
+
+    const buildTaxDeductionsFields = (memberKey, detail, employmentType) => {
+        const isGov = isGovernmentSector(employmentType);
+        const d = detail.taxPlanning?.deductions || {};
+
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <CurrencyField
+                    label={isGov ? 'Employee PF / NPS' : 'Employee PF'}
+                    value={d.employeePF}
+                    onChange={(v) => updateTaxField(memberKey, 'deductions', 'employeePF', v)}
+                />
+                <CurrencyField
+                    label="Income Tax (TDS)"
+                    value={d.incomeTax}
+                    onChange={(v) => updateTaxField(memberKey, 'deductions', 'incomeTax', v)}
+                />
+                {isGov ? (
+                    <>
+                        <CurrencyField label="Group Insurance" value={d.groupInsurance} onChange={(v) => updateTaxField(memberKey, 'deductions', 'groupInsurance', v)} />
+                        <CurrencyField label="Health Scheme" value={d.healthScheme} onChange={(v) => updateTaxField(memberKey, 'deductions', 'healthScheme', v)} />
+                    </>
+                ) : (
+                    <>
+                        <CurrencyField label="Group Personal Accident" value={d.groupPersonalAccident} onChange={(v) => updateTaxField(memberKey, 'deductions', 'groupPersonalAccident', v)} />
+                        <CurrencyField label="Group Medical Coverage" value={d.groupMedicalCoverage} onChange={(v) => updateTaxField(memberKey, 'deductions', 'groupMedicalCoverage', v)} />
+                    </>
+                )}
+                <div>
+                    <label style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.4rem', display: 'block' }}>Other Deduction</label>
+                    <input
+                        type="text"
+                        className="conversational-input"
+                        style={{ marginBottom: '0.5rem' }}
+                        placeholder="Other deduction name"
+                        value={d.other?.name || ''}
+                        onChange={(ev) => updateTaxField(memberKey, 'deductions', 'other', { ...d.other, name: ev.target.value })}
+                    />
+                    <CurrencyField
+                        value={d.other?.amount}
+                        onChange={(v) => updateTaxField(memberKey, 'deductions', 'other', { ...d.other, amount: v })}
+                        placeholder="Annual amount"
+                    />
                 </div>
-            )}
-            {showPensionerTaxNote(employmentType) && (
-                <div style={{
-                    padding: '0.75rem 1rem',
-                    background: '#fefce8',
-                    borderLeft: '4px solid #ca8a04',
-                    borderRadius: '4px',
-                    marginBottom: '1rem',
-                    fontSize: '0.85rem',
-                    color: '#854d0e',
-                }}>
-                    <strong>Assumption:</strong> {PENSIONER_STANDARD_DEDUCTION_NOTE}
-                </div>
-            )}
-            {taxResults && <IncomeTaxOutput results={taxResults} />}
-        </>
-    );
+            </div>
+        );
+    };
+
+    const renderMemberTax = (member, employmentType, detail, taxResults, memberKey) => {
+        const isSalaried = isSalariedEmployment(employmentType);
+
+        return (
+            <>
+                {isSalaried && (
+                    <div style={{ marginBottom: '2rem', background: '#f8fafc', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <h3 style={{ marginTop: 0, marginBottom: '1rem', color: '#0f172a' }}>Salary Slip Details</h3>
+                        <p style={{ fontSize: '0.85rem', color: '#475569', marginBottom: '1.5rem' }}>
+                            Fill in your detailed earnings and deductions to accurately calculate your income tax.
+                        </p>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
+                            <div>
+                                <h4 style={{ color: '#334155', borderBottom: '1px solid #cbd5e1', paddingBottom: '0.5rem', marginBottom: '1rem' }}>Earnings</h4>
+                                {buildTaxEarningsFields(memberKey, detail, employmentType)}
+                            </div>
+                            <div>
+                                <h4 style={{ color: '#334155', borderBottom: '1px solid #cbd5e1', paddingBottom: '0.5rem', marginBottom: '1rem' }}>Deductions</h4>
+                                {buildTaxDeductionsFields(memberKey, detail, employmentType)}
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {showPensionerTaxNote(employmentType) && (
+                    <div style={{
+                        padding: '0.75rem 1rem',
+                        background: '#fefce8',
+                        borderLeft: '4px solid #ca8a04',
+                        borderRadius: '4px',
+                        marginBottom: '1rem',
+                        fontSize: '0.85rem',
+                        color: '#854d0e',
+                    }}>
+                        <strong>Assumption:</strong> {PENSIONER_STANDARD_DEDUCTION_NOTE}
+                    </div>
+                )}
+                {taxResults && <IncomeTaxOutput results={taxResults} />}
+            </>
+        );
+    };
 
     return (
         <div className="fade-in" style={{ marginTop: '2rem' }}>
@@ -101,7 +237,7 @@ const IncomeTaxModule = ({ familyMembers, income, onNext, onBack, isCalculatorMo
                         <h2 style={{ color: 'var(--primary)', borderBottom: '2px solid var(--border)', paddingBottom: '0.5rem' }}>
                             {selfMember.name || 'Self'}'s Tax ({selfMember.employmentType || selfMember.occupation})
                         </h2>
-                        {renderMemberTax(selfMember, selfEmploymentType, selfDetail, selfTaxResults)}
+                        {renderMemberTax(selfMember, selfEmploymentType, selfDetail, selfTaxResults, 'self')}
                     </div>
 
                     {spouseMember && (
@@ -116,7 +252,7 @@ const IncomeTaxModule = ({ familyMembers, income, onNext, onBack, isCalculatorMo
                                     </p>
                                 </div>
                             ) : (
-                                renderMemberTax(spouseMember, spouseEmploymentType, spouseDetail, spouseTaxResults)
+                                renderMemberTax(spouseMember, spouseEmploymentType, spouseDetail, spouseTaxResults, 'spouse')
                             )}
                         </div>
                     )}

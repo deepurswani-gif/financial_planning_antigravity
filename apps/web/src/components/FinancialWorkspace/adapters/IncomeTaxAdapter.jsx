@@ -7,12 +7,13 @@ import IncomeTaxModule from '../../IncomeTaxModule/IncomeTaxModule';
  * IncomeTaxModule expects familyMembers, income, isCalculatorMode — unchanged.
  */
 export default function IncomeTaxAdapter() {
-  const { familyMembers = [], income = {} } = useFinancialPlan();
+  const { familyMembers = [], income = {}, setIncome } = useFinancialPlan();
 
   return (
     <IncomeTaxModule
       familyMembers={familyMembers}
       income={income}
+      setIncome={setIncome}
       isCalculatorMode
     />
   );

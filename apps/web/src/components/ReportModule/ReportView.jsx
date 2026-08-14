@@ -15,7 +15,7 @@ import GrowthModule from '../GrowthModule/GrowthModule';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 
 const ReportView = ({ onBack }) => {
-    const { familyMembers, income, expenseCategories, assetCategories, liabilityCategories, goals, policies, investmentAllocations: allocations, goalMappings, contingencyFund, journeyAdjustments, journeyProjections: projections, calculatorInputs, hasSpouseIncome } = useFinancialPlan();
+    const { familyMembers, income, setIncome, expenseCategories, assetCategories, liabilityCategories, goals, policies, investmentAllocations: allocations, goalMappings, contingencyFund, journeyAdjustments, journeyProjections: projections, calculatorInputs, hasSpouseIncome } = useFinancialPlan();
     const [isDashboardMode, setIsDashboardMode] = useState(true);
     const [activeGoalTab, setActiveGoalTab] = useState('short'); // For goal tabs
 
@@ -738,6 +738,7 @@ const ReportView = ({ onBack }) => {
                     <IncomeTaxModule 
                         familyMembers={familyMembers}
                         income={income}
+                        setIncome={setIncome}
                         isCalculatorMode={true}
                     />
                 </section>

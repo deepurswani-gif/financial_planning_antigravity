@@ -486,7 +486,6 @@ export function calculateIncomeTaxFromInput(taxInput) {
 
 export function calculateIncomeTaxFromDetail(detail, employmentType) {
     const taxInput = buildTaxInput(detail, employmentType);
-    if (!taxInput) return null;
     return calculateIncomeTaxFromInput(taxInput);
 }
 

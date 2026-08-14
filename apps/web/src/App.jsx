@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import RoleBasedRouting from './components/Auth/RoleBasedRouting';
 import ProtectedRoute from './components/ProtectedRoute';
 import DetailedAccessGate from './components/Auth/DetailedAccessGate';
+import ResetPassword from './components/Auth/ResetPassword';
 import { useFinancialPlan } from './contexts/FinancialPlanContext';
 import BlankLayout from './components/Layouts/BlankLayout';
 
@@ -22,6 +23,7 @@ import { EditingProvider, FocusedEditShell } from './editing';
 
 // Detailed Flow Placeholder
 import DetailedFamilyInfo from './components/DetailedFlow/DetailedFamilyInfo';
+import { DetailedHub } from './components/DetailedHub';
 import DetailedMoneyInOut from './components/DetailedFlow/DetailedMoneyInOut';
 import DetailedMyWealthSnapshot from './components/DetailedFlow/DetailedMyWealthSnapshot';
 import DetailedDreamsGoals from './components/DetailedFlow/DetailedDreamsGoals';
@@ -54,6 +56,7 @@ function App() {
     <RoleBasedRouting>
       <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
         <Routes>
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route
           path="/"
           element={
@@ -96,7 +99,7 @@ function App() {
 
         {/* Financial Workspace (shell v1.0 + Phase 2 navigation) */}
         <Route
-          path="/financial-workspace"
+          path="/financial-workspace/*"
           element={
             <ProtectedRoute>
               <FinancialWorkspaceProvider>
@@ -132,13 +135,14 @@ function App() {
             </ProtectedRoute>
           }
         >
+          <Route index element={<Navigate to="/financial-workspace/full_profile" replace />} />
           <Route path="familyinfo" element={<DetailedFamilyInfo />} />
           <Route path="money_in_out" element={<DetailedMoneyInOut />} />
           <Route path="mywealth" element={<DetailedMyWealthSnapshot />} />
           <Route path="dreams_goals" element={<DetailedDreamsGoals />} />
           <Route path="growth_expectations" element={<DetailedGrowthExpectations />} />
-          <Route path="expenses_emis" element={<Navigate to="/detailed-flow/money_in_out" replace />} />
-          <Route path="*" element={<Navigate to="/detailed-flow/familyinfo" replace />} />
+          <Route path="expenses_emis" element={<Navigate to="/detailed-flow" replace />} />
+          <Route path="*" element={<Navigate to="/detailed-flow" replace />} />
         </Route>
 
         {import.meta.env.DEV && RegistryExplorer && (

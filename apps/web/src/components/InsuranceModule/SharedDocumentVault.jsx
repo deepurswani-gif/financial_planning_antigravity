@@ -126,7 +126,7 @@ const SharedDocumentVault = () => {
                 </div>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(250px, 1fr) 2fr', gap: '2rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                 {/* Upload Area */}
                 <div>
                     <input
