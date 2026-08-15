@@ -20,6 +20,8 @@ export default function MobileTopBar({
   onOpenSettings,
   contextFields = [],
   dashboardLabel = WORKSPACE_DASHBOARD_LABEL,
+  detailLocked = false,
+  onLockedSelect,
 }) {
   const { incompleteCount } = useProfileCompletion();
 
@@ -56,7 +58,13 @@ export default function MobileTopBar({
             <span>Tools</span>
           </button>
           <Link
-            to="/financial-workspace/full_profile"
+            to={detailLocked ? "#" : "/financial-workspace/full_profile"}
+            onClick={(e) => {
+              if (detailLocked) {
+                e.preventDefault();
+                if (onLockedSelect) onLockedSelect('full_profile');
+              }
+            }}
             className="fw-icon-btn"
             aria-label="Financial Profile"
             style={{ marginLeft: '0.25rem', marginRight: '0.25rem', position: 'relative' }}

@@ -3,16 +3,16 @@ import { X, Wallet, ArrowRightLeft, Users, Target, Shield, Landmark, TrendingUp 
 import SubCard from './SubCard';
 import './BreakdownModal.css';
 
-const BreakdownModal = ({ isOpen, onClose, activeCategory, onOpenSheet, completedStates = {} }) => {
+const BreakdownModal = ({ isOpen, onClose, activeCategory, onOpenSheet, completedStates = {}, isSheetOpen }) => {
     useEffect(() => {
         const handleKeyDown = (e) => {
-            if (e.key === 'Escape' && isOpen) {
+            if (e.key === 'Escape' && isOpen && !isSheetOpen) {
                 onClose();
             }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isOpen, onClose]);
+    }, [isOpen, isSheetOpen, onClose]);
 
     if (!isOpen) return null;
 

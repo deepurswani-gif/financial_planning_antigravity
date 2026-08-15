@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import SubscriptionGate from './SubscriptionGate';
@@ -16,8 +16,16 @@ import {
 const DetailedAccessGate = ({ children }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
+
+  useEffect(() => {
+    if (hasAccess && location.state?.returnTo) {
+      const target = location.state.returnTo;
+      navigate(target, { replace: true, state: {} });
+    }
+  }, [hasAccess, location.state?.returnTo, navigate]);
 
   useEffect(() => {
     let cancelled = false;

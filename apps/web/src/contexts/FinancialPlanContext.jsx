@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from './AuthContext';
-import { createFinancialPlan, getActivePlan, updateFinancialPlan, markSummaryReportGenerated } from '../services/financialPlanService';
+import { createFinancialPlan, getActivePlan, updateFinancialPlan, markSummaryReportGenerated, getUserProfile } from '../services/financialPlanService';
 import {
   buildSummaryDraftPayload,
   clearSummaryDraft,
@@ -26,6 +26,7 @@ import {
   resolveEffectiveCapability,
 } from '../components/FinancialWorkspace/workspaceCapabilityStorage';
 import { dispatchMonthlyWealthSummary } from '../notificationDelivery';
+import { isSubscriptionCurrentlyValid } from '../lib/subscriptionAccess';
 
 const FinancialPlanContext = createContext();
 
@@ -547,7 +548,17 @@ export const FinancialPlanProvider = ({ children }) => {
         setLoading(true);
       }
 
-      const { data, error } = await getActivePlan();
+      const [planResult, profileResult] = await Promise.all([
+        getActivePlan(),
+        getUserProfile(),
+      ]);
+      const { data, error } = planResult;
+
+      if (profileResult?.data) {
+        if (isSubscriptionCurrentlyValid(profileResult.data)) {
+          saveWorkspaceCapability(userId, WORKSPACE_CAPABILITY_FULL);
+        }
+      }
 
       if (error) {
         console.error('Error loading plan from Supabase:', error);

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Check, Shield, Trash2, UserPlus, X } from 'lucide-react';
+import { Check, Shield, Trash2, UserPlus, X, Edit2 } from 'lucide-react';
 
 const PERMISSIONS = [
   { id: 'analytics', label: 'Business Analytics' },
@@ -13,12 +13,13 @@ const PERMISSIONS = [
 ];
 
 const TeamTab = ({ teamMembers, currentUserProfile, loadAdminData }) => {
-  const [isCreating, setIsCreating] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingUserId, setEditingUserId] = useState(null);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     full_name: '',
-    permissions: [], // empty array means no access, we'll let them check boxes
+    permissions: [],
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -38,13 +39,46 @@ const TeamTab = ({ teamMembers, currentUserProfile, loadAdminData }) => {
     }));
   };
 
-  const handleCreate = async (e) => {
+  const handleOpenCreate = () => {
+    setEditingUserId(null);
+    setFormData({ email: '', password: '', full_name: '', permissions: [] });
+    setIsFormOpen(true);
+  };
+
+  const handleOpenEdit = (member) => {
+    setEditingUserId(member.id);
+    setFormData({
+      email: member.email || '',
+      password: '', // leave blank so they don't have to change it unless they want to
+      full_name: member.full_name || '',
+      permissions: member.admin_permissions || [],
+    });
+    setIsFormOpen(true);
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       
+      const payload = {
+        action: editingUserId ? 'update' : 'create',
+        email: formData.email,
+        full_name: formData.full_name,
+        permissions: formData.permissions,
+      };
+
+      if (editingUserId) {
+        payload.userId = editingUserId;
+        if (formData.password) {
+           payload.password = formData.password;
+        }
+      } else {
+        payload.password = formData.password;
+      }
+
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-subadmin`,
         {
@@ -53,20 +87,15 @@ const TeamTab = ({ teamMembers, currentUserProfile, loadAdminData }) => {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${session?.access_token}`,
           },
-          body: JSON.stringify({
-            action: 'create',
-            email: formData.email,
-            password: formData.password,
-            full_name: formData.full_name,
-            permissions: formData.permissions,
-          }),
+          body: JSON.stringify(payload),
         }
       );
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to create sub-admin');
+        throw new Error(data.error || `Failed to ${editingUserId ? 'update' : 'create'} sub-admin`);
       }
-      setIsCreating(false);
+      setIsFormOpen(false);
+      setEditingUserId(null);
       setFormData({ email: '', password: '', full_name: '', permissions: [] });
       await loadAdminData();
     } catch (err) {
@@ -116,9 +145,9 @@ const TeamTab = ({ teamMembers, currentUserProfile, loadAdminData }) => {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <h2>Team & Access Control</h2>
-        {!isCreating && (
+        {!isFormOpen && (
           <button
-            onClick={() => setIsCreating(true)}
+            onClick={handleOpenCreate}
             style={{
               padding: '0.75rem 1.5rem',
               background: 'var(--primary)',
@@ -143,10 +172,10 @@ const TeamTab = ({ teamMembers, currentUserProfile, loadAdminData }) => {
         </div>
       )}
 
-      {isCreating && (
+      {isFormOpen && (
         <div style={{ padding: '1.5rem', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', marginBottom: '2rem' }}>
-          <h3 style={{ marginTop: 0 }}>Create New Sub-Admin</h3>
-          <form onSubmit={handleCreate} style={{ display: 'grid', gap: '1rem', maxWidth: '500px' }}>
+          <h3 style={{ marginTop: 0 }}>{editingUserId ? 'Edit Sub-Admin' : 'Create New Sub-Admin'}</h3>
+          <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '1rem', maxWidth: '500px' }}>
             <div>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>Full Name</label>
               <input
@@ -162,18 +191,20 @@ const TeamTab = ({ teamMembers, currentUserProfile, loadAdminData }) => {
               <input
                 type="email"
                 required
+                disabled={!!editingUserId}
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-main)' }}
+                style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-main)', opacity: editingUserId ? 0.6 : 1 }}
               />
             </div>
             <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>Temporary Password</label>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>{editingUserId ? 'New Password (Optional)' : 'Temporary Password'}</label>
               <input
                 type="password"
-                required
+                required={!editingUserId}
                 minLength={6}
                 value={formData.password}
+                placeholder={editingUserId ? "Leave blank to keep current password" : ""}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-main)' }}
               />
@@ -209,11 +240,11 @@ const TeamTab = ({ teamMembers, currentUserProfile, loadAdminData }) => {
                   flex: 1,
                 }}
               >
-                {loading ? 'Creating...' : 'Create Account'}
+                {loading ? 'Saving...' : (editingUserId ? 'Save Changes' : 'Create Account')}
               </button>
               <button
                 type="button"
-                onClick={() => setIsCreating(false)}
+                onClick={() => { setIsFormOpen(false); setEditingUserId(null); }}
                 disabled={loading}
                 style={{
                   padding: '0.75rem 1.5rem',
@@ -281,25 +312,46 @@ const TeamTab = ({ teamMembers, currentUserProfile, loadAdminData }) => {
                 </td>
                 <td style={{ padding: '1rem', textAlign: 'right' }}>
                   {member.id !== currentUserProfile.id && member.admin_permissions !== null && (
-                    <button
-                      onClick={() => handleDelete(member.id)}
-                      disabled={loading}
-                      style={{
-                        padding: '0.5rem',
-                        background: 'transparent',
-                        color: '#ef4444',
-                        border: '1px solid #fca5a5',
-                        borderRadius: '6px',
-                        cursor: loading ? 'not-allowed' : 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        transition: 'all 0.2s'
-                      }}
-                      title="Delete Sub-Admin"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                      <button
+                        onClick={() => handleOpenEdit(member)}
+                        disabled={loading}
+                        style={{
+                          padding: '0.5rem',
+                          background: 'transparent',
+                          color: 'var(--text)',
+                          border: '1px solid var(--border)',
+                          borderRadius: '6px',
+                          cursor: loading ? 'not-allowed' : 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.2s'
+                        }}
+                        title="Edit Sub-Admin"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(member.id)}
+                        disabled={loading}
+                        style={{
+                          padding: '0.5rem',
+                          background: 'transparent',
+                          color: '#ef4444',
+                          border: '1px solid #fca5a5',
+                          borderRadius: '6px',
+                          cursor: loading ? 'not-allowed' : 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.2s'
+                        }}
+                        title="Delete Sub-Admin"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   )}
                 </td>
               </tr>

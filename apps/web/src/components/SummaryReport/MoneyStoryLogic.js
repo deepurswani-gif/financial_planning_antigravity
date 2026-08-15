@@ -98,38 +98,43 @@ export const buildWaterfallData = (cashFlowResults) => {
     const emi = cashFlowResults.categorySums?.emi || 0;
     const insurance = cashFlowResults.categorySums?.insurance || 0;
     const savings = cashFlowResults.totalSavings || 0;
-    const expenses = household + insurance; // Household + Insurance = living expenses (EMI separate)
-    const unallocated = income - expenses - emi - savings;
+    const unallocated = income - household - emi - insurance - savings;
 
     return [
         {
             name: 'Income',
             value: income,
             fill: '#10B981',
-            // For waterfall: base is 0, top is income
             base: 0,
             top: income
         },
         {
-            name: 'Expenses',
-            value: expenses,
+            name: 'Household',
+            value: household,
             fill: '#EF4444',
-            base: income - expenses,
+            base: income - household,
             top: income
         },
         {
             name: 'EMIs',
             value: emi,
             fill: '#F59E0B',
-            base: income - expenses - emi,
-            top: income - expenses
+            base: income - household - emi,
+            top: income - household
+        },
+        {
+            name: 'Insurance',
+            value: insurance,
+            fill: '#8B5CF6',
+            base: income - household - emi - insurance,
+            top: income - household - emi
         },
         {
             name: 'Savings',
             value: savings,
             fill: '#6366F1',
-            base: income - expenses - emi - savings,
-            top: income - expenses - emi
+            base: income - household - emi - insurance - savings,
+            top: income - household - emi - insurance
         },
         {
             name: 'Surplus',

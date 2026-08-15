@@ -18,17 +18,18 @@ import CurrencyInput from '../../common/CurrencyInput';
 import DateInput from '../../common/DateInput';
 
 const BreakdownFamily = () => {
-    const { familyMembers, setFamilyMembers, setHasSpouseIncome, setExpenseCategories } = useFinancialPlan();
+    const { familyMembers, setFamilyMembers, setHasSpouseIncome, setExpenseCategories, hasSpouseIncome } = useFinancialPlan();
 
     useEffect(() => {
         setFamilyMembers(prev => {
             let changed = false;
             const hasSpouse = prev.some(m => m.relation === 'Spouse');
             const hasChildren = prev.some(m => m.relation === 'Child');
-            const next = prev.map(m => {
+            
+            let next = prev.map(m => {
                 if (m.relation === 'Self') {
                     const updates = { ...m };
-                    if (m.isMarried === undefined && (hasSpouse || hasChildren)) {
+                    if (m.isMarried === undefined && (hasSpouse || hasChildren || hasSpouseIncome)) {
                         updates.isMarried = true;
                         changed = true;
                     }
@@ -45,15 +46,23 @@ const BreakdownFamily = () => {
                     changed = true;
                     return {
                         ...m,
-                        isSpouseWorking: m.occupation?.toLowerCase() !== 'housewife',
+                        isSpouseWorking: hasSpouseIncome ? true : m.occupation?.toLowerCase() !== 'housewife',
                         employmentType: m.employmentType || guessEmploymentTypeFromSummaryOccupation(m.occupation),
                     };
                 }
                 return m;
             });
+
+            if (hasSpouseIncome && !hasSpouse) {
+                const newSpouse = createEmptySpouseMember();
+                newSpouse.isSpouseWorking = true;
+                next.push(newSpouse);
+                changed = true;
+            }
+
             return changed ? next : prev;
         });
-    }, [setFamilyMembers]);
+    }, [setFamilyMembers, hasSpouseIncome]);
 
     const selfMember = familyMembers.find(m => m.relation === 'Self') || {
         name: '', dob: '', occupation: 'Salaried', retirementAge: 60, relation: 'Self', mobile: '',
