@@ -242,8 +242,8 @@ const MoneyStorySection = () => {
                     <div className="ms-stat-accent" style={{ background: '#EF4444' }} />
                     <div className="ms-stat-icon" style={{ color: '#EF4444' }}><CreditCard size={22} /></div>
                     <div className="ms-stat-info">
-                        <span className="ms-stat-label">Total Monthly Expenses</span>
-                        <span className="ms-stat-value">{formatCurrency(cashFlowResults.totalExpenses)}</span>
+                        <span className="ms-stat-label">Monthly Household Expenses</span>
+                        <span className="ms-stat-value">{formatCurrency(cashFlowResults.categorySums?.household || 0)}</span>
                     </div>
                 </div>
                 <div className="ms-stat-card">
@@ -252,6 +252,14 @@ const MoneyStorySection = () => {
                     <div className="ms-stat-info">
                         <span className="ms-stat-label">Total Monthly EMIs</span>
                         <span className="ms-stat-value">{formatCurrency(cashFlowResults.categorySums?.emi || 0)}</span>
+                    </div>
+                </div>
+                <div className="ms-stat-card">
+                    <div className="ms-stat-accent" style={{ background: '#8B5CF6' }} />
+                    <div className="ms-stat-icon" style={{ color: '#8B5CF6' }}><Shield size={22} /></div>
+                    <div className="ms-stat-info">
+                        <span className="ms-stat-label">Monthly Insurance Premiums</span>
+                        <span className="ms-stat-value">{formatCurrency(cashFlowResults.categorySums?.insurance || 0)}</span>
                     </div>
                 </div>
                 <div className="ms-stat-card">
@@ -715,9 +723,9 @@ const MoneyStorySection = () => {
                 /* ── Stat Strip ── */
                 .ms-stat-strip {
                     display: grid;
-                    grid-template-columns: repeat(4, 1fr);
+                    grid-template-columns: repeat(5, 1fr);
                     gap: 0;
-                    max-width: 1000px;
+                    max-width: 1200px;
                     margin: 0 auto 2rem;
                     padding: 0 2rem;
                 }
