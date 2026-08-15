@@ -208,14 +208,7 @@ const MoneyStorySection = () => {
                 </p>
             </RevealSection>
 
-            {!(getHouseholdBreakdownTotal(expenseCategories, familyMembers) > 0) && (
-                <div style={{ padding: '0 2rem', maxWidth: '800px', margin: '0 auto' }}>
-                    <DetailedHubCTA 
-                        message="Want a more accurate Money Story? Update your expenses in your Financial Profile."
-                        buttonText="Update Now"
-                    />
-                </div>
-            )}
+
 
             {/* ══════════════════════════════════════════════
                 THE RIVER — MONTHLY CASH FLOW

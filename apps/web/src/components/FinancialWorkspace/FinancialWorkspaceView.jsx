@@ -327,7 +327,7 @@ export default function FinancialWorkspaceView() {
   const goToDetailedPlanning = useCallback(() => {
     setUnlockOpen(false);
     setDrawerOpen(false);
-    navigate(DETAILED_FLOW_ENTRY_PATH);
+    navigate(DETAILED_FLOW_ENTRY_PATH, { state: { returnTo: '/financial-workspace/full_profile' } });
   }, [navigate, setDrawerOpen]);
 
   useEffect(() => {

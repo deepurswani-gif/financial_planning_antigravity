@@ -50,8 +50,8 @@ export function isDrawerItemLocked(mode, itemId) {
 }
 
 export const UNLOCK_DIALOG_COPY = {
-  title: 'Unlock Detailed Planning',
-  body: 'Complete Detailed Planning to access advanced reports, calculators, loan trackers and tax planning tools.',
-  primary: 'Continue to Detailed Planning →',
+  title: 'Unlock Complete Planning',
+  body: 'Complete your Financial Profile to access detailed reports, advanced calculators, loan tracking, tax planning tools, and many more powerful planning features.',
+  primary: 'Complete Financial Profile →',
   secondary: 'Maybe Later',
 };

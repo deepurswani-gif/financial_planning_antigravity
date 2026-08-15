@@ -13,6 +13,7 @@ import {
   getSubscriptionValidUntilDate,
   isIntroPricing,
 } from '../../lib/subscriptionAccess';
+import { saveWorkspaceCapability, WORKSPACE_CAPABILITY_FULL } from '../FinancialWorkspace/workspaceCapabilityStorage';
 
 const RAZORPAY_SCRIPT_ID = 'razorpay-checkout-js';
 const ANNUAL_PLAN_INR = getAnnualPlanPriceInr();
@@ -134,6 +135,7 @@ const SubscriptionGate = ({ onActivate, onBack }) => {
           console.warn('Checkout transaction record failed after coupon redeem:', txnError);
         }
 
+        saveWorkspaceCapability(user.id, WORKSPACE_CAPABILITY_FULL);
         clearPendingCouponInvite();
         finishActivation();
       } catch (err) {
@@ -237,6 +239,7 @@ const SubscriptionGate = ({ onActivate, onBack }) => {
               console.warn('Checkout transaction record failed after payment:', txnError);
             }
 
+            saveWorkspaceCapability(user.id, WORKSPACE_CAPABILITY_FULL);
             finishActivation();
           } catch (err) {
             console.error(err);

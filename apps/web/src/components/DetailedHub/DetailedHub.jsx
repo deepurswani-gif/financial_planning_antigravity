@@ -348,6 +348,7 @@ const DetailedHub = () => {
 
             <BreakdownModal 
                 isOpen={isModalOpen} 
+                isSheetOpen={isSheetOpen}
                 onClose={handleCloseModal} 
                 activeCategory={activeCategory} 
                 onOpenSheet={handleOpenSheet}

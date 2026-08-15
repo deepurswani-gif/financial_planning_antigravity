@@ -27,12 +27,17 @@ const IncomeCard = () => {
 
     useEffect(() => {
         setIncome(prev => {
-            if (prev.selfDetail?.inHandSalary || prev.selfDetail?.takeHomeProfit || prev.selfDetail?.netPension) {
+            const hasSelfDetail = !!(prev.selfDetail?.inHandSalary || prev.selfDetail?.takeHomeProfit || prev.selfDetail?.netPension);
+            const hasSpouseDetail = !!(prev.spouseDetail?.inHandSalary || prev.spouseDetail?.takeHomeProfit || prev.spouseDetail?.netPension);
+            const working = shouldIncludeSpouseIncome(spouseMember, hasSpouseIncome, prev);
+            
+            if (hasSelfDetail && (!working || hasSpouseDetail)) {
                 return prev;
             }
-            const working = shouldIncludeSpouseIncome(spouseMember, hasSpouseIncome, prev);
-            const selfD = prefillDetailFromSummaryAmount(prev.selfDetail, prev.summarySelfInHand || prev.self, selfEmploymentType);
-            const spouseD = prefillDetailFromSummaryAmount(prev.spouseDetail, prev.summarySpouseInHand || prev.spouse, spouseEmploymentType);
+            
+            const selfD = hasSelfDetail ? prev.selfDetail : prefillDetailFromSummaryAmount(prev.selfDetail, prev.summarySelfInHand || prev.self, selfEmploymentType);
+            const spouseD = (working && !hasSpouseDetail) ? prefillDetailFromSummaryAmount(prev.spouseDetail, prev.summarySpouseInHand || prev.spouse, spouseEmploymentType) : prev.spouseDetail;
+            
             return applyDetailSyncToIncome(
                 { ...prev, selfDetail: selfD, spouseDetail: spouseD },
                 selfEmploymentType,

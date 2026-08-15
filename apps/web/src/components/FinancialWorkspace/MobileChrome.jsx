@@ -35,6 +35,8 @@ export default function MobileChrome({
         onTakeTour={onTakeTour}
         onOpenSettings={onOpenSettings}
         contextFields={contextFields}
+        detailLocked={detailLocked}
+        onLockedSelect={onLockedSelect}
       />
       <MobileReportHeader
         title={reportTitle}

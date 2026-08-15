@@ -71,7 +71,13 @@ export default function DesktopChrome({
                 onLockedSelect={onLockedSelect}
               />
               <Link 
-                to="/financial-workspace/full_profile"
+                to={detailLocked ? "#" : "/financial-workspace/full_profile"}
+                onClick={(e) => {
+                  if (detailLocked) {
+                    e.preventDefault();
+                    if (onLockedSelect) onLockedSelect('full_profile');
+                  }
+                }}
                 className="fw-tools-menu-btn"
                 style={{ marginLeft: '0.75rem', textDecoration: 'none', position: 'relative' }}
               >

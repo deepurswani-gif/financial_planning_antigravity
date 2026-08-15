@@ -83,11 +83,20 @@ export default function WorkflowNavigationBar({
         <div className="fw-workflow-continue">
           <button
             type="button"
-            className="btn btn-primary fw-workflow-continue-btn"
+            className="fw-workflow-continue-link"
+            style={{ 
+              background: 'transparent', 
+              border: 'none', 
+              color: 'var(--color-1)', 
+              textDecoration: 'underline', 
+              fontStyle: 'italic', 
+              cursor: 'pointer',
+              fontSize: '0.9rem'
+            }}
             onClick={onContinueDetailed}
             tabIndex={visible ? 0 : -1}
           >
-            Continue to Detailed Planning →
+            Continue to Financial Profile →
           </button>
         </div>
       ) : null}
