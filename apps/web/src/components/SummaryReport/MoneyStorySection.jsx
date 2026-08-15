@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect, useState, useRef } from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
+import { ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { TrendingUp, Wallet, CreditCard, PiggyBank, BarChart3, Shield, AlertTriangle, Landmark, ArrowRight, Gem, Building2, Banknote, Layers, Info } from 'lucide-react';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 import { calculateCashFlow, formatCurrency } from '../CashFlowModule/CashFlowLogic';
@@ -9,7 +9,6 @@ import {
     calculateUnallocatedSurplus,
     calculateOwnedVsFinanced,
     computeSIPProjection,
-    buildWaterfallData,
     buildAssetBreakdownData,
     buildLiabilityBreakdownData,
     formatCompact
@@ -107,18 +106,7 @@ const RevealSection = ({ children, className = '', delay = 0 }) => {
     );
 };
 
-/* ─────────────── Custom Waterfall Tooltip ─────────────── */
-const WaterfallTooltip = ({ active, payload }) => {
-    if (!active || !payload?.length) return null;
-    const data = payload[0]?.payload;
-    if (!data) return null;
-    return (
-        <div className="ms-tooltip">
-            <div className="ms-tooltip-label">{data.name}</div>
-            <div className="ms-tooltip-value">{formatCurrency(data.value)}</div>
-        </div>
-    );
-};
+
 
 /* ════════════════════════════════════════════════════════════
    MAIN COMPONENT
@@ -146,7 +134,7 @@ const MoneyStorySection = () => {
     const surplusData = useMemo(() => calculateUnallocatedSurplus(cashFlowResults), [cashFlowResults]);
     const assetClassification = useMemo(() => classifyAssets(assetCategories), [assetCategories]);
     const ownedFinanced = useMemo(() => calculateOwnedVsFinanced(assetResults.totalAssets, assetResults.totalLiabilities), [assetResults]);
-    const waterfallData = useMemo(() => buildWaterfallData(cashFlowResults), [cashFlowResults]);
+
     const assetBreakdown = useMemo(() => buildAssetBreakdownData(assetCategories, assetResults.totalAssets), [assetCategories, assetResults.totalAssets]);
     const liabilityBreakdown = useMemo(() => buildLiabilityBreakdownData(liabilityCategories, assetResults.totalLiabilities), [liabilityCategories, assetResults.totalLiabilities]);
 
@@ -188,6 +176,32 @@ const MoneyStorySection = () => {
         return data;
     }, [assetClassification]);
 
+    // ── Money Flow Strip Data ──
+    const flowSegments = useMemo(() => {
+        if (!cashFlowResults.totalIncome) return [];
+        const total = cashFlowResults.totalIncome;
+        return [
+            { name: 'Household Expenses', value: cashFlowResults.categorySums?.household || 0, color: '#EF4444' },
+            { name: 'EMI Payments', value: cashFlowResults.categorySums?.emi || 0, color: '#F59E0B' },
+            { name: 'Insurance Premium', value: cashFlowResults.categorySums?.insurance || 0, color: '#8B5CF6' },
+            { name: 'Total Savings', value: cashFlowResults.totalSavings || 0, color: '#6366F1' },
+            { name: 'Surplus', value: surplusData.unallocated || 0, color: '#10B981' }
+        ].map(s => ({
+            ...s,
+            percent: (s.value / total) * 100
+        })).filter(s => s.value > 0);
+    }, [cashFlowResults, surplusData]);
+
+    const fractionalPhrase = useMemo(() => {
+        if (!assetClassification || assetClassification.grandTotal === 0) return "your money";
+        const incomePct = assetClassification.incomePercent;
+        if (incomePct <= 0) return "none";
+        if (incomePct >= 100) return "all";
+        
+        const fraction = Math.round(100 / incomePct);
+        return `1 in every ${fraction} rupees`;
+    }, [assetClassification]);
+
     const INCOME_COLOR = '#00A9F2';
     const LEGACY_COLOR = '#94A3B8';
 
@@ -220,11 +234,14 @@ const MoneyStorySection = () => {
             </div>
 
             {/* Hero: Unallocated Surplus */}
-            <RevealSection className="ms-hero-block">
+            <RevealSection className="ms-hero-block ms-hero-surplus-block">
                 <div className="ms-hero-number">
                     <AnimatedCounter value={surplusData.unallocated} />
                 </div>
                 <p className="ms-hero-label">Unallocated Surplus / Month</p>
+                <p className="ms-hero-yearly-projection">
+                    = {formatCurrency(surplusData.yearlyUnallocated)} saved a year — enough to fund your wealth building, protection goals and emergency reserves.
+                </p>
                 <div className="ms-hero-gradient-bar" />
             </RevealSection>
 
@@ -272,120 +289,31 @@ const MoneyStorySection = () => {
                 </div>
             </RevealSection>
 
-            {/* Waterfall Chart */}
-            <RevealSection className="ms-waterfall-section" delay={300}>
-                <h3 className="ms-section-title">
-                    <BarChart3 size={20} style={{ marginRight: '0.5rem', color: 'var(--color-2)' }} />
-                    How Your Income Flows
-                </h3>
-                <div className="ms-waterfall-chart">
-                    <ResponsiveContainer width="100%" height={320}>
-                        <BarChart data={waterfallData} margin={{ top: 20, right: 30, left: 20, bottom: 10 }} barCategoryGap="25%">
-                            <XAxis
-                                dataKey="name"
-                                axisLine={false}
-                                tickLine={false}
-                                tick={{ fill: '#64748b', fontSize: 13, fontWeight: 600 }}
-                            />
-                            <YAxis
-                                tickFormatter={(val) => formatCompact(val)}
-                                axisLine={false}
-                                tickLine={false}
-                                tick={{ fill: '#94a3b8', fontSize: 12 }}
-                            />
-                            <Tooltip content={<WaterfallTooltip />} cursor={false} />
-                            {/* Invisible base bar */}
-                            <Bar dataKey="base" stackId="waterfall" fill="transparent" radius={0} />
-                            {/* Visible value bar */}
-                            <Bar dataKey="value" stackId="waterfall" radius={[6, 6, 0, 0]}>
-                                {waterfallData.map((entry, index) => (
-                                    <Cell key={index} fill={entry.fill} />
-                                ))}
-                            </Bar>
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-            </RevealSection>
-
-            {/* Surplus Distribution Suggestions */}
-            {surplusData.unallocated > 0 && (
-                <RevealSection className="ms-suggestions-section" delay={400}>
-                    <div className="ms-suggestions-intro">
-                        <p className="ms-suggestions-headline">
-                            <span className="ms-suggestions-amount">{formatCurrency(surplusData.unallocated)}</span> unallocated every month.
-                        </p>
-                        <p className="ms-suggestions-sub">
-                            That's <strong>{formatCurrency(surplusData.yearlyUnallocated)}</strong> yearly — enough to fund your wealth building, protection gap and emergency reserves.
-                        </p>
-                    </div>
-
-                    <div className="ms-suggestions-grid">
-                        {/* SIP / Wealth Building */}
-                        <div className="ms-suggestion-card">
-                            <div className="ms-suggestion-icon" style={{ background: 'rgba(0, 169, 242, 0.1)', color: '#00A9F2' }}>
-                                <TrendingUp size={28} />
-                            </div>
-                            <h4 className="ms-suggestion-title">Wealth Building via SIP</h4>
-                            <p className="ms-suggestion-desc">
-                                A monthly SIP of your unallocated surplus <strong>{formatCurrency(surplusData.unallocated)}</strong> at
-                                12% expected returns could grow to
-                            </p>
-                            <div className="ms-suggestion-highlight">
-                                {formatCompact(sipProjection.futureValue)}
-                            </div>
-                            <p className="ms-suggestion-tenure">in {yearsToRetirement} years (till retirement)</p>
-                            <div className="ms-suggestion-note">
-                                <Info size={14} />
-                                <span>Assumed at 12% p.a. CAGR. Actual returns may vary based on market conditions.</span>
-                            </div>
+            {/* Money Flow Strip */}
+            {flowSegments.length > 0 && (
+                <RevealSection className="ms-flow-strip-section" delay={300}>
+                    <div className="ms-flow-strip-wrapper">
+                        <div className="ms-flow-strip-bar">
+                            {flowSegments.map((seg, idx) => (
+                                <div 
+                                    key={idx} 
+                                    className="ms-flow-strip-segment" 
+                                    style={{ width: `${seg.percent}%`, backgroundColor: seg.color }}
+                                    title={`${seg.name}: ${formatCurrency(seg.value)}`}
+                                >
+                                    {seg.percent > 5 && (
+                                        <span className="ms-flow-strip-label">{Math.round(seg.percent)}%</span>
+                                    )}
+                                </div>
+                            ))}
                         </div>
-
-                        {/* Family Protection */}
-                        <div className="ms-suggestion-card">
-                            <div className="ms-suggestion-icon" style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#6366F1' }}>
-                                <Shield size={28} />
-                            </div>
-                            <h4 className="ms-suggestion-title">Family Protection Needs</h4>
-                            <p className="ms-suggestion-desc">
-                                A term insurance plan can secure your family's financial future against life's uncertainties. Adequate life cover protects household expenses, EMIs, and children's education.
-                            </p>
-                            <div className="ms-suggestion-highlight" style={{ color: protectionData.hasGap ? '#EF4444' : '#10B981' }}>
-                                {protectionData.hasGap ? formatCurrency(protectionData.protectionGap) : 'Fully Covered'}
-                            </div>
-                            <p className="ms-suggestion-tenure">
-                                {protectionData.hasGap
-                                    ? (protectionData.spouse ? 'Combined self + spouse term to buy' : 'Protection gap to close')
-                                    : 'No protection gap'}
-                            </p>
-                            <div className="ms-suggestion-note">
-                                <Info size={14} />
-                                <span>
-                                    {protectionData.spouse
-                                        ? `Each earning member needs ${protectionData.multiplier}× monthly expenses. Weakest cover today: ${formatCurrency(protectionData.coverageHave)} on ${protectionData.weakestName}.`
-                                        : `Based on ${protectionData.multiplier}× monthly expenses vs your current life cover of ${formatCurrency(protectionData.coverageHave)}.`}
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* Contingency / Emergency */}
-                        <div className="ms-suggestion-card">
-                            <div className="ms-suggestion-icon" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#F59E0B' }}>
-                                <AlertTriangle size={28} />
-                            </div>
-                            <h4 className="ms-suggestion-title">Contingency Planning</h4>
-                            <p className="ms-suggestion-desc">
-                                An emergency fund of 3–6 months of expenses ensures you can handle medical emergencies, job transitions, or unexpected events without breaking your investment portfolio.
-                            </p>
-                            <div className="ms-suggestion-highlight" style={{ color: contingencyData.gap > 0 ? '#EF4444' : '#10B981' }}>
-                                {contingencyData.gap > 0 ? formatCurrency(contingencyData.gap) : 'Fully Funded'}
-                            </div>
-                            <p className="ms-suggestion-tenure">
-                                {contingencyData.gap > 0 ? 'Emergency fund gap to build' : 'Emergency fund on target'}
-                            </p>
-                            <div className="ms-suggestion-note">
-                                <Info size={14} />
-                                <span>Target: 6 months of household expenses + EMIs ({formatCurrency(contingencyData.emergencyFundNeeded)}). Currently available: {formatCurrency(contingencyData.emergencyFundHave)}.</span>
-                            </div>
+                        <div className="ms-flow-strip-legend">
+                            {flowSegments.map((seg, idx) => (
+                                <div key={idx} className="ms-flow-strip-legend-item">
+                                    <span className="ms-flow-strip-dot" style={{ backgroundColor: seg.color }} />
+                                    <span className="ms-flow-strip-name">{seg.name}</span>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </RevealSection>
@@ -441,79 +369,88 @@ const MoneyStorySection = () => {
                 </div>
                 <p className="ms-hero-label">of your wealth consists of Income Assets</p>
 
-                {/* Donut pair */}
+                {/* Unified Donut */}
                 {assetClassification.grandTotal > 0 && (
-                    <div className="ms-donut-pair">
-                        <div className="ms-donut-item">
-                            <div className="ms-donut-chart">
-                                <ResponsiveContainer width={160} height={160}>
-                                    <PieChart>
-                                        <Pie
-                                            data={incomeVsLegacyData}
-                                            cx="50%"
-                                            cy="50%"
-                                            innerRadius={55}
-                                            outerRadius={75}
-                                            paddingAngle={3}
-                                            dataKey="value"
-                                            stroke="none"
-                                            startAngle={90}
-                                            endAngle={-270}
-                                        >
-                                            {incomeVsLegacyData.map((entry, i) => (
-                                                <Cell key={i} fill={entry.name === 'Income Assets' ? INCOME_COLOR : LEGACY_COLOR} />
-                                            ))}
-                                        </Pie>
-                                    </PieChart>
-                                </ResponsiveContainer>
-                                <div className="ms-donut-center">
-                                    <span className="ms-donut-pct">{Math.round(assetClassification.incomePercent)}%</span>
-                                    <span className="ms-donut-sub">Income</span>
-                                </div>
-                            </div>
-                            <div className="ms-donut-meta">
-                                <h4 style={{ color: INCOME_COLOR }}>Income Assets</h4>
-                                <p className="ms-donut-amount">{formatCurrency(assetClassification.incomeTotal)}</p>
-                                <p className="ms-donut-desc">Assets delivering predictable cash — Mutual Funds, Equity, FDs, Retirement Accounts, Bank Savings</p>
+                    <div className="ms-donut-unified">
+                        <div className="ms-donut-chart-large">
+                            <ResponsiveContainer width={220} height={220}>
+                                <PieChart>
+                                    <Pie
+                                        data={incomeVsLegacyData}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={75}
+                                        outerRadius={105}
+                                        paddingAngle={2}
+                                        dataKey="value"
+                                        stroke="none"
+                                        startAngle={90}
+                                        endAngle={-270}
+                                    >
+                                        {incomeVsLegacyData.map((entry, i) => (
+                                            <Cell key={i} fill={entry.name === 'Income Assets' ? INCOME_COLOR : LEGACY_COLOR} />
+                                        ))}
+                                    </Pie>
+                                </PieChart>
+                            </ResponsiveContainer>
+                            <div className="ms-donut-center">
+                                <span className="ms-donut-pct" style={{ fontSize: '1.2rem' }}>{formatCompact(assetClassification.grandTotal)}</span>
+                                <span className="ms-donut-sub">Total</span>
                             </div>
                         </div>
-                        <div className="ms-donut-separator" />
-                        <div className="ms-donut-item">
-                            <div className="ms-donut-chart">
-                                <ResponsiveContainer width={160} height={160}>
-                                    <PieChart>
-                                        <Pie
-                                            data={incomeVsLegacyData}
-                                            cx="50%"
-                                            cy="50%"
-                                            innerRadius={55}
-                                            outerRadius={75}
-                                            paddingAngle={3}
-                                            dataKey="value"
-                                            stroke="none"
-                                            startAngle={90}
-                                            endAngle={-270}
-                                        >
-                                            {incomeVsLegacyData.map((entry, i) => (
-                                                <Cell key={i} fill={entry.name === 'Legacy Assets' ? '#64748B' : '#E2E8F0'} />
-                                            ))}
-                                        </Pie>
-                                    </PieChart>
-                                </ResponsiveContainer>
-                                <div className="ms-donut-center">
-                                    <span className="ms-donut-pct">{Math.round(assetClassification.legacyPercent)}%</span>
-                                    <span className="ms-donut-sub">Legacy</span>
+
+                        <div className="ms-donut-legend-unified">
+                            <div className="ms-donut-legend-card">
+                                <div className="ms-donut-legend-header">
+                                    <span className="ms-donut-legend-dot" style={{ background: INCOME_COLOR }} />
+                                    <h4>Income Assets</h4>
+                                    <span className="ms-donut-legend-pct" style={{ color: INCOME_COLOR }}>{Math.round(assetClassification.incomePercent)}%</span>
                                 </div>
+                                <p className="ms-donut-desc">Assets delivering predictable cash — Mutual Funds, Equity, FDs, Retirement Accounts, Bank Savings</p>
                             </div>
-                            <div className="ms-donut-meta">
-                                <h4 style={{ color: '#64748B' }}>Legacy Assets</h4>
-                                <p className="ms-donut-amount">{formatCurrency(assetClassification.legacyTotal)}</p>
+                            <div className="ms-donut-legend-card">
+                                <div className="ms-donut-legend-header">
+                                    <span className="ms-donut-legend-dot" style={{ background: LEGACY_COLOR }} />
+                                    <h4>Legacy Assets</h4>
+                                    <span className="ms-donut-legend-pct" style={{ color: LEGACY_COLOR }}>{Math.round(assetClassification.legacyPercent)}%</span>
+                                </div>
                                 <p className="ms-donut-desc">Assets that pass to next generations — Residential Property, Land, Gold, Vehicles</p>
                             </div>
                         </div>
                     </div>
                 )}
             </RevealSection>
+
+            {/* THE PROBLEM — Insight Callout (Moved Up) */}
+            {assetClassification.grandTotal > 0 && assetClassification.legacyPercent > 50 && (
+                <RevealSection className="ms-problem-callout" delay={300}>
+                    <div className="ms-problem-icon">
+                        <AlertTriangle size={28} />
+                    </div>
+                    <div className="ms-problem-content">
+                        <h3 className="ms-problem-title">Your lake is frozen.</h3>
+                        <p className="ms-problem-text">
+                            Most of what you own — your home, gold, land — can't be sold or reinvested without disrupting your life. Only about <strong>{fractionalPhrase}</strong> of your net worth is actually working for you, growing and generating income. To build long-term financial freedom, focus new savings toward income-generating assets like mutual funds, equity, and retirement accounts.
+                        </p>
+                    </div>
+                </RevealSection>
+            )}
+
+            {assetClassification.grandTotal > 0 && assetClassification.legacyPercent <= 50 && (
+                <RevealSection className="ms-problem-callout ms-healthy-callout" delay={300}>
+                    <div className="ms-problem-icon" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10B981' }}>
+                        <TrendingUp size={28} />
+                    </div>
+                    <div className="ms-problem-content">
+                        <h3 className="ms-problem-title" style={{ color: '#10B981' }}>Your wealth is working for you.</h3>
+                        <p className="ms-problem-text">
+                            <strong>{Math.round(assetClassification.incomePercent)}%</strong> of your wealth is in <strong>Income Assets</strong> — 
+                            investments that actively grow and compound. This is a healthy portfolio balance. Continue building 
+                            wealth through systematic investments to maintain this momentum.
+                        </p>
+                    </div>
+                </RevealSection>
+            )}
 
             {/* Assets & Liabilities Breakdown — Two-column */}
             <RevealSection className="ms-balance-sheet" delay={300}>
@@ -574,43 +511,7 @@ const MoneyStorySection = () => {
                 </div>
             </RevealSection>
 
-            {/* THE PROBLEM — Insight Callout */}
-            {assetClassification.grandTotal > 0 && assetClassification.legacyPercent > 50 && (
-                <RevealSection className="ms-problem-callout" delay={400}>
-                    <div className="ms-problem-icon">
-                        <AlertTriangle size={28} />
-                    </div>
-                    <div className="ms-problem-content">
-                        <h3 className="ms-problem-title">Your lake is frozen.</h3>
-                        <p className="ms-problem-text">
-                            <strong>{Math.round(assetClassification.legacyPercent)}%</strong> of your wealth consists of <strong>Legacy Assets</strong> — 
-                            these are assets like your residential property, gold, and land that are typically never sold. They are emotionally
-                            important and pass to the next generation, but they <em>don't generate regular income</em> or compound your wealth.
-                        </p>
-                        <p className="ms-problem-text" style={{ marginTop: '0.75rem' }}>
-                            Only <strong>{Math.round(assetClassification.incomePercent)}%</strong> is in <strong>Income Assets</strong> — 
-                            investments like Mutual Funds, Equity, Fixed Deposits, and Retirement Accounts that <em>actively grow</em> and 
-                            deliver returns. To build long-term financial freedom, aim to increase the proportion of income-generating assets.
-                        </p>
-                    </div>
-                </RevealSection>
-            )}
 
-            {assetClassification.grandTotal > 0 && assetClassification.legacyPercent <= 50 && (
-                <RevealSection className="ms-problem-callout ms-healthy-callout" delay={400}>
-                    <div className="ms-problem-icon" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10B981' }}>
-                        <TrendingUp size={28} />
-                    </div>
-                    <div className="ms-problem-content">
-                        <h3 className="ms-problem-title" style={{ color: '#10B981' }}>Your wealth is working for you.</h3>
-                        <p className="ms-problem-text">
-                            <strong>{Math.round(assetClassification.incomePercent)}%</strong> of your wealth is in <strong>Income Assets</strong> — 
-                            investments that actively grow and compound. This is a healthy portfolio balance. Continue building 
-                            wealth through systematic investments to maintain this momentum.
-                        </p>
-                    </div>
-                </RevealSection>
-            )}
 
             {/* ─── SCOPED STYLES ─── */}
             <style>{`
@@ -774,10 +675,21 @@ const MoneyStorySection = () => {
                     color: var(--text-main);
                 }
 
-                /* ── Waterfall Chart ── */
-                .ms-waterfall-section {
-                    max-width: 900px;
-                    margin: 0 auto 2rem;
+                /* ── Hero Yearly Projection ── */
+                .ms-hero-yearly-projection {
+                    font-size: 1.1rem;
+                    color: var(--text-muted);
+                    margin-top: 0.75rem;
+                    max-width: 600px;
+                    margin-left: auto;
+                    margin-right: auto;
+                    line-height: 1.5;
+                }
+
+                /* ── Money Flow Strip ── */
+                .ms-flow-strip-section {
+                    max-width: 1000px;
+                    margin: 0 auto 3rem;
                     padding: 0 2rem;
                 }
                 .ms-section-title {
@@ -788,119 +700,52 @@ const MoneyStorySection = () => {
                     color: var(--text-main);
                     margin-bottom: 1.5rem;
                 }
-                .ms-waterfall-chart {
-                    width: 100%;
-                }
-                .ms-tooltip {
-                    background: var(--text-main);
-                    color: white;
-                    padding: 0.6rem 1rem;
-                    border-radius: 8px;
-                    font-size: 0.85rem;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-                }
-                .ms-tooltip-label {
-                    font-weight: 600;
-                    margin-bottom: 0.2rem;
-                }
-                .ms-tooltip-value {
-                    font-weight: 700;
-                    font-size: 1rem;
-                }
-
-                /* ── Suggestions Section ── */
-                .ms-suggestions-section {
-                    max-width: 1000px;
-                    margin: 1rem auto 2rem;
-                    padding: 0 2rem;
-                }
-                .ms-suggestions-intro {
-                    text-align: center;
-                    margin-bottom: 2.5rem;
-                    padding: 2rem;
-                    background: linear-gradient(135deg, #f0f9ff 0%, #f8fafc 100%);
-                    border-radius: 16px;
-                }
-                .ms-suggestions-headline {
-                    font-size: 1.3rem;
-                    color: var(--text-main);
-                    font-weight: 600;
-                    margin-bottom: 0.5rem;
-                }
-                .ms-suggestions-amount {
-                    color: var(--color-2);
-                    font-weight: 800;
-                }
-                .ms-suggestions-sub {
-                    font-size: 1rem;
-                    color: var(--text-muted);
-                    line-height: 1.6;
-                }
-                .ms-suggestions-grid {
-                    display: grid;
-                    grid-template-columns: repeat(3, 1fr);
-                    gap: 1.5rem;
-                }
-                .ms-suggestion-card {
-                    padding: 2rem 1.5rem;
+                .ms-flow-strip-wrapper {
+                    background: #fff;
                     border: 1px solid #f1f5f9;
                     border-radius: 16px;
-                    text-align: center;
-                    transition: all 0.3s ease;
-                    background: #ffffff;
+                    padding: 2rem;
                 }
-                .ms-suggestion-card:hover {
-                    box-shadow: 0 8px 30px rgba(0,0,0,0.06);
-                    transform: translateY(-4px);
+                .ms-flow-strip-bar {
+                    display: flex;
+                    height: 48px;
+                    width: 100%;
+                    border-radius: 12px;
+                    overflow: hidden;
+                    margin-bottom: 1.5rem;
+                    background: #f1f5f9;
                 }
-                .ms-suggestion-icon {
-                    width: 60px;
-                    height: 60px;
-                    border-radius: 16px;
+                .ms-flow-strip-segment {
+                    height: 100%;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    margin: 0 auto 1rem;
+                    transition: width 1s cubic-bezier(0.16, 1, 0.3, 1);
                 }
-                .ms-suggestion-title {
-                    font-size: 1.05rem;
+                .ms-flow-strip-label {
+                    color: #fff;
                     font-weight: 700;
-                    color: var(--text-main);
-                    margin-bottom: 0.75rem;
+                    font-size: 0.9rem;
+                    text-shadow: 0 1px 2px rgba(0,0,0,0.2);
                 }
-                .ms-suggestion-desc {
-                    font-size: 0.88rem;
-                    color: var(--text-muted);
-                    line-height: 1.6;
-                    margin-bottom: 0.75rem;
-                }
-                .ms-suggestion-highlight {
-                    font-size: 1.6rem;
-                    font-weight: 800;
-                    color: var(--color-1);
-                    margin: 0.75rem 0 0.25rem;
-                }
-                .ms-suggestion-tenure {
-                    font-size: 0.82rem;
-                    color: var(--text-muted);
-                    margin-bottom: 0.75rem;
-                }
-                .ms-suggestion-note {
+                .ms-flow-strip-legend {
                     display: flex;
-                    align-items: flex-start;
-                    gap: 0.5rem;
-                    font-size: 0.75rem;
-                    color: var(--text-muted);
-                    text-align: left;
-                    padding: 0.75rem;
-                    background: #f8fafc;
-                    border-radius: 8px;
-                    line-height: 1.5;
-                    margin-top: 0.75rem;
+                    flex-wrap: wrap;
+                    gap: 1.5rem;
+                    justify-content: center;
                 }
-                .ms-suggestion-note svg {
-                    flex-shrink: 0;
-                    margin-top: 1px;
+                .ms-flow-strip-legend-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    font-size: 0.9rem;
+                    color: var(--text-main);
+                    font-weight: 500;
+                }
+                .ms-flow-strip-dot {
+                    width: 12px;
+                    height: 12px;
+                    border-radius: 4px;
                 }
 
                 /* ── Owned vs Financed Bar ── */
@@ -940,31 +785,19 @@ const MoneyStorySection = () => {
                     transition: width 1s cubic-bezier(0.16, 1, 0.3, 1);
                 }
 
-                /* ── Donut Pair ── */
-                .ms-donut-pair {
+                /* ── Unified Donut ── */
+                .ms-donut-unified {
                     display: flex;
-                    align-items: flex-start;
+                    align-items: center;
                     justify-content: center;
-                    gap: 2rem;
+                    gap: 3rem;
                     margin-top: 2.5rem;
                     flex-wrap: wrap;
                 }
-                .ms-donut-separator {
-                    width: 1px;
-                    height: 200px;
-                    background: #f1f5f9;
-                    align-self: center;
-                }
-                .ms-donut-item {
-                    display: flex;
-                    align-items: center;
-                    gap: 1.5rem;
-                    min-width: 300px;
-                }
-                .ms-donut-chart {
+                .ms-donut-chart-large {
                     position: relative;
-                    width: 160px;
-                    height: 160px;
+                    width: 220px;
+                    height: 220px;
                     flex-shrink: 0;
                 }
                 .ms-donut-center {
@@ -978,7 +811,6 @@ const MoneyStorySection = () => {
                     gap: 0.1rem;
                 }
                 .ms-donut-pct {
-                    font-size: 1.4rem;
                     font-weight: 800;
                     color: var(--text-main);
                 }
@@ -989,22 +821,43 @@ const MoneyStorySection = () => {
                     text-transform: uppercase;
                     letter-spacing: 0.05em;
                 }
-                .ms-donut-meta h4 {
-                    font-size: 1rem;
-                    font-weight: 700;
-                    margin-bottom: 0.25rem;
+                .ms-donut-legend-unified {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1.5rem;
+                    max-width: 320px;
                 }
-                .ms-donut-amount {
-                    font-size: 1.2rem;
+                .ms-donut-legend-card {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.25rem;
+                }
+                .ms-donut-legend-header {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                }
+                .ms-donut-legend-dot {
+                    width: 12px;
+                    height: 12px;
+                    border-radius: 4px;
+                }
+                .ms-donut-legend-header h4 {
+                    font-size: 1.05rem;
                     font-weight: 700;
                     color: var(--text-main);
-                    margin-bottom: 0.5rem;
+                    margin: 0;
+                    flex: 1;
+                }
+                .ms-donut-legend-pct {
+                    font-size: 1.1rem;
+                    font-weight: 800;
                 }
                 .ms-donut-desc {
                     font-size: 0.82rem;
                     color: var(--text-muted);
                     line-height: 1.5;
-                    max-width: 220px;
+                    margin: 0;
                 }
 
                 /* ── Balance Sheet Two-Column ── */
@@ -1152,31 +1005,21 @@ const MoneyStorySection = () => {
                         border-right: none;
                         border-bottom: 1px solid #f1f5f9;
                     }
-                    .ms-suggestions-grid {
-                        grid-template-columns: 1fr;
-                    }
                     .ms-balance-sheet {
                         grid-template-columns: 1fr;
                         gap: 2rem;
                     }
-                    .ms-donut-pair {
+                    .ms-donut-unified {
                         flex-direction: column;
-                        align-items: center;
+                        gap: 2rem;
                     }
-                    .ms-donut-separator {
-                        width: 60%;
-                        height: 1px;
-                    }
-                    .ms-donut-item {
-                        flex-direction: column;
-                        text-align: center;
-                        min-width: unset;
-                    }
-                    .ms-donut-meta {
-                        text-align: center;
-                    }
-                    .ms-donut-desc {
+                    .ms-donut-legend-unified {
                         max-width: 100%;
+                        align-items: center;
+                        text-align: center;
+                    }
+                    .ms-donut-legend-header {
+                        justify-content: center;
                     }
                     .ms-problem-callout {
                         flex-direction: column;
