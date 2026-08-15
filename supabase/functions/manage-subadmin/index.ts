@@ -161,21 +161,37 @@ serve(async (req) => {
     return json(200, { success: true, message: 'Sub-admin deleted successfully' });
   }
 
-  if (action === 'update_permissions') {
+  if (action === 'update') {
      const targetUserId = String(body.userId || '');
      const permissions = body.permissions;
+     const password = body.password; // optional
+     const full_name = body.full_name; // optional
      
      if (!targetUserId || !Array.isArray(permissions)) {
          return json(400, { success: false, error: 'Missing required fields for update' });
      }
      
      if (targetUserId === user.id) {
-         return json(400, { success: false, error: 'Cannot update your own permissions' });
+         return json(400, { success: false, error: 'Cannot update your own account via this endpoint' });
      }
      
+     // 1. Update user auth (if password is provided)
+     if (password) {
+       const { error: authError } = await adminClient.auth.admin.updateUserById(targetUserId, {
+         password: String(password)
+       });
+       if (authError) {
+         return json(400, { success: false, error: authError.message });
+       }
+     }
+     
+     // 2. Update user profile (permissions, full_name)
+     const updateData: any = { admin_permissions: permissions };
+     if (full_name) updateData.full_name = full_name;
+
      const { error: updateError } = await adminClient
         .from('user_profiles')
-        .update({ admin_permissions: permissions })
+        .update(updateData)
         .eq('id', targetUserId)
         .eq('role', 'admin'); // Safety check
         
@@ -183,7 +199,7 @@ serve(async (req) => {
          return json(400, { success: false, error: updateError.message });
      }
      
-     return json(200, { success: true, message: 'Permissions updated successfully' });
+     return json(200, { success: true, message: 'Sub-admin updated successfully' });
   }
 
   return json(400, { success: false, error: 'Invalid action' });
