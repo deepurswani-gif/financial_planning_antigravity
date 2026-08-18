@@ -302,7 +302,7 @@ describe('resolver integration', () => {
       now: NOW,
     });
     const lifeGap = store.getById('protection.lifeGap');
-    expect(lifeGap.summary).toContain('5.0 L');
+    expect(lifeGap.summary).toContain('Alex');
     expect(lifeGap.summary).not.toContain('{');
   });
 });

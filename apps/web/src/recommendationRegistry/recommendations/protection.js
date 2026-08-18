@@ -14,7 +14,7 @@ export const PROTECTION_RECOMMENDATIONS = [
     id: 'protection.lifeGap',
     title: "Fill {selfName}'s Protection Gap",
     summary:
-      "Buy term cover of {selfProtectionGapDisplay} on {selfName}. Life cover pays only on that person's death — underinsurance here leaves the household exposed.",
+      "Buy term cover to close this gap on {selfName}.",
     category: 'protection',
     type: 'protectionGap',
     severity: 'critical',
@@ -34,7 +34,7 @@ export const PROTECTION_RECOMMENDATIONS = [
     id: 'protection.lifeGapSpouse',
     title: "Fill {spouseName}'s Protection Gap",
     summary:
-      'Buy term cover of {spouseProtectionGapDisplay} on {spouseName}. If they pass away, only their sum insured supports household expenses — not cover held on other members.',
+      "Buy term cover to close this gap on {spouseName}.",
     category: 'protection',
     type: 'protectionGap',
     severity: 'critical',

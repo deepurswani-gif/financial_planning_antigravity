@@ -124,6 +124,14 @@ const DetailedHub = () => {
         }
     };
 
+    React.useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const openSub = params.get('openSub');
+        if (openSub && ['income', 'expenses', 'debt', 'insurance', 'savings', 'family-details', 'assets', 'liabilities'].includes(openSub)) {
+            handleOpenSheet(openSub);
+        }
+    }, [window.location.search]);
+
     const handleOpenVault = () => {
         handleOpenSheet('vault');
     };

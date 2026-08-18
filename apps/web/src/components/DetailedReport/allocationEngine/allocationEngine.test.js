@@ -73,6 +73,7 @@ describe('protection policy', () => {
             assetCategories: { cash: { savings: 0 } },
             contingencyFund: '0',
             deployableSurplus: 100000,
+            income: { self: 1200000 }
         });
         // 20% of 100000 = 20000, but premium is much smaller
         expect(result.term.requiredPremium).toBeGreaterThan(0);

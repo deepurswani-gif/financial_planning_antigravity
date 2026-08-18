@@ -48,6 +48,8 @@ const ExecutiveSummarySection = () => {
         hasSpouseIncome,
         policies,
         hasHealthInsurance,
+        liabilityCategories,
+        calculatorInputs,
     } = useFinancialPlan();
 
     const report = useMemo(
@@ -65,8 +67,10 @@ const ExecutiveSummarySection = () => {
                 hasSpouseIncome,
                 policies,
                 hasHealthInsurance,
+                liabilityCategories,
+                calculatorInputs,
             }),
-        [income, expenseCategories, assetCategories, summaryLifeCover, summaryHealthCover, contingencyFund, goals, inflationRates, familyMembers, hasSpouseIncome, policies, hasHealthInsurance]
+        [income, expenseCategories, assetCategories, summaryLifeCover, summaryHealthCover, contingencyFund, goals, inflationRates, familyMembers, hasSpouseIncome, policies, hasHealthInsurance, liabilityCategories, calculatorInputs]
     );
 
     // Priority Next Steps: report selects/orders by weakest pillars; presentation

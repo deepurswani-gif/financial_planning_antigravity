@@ -107,6 +107,11 @@ export function buildInvestSurplusReport({
     summaryLifeCover = '',
     investmentAllocations = [],
     policies = [],
+    liabilityCategories = {},
+    income = {},
+    inflationRates = {},
+    calculatorInputs = {},
+    goals = []
 }) {
     if (!moneyFlowReport) {
         return { meta: { hasData: false } };
@@ -122,7 +127,18 @@ export function buildInvestSurplusReport({
         ? (ledger.unallocatedSurplus[meta.currentMonth] || 0)
         : 0;
 
-    const protectionData = calculateProtectionData(expenseCategories, summaryLifeCover, familyMembers, policies);
+    const protectionData = calculateProtectionData(
+        expenseCategories,
+        summaryLifeCover,
+        familyMembers,
+        policies,
+        income,
+        inflationRates,
+        calculatorInputs,
+        goals,
+        assetCategories,
+        liabilityCategories
+    );
     const contingencyData = calculateContingencyData(
         expenseCategories,
         getEmergencyFundAmount(assetCategories, contingencyFund),

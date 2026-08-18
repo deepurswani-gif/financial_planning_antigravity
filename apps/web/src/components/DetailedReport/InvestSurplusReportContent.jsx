@@ -30,6 +30,10 @@ const InvestSurplusReportContent = () => {
         summaryLifeCover,
         investmentAllocations,
         policies,
+        liabilityCategories,
+        inflationRates,
+        calculatorInputs,
+        goals,
     } = useFinancialPlan();
 
     const moneyFlowReport = useMemo(
@@ -64,6 +68,11 @@ const InvestSurplusReportContent = () => {
             summaryLifeCover,
             investmentAllocations,
             policies,
+            liabilityCategories,
+            income,
+            inflationRates,
+            calculatorInputs,
+            goals,
         }),
         [
             moneyFlowReport,
@@ -74,6 +83,11 @@ const InvestSurplusReportContent = () => {
             summaryLifeCover,
             investmentAllocations,
             policies,
+            liabilityCategories,
+            income,
+            inflationRates,
+            calculatorInputs,
+            goals,
         ],
     );
 

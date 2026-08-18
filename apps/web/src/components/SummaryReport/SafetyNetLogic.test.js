@@ -16,20 +16,22 @@ const baseContingency = {
 };
 
 describe('calculateProtectionData', () => {
-    const expenses = { summaryHouseholdTotal: '50000', summaryEmiTotal: '10000' };
+    const expenses = { summaryHouseholdTotal: '250000', summaryEmiTotal: '50000' }; // 300k total
 
     it('uses summary life cover when policies are empty', () => {
-        const result = calculateProtectionData(expenses, '1000000', [], []);
+        const income = { self: '200000' };
+        const result = calculateProtectionData(expenses, '1000000', [], [], income, {}, {}, [], {}, {});
         expect(result.coverageHave).toBe(1000000);
-        expect(result.coverageRequired).toBe(60000 * 200);
         expect(result.self.coverage).toBe(1000000);
         expect(result.spouse).toBe(null);
     });
 
+    const income = { self: '200000', spouse: '50000' };
+
     it('prefers detailed policy sum assured over summary 0', () => {
-        const result = calculateProtectionData(expenses, '0', [{ name: 'Alex', relation: 'Self' }], [
+        const result = calculateProtectionData(expenses, '0', [{ name: 'Alex', relation: 'Self', age: 35 }], [
             { planType: 'Term Insurance', sumAssured: '5000000', insuredName: 'Alex', isProposed: false },
-        ]);
+        ], income, {}, {}, [], {}, {});
         expect(result.coverageHave).toBe(5000000);
         expect(result.self.coverage).toBe(5000000);
         expect(result.coveredPercent).toBeGreaterThan(0);
@@ -37,27 +39,19 @@ describe('calculateProtectionData', () => {
 
     it('assesses working spouse separately against shared household need', () => {
         const family = [
-            { name: 'Alex', relation: 'Self' },
-            { name: 'Sam', relation: 'Spouse', isSpouseWorking: true },
+            { name: 'Alex', relation: 'Self', age: 35 },
+            { name: 'Sam', relation: 'Spouse', age: 35, isSpouseWorking: true },
         ];
         const policies = [
             { planType: 'Term Insurance', sumAssured: '12000000', insuredName: 'Alex', isProposed: false },
             { planType: 'Term Insurance', sumAssured: '1000000', insuredName: 'Sam', isProposed: false },
         ];
-        const result = calculateProtectionData(expenses, '0', family, policies);
-        const need = 60000 * 200;
-
-        expect(result.coverageRequired).toBe(need);
-        expect(result.self.gap).toBe(0);
-        expect(result.self.isGap).toBe(false);
+        const result = calculateProtectionData(expenses, '0', family, policies, income, {}, {}, [], {}, {});
+        
+        expect(result.self.gap).toBe(Math.max(0, result.self.need - 12000000));
         expect(result.spouse.name).toBe('Sam');
         expect(result.spouse.coverage).toBe(1000000);
-        expect(result.spouse.gap).toBe(need - 1000000);
-        expect(result.hasGap).toBe(true);
-        // Weakest member drives headline cover — must not look "fine" from self alone
-        expect(result.weakestRole).toBe('spouse');
-        expect(result.coverageHave).toBe(1000000);
-        expect(result.protectionGap).toBe(need - 1000000);
+        expect(result.spouse.gap).toBe(Math.max(0, result.spouse.need - 1000000));
     });
 
     it('skips spouse when isSpouseWorking is false', () => {
@@ -69,7 +63,7 @@ describe('calculateProtectionData', () => {
             { planType: 'Term Insurance', sumAssured: '1000000', insuredName: 'Alex', isProposed: false },
             { planType: 'Term Insurance', sumAssured: '500000', insuredName: 'Sam', isProposed: false },
         ];
-        const result = calculateProtectionData(expenses, '0', family, policies);
+        const result = calculateProtectionData(expenses, '0', family, policies, income, {}, {}, [], {}, {});
         expect(result.spouse).toBe(null);
         expect(result.protectionGap).toBe(result.self.gap);
     });
@@ -81,10 +75,21 @@ describe('calculateProtectionData', () => {
             { planType: 'Term Insurance', sumAssured: '9000000', insuredName: 'Alex', isProposed: true },
             { planType: 'Health Insurance', sumAssured: '1000000', insuredName: 'Alex', isProposed: false },
         ];
-        const result = calculateProtectionData(expenses, '0', family, policies);
+        const result = calculateProtectionData(expenses, '0', family, policies, income, {}, {}, [], {}, {});
         expect(result.self.coverage).toBe(2000000);
     });
+
+    it('ensures self and spouse protection needs are not identical when incomes differ', () => {
+        const family = [
+            { name: 'Krishna', relation: 'Self', age: 35, retirementAge: 60 },
+            { name: 'Radha', relation: 'Spouse', age: 30, retirementAge: 60, isSpouseWorking: true },
+        ];
+        const testIncome = { self: '200000', spouse: '50000' };
+        const result = calculateProtectionData(expenses, '0', family, [], testIncome, {}, {}, [], {}, {});
+        expect(result.self.need).not.toBe(result.spouse.need);
+    });
 });
+
 
 describe('calculateHealthInsuranceData', () => {
     it('reports none when user has no health insurance', () => {

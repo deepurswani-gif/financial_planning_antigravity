@@ -136,6 +136,12 @@ const ProtectionGapOutput = ({ results, familyMembers, moduleName = 'Protection 
                                 <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                                     You have a protection gap of <strong>{formatCurrency(data.gap)}</strong>. Consider securing additional term life insurance to fully protect your family's future lifestyle.
                                 </p>
+                                {data.isCapped && (
+                                    <div style={{ marginTop: '10px', padding: '10px', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '8px', fontSize: '0.8rem', color: '#b45309' }}>
+                                        <strong>Income Eligibility Note:</strong> Your ideal cover requirement is <strong>{formatCurrency(data.idealCover)}</strong>, but based on industry income multiples, your maximum term insurance cap is <strong>{formatCurrency(data.insurabilityCap)}</strong>. 
+                                        <br/>This leaves an uninsurable shortfall of <strong>{formatCurrency(data.shortfall)}</strong>. You may need to rely on alternative wealth accumulation to fully bridge this gap.
+                                    </div>
+                                )}
                             </div>
                         </>
                     )}
@@ -170,20 +176,22 @@ const ProtectionGapOutput = ({ results, familyMembers, moduleName = 'Protection 
 
                 <div className="grid" style={{ position: 'relative', zIndex: 1 }}>
                     <div style={{ background: 'rgba(255, 255, 255, 0.1)', padding: '1.25rem', borderRadius: '12px', backdropFilter: 'blur(10px)' }}>
-                        <label style={{ color: '#ffffff', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>Monthly Expenses</label>
-                        <strong style={{ display: 'block', fontSize: '1.5rem', fontWeight: 700 }}>{formatCurrency(results.monthlyExpenditure)}</strong>
-                        <div style={{ fontSize: '0.75rem', marginTop: '4px', opacity: 0.7 }}>Base for HLV calculation</div>
+                        <label style={{ color: '#ffffff', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>Household Base Need</label>
+                        <strong style={{ display: 'block', fontSize: '1.5rem', fontWeight: 700 }}>{formatCurrency(results.monthlyExpenditure * 12)} / yr</strong>
+                        <div style={{ fontSize: '0.75rem', marginTop: '4px', opacity: 0.7 }}>Expenses at risk</div>
                     </div>
                     <div style={{ background: 'rgba(255, 255, 255, 0.1)', padding: '1.25rem', borderRadius: '12px', backdropFilter: 'blur(10px)' }}>
-                        <label style={{ color: '#ffffff', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>HLV Multiplier</label>
-                        <strong style={{ display: 'block', fontSize: '1.5rem', fontWeight: 700 }}>{results.multiplier}x</strong>
-                        <div style={{ fontSize: '0.75rem', marginTop: '4px', opacity: 0.7 }}>Based on age & dependents</div>
+                        <label style={{ color: '#ffffff', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>Self Target Need</label>
+                        <strong style={{ display: 'block', fontSize: '1.5rem', fontWeight: 700 }}>{formatCurrency(results.self?.need || 0)}</strong>
+                        <div style={{ fontSize: '0.75rem', marginTop: '4px', opacity: 0.7 }}>Recommended SA</div>
                     </div>
-                    <div style={{ background: 'rgba(255, 255, 255, 0.1)', padding: '1.25rem', borderRadius: '12px', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.2)' }}>
-                        <label style={{ color: '#93c5fd', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '8px', fontWeight: 600 }}>Target Coverage Need</label>
-                        <strong style={{ display: 'block', fontSize: '1.6rem', fontWeight: 800, color: '#fff' }}>{formatCurrency(results.protectionNeed)}</strong>
-                        <div style={{ fontSize: '0.75rem', marginTop: '4px', color: '#93c5fd' }}>Recommended Human Life Value</div>
-                    </div>
+                    {results.spouse && (
+                        <div style={{ background: 'rgba(255, 255, 255, 0.1)', padding: '1.25rem', borderRadius: '12px', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.2)' }}>
+                            <label style={{ color: '#93c5fd', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '8px', fontWeight: 600 }}>Spouse Target Need</label>
+                            <strong style={{ display: 'block', fontSize: '1.6rem', fontWeight: 800, color: '#fff' }}>{formatCurrency(results.spouse.need)}</strong>
+                            <div style={{ fontSize: '0.75rem', marginTop: '4px', color: '#93c5fd' }}>Recommended SA</div>
+                        </div>
+                    )}
                 </div>
             </div>
 

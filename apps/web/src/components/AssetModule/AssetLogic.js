@@ -7,7 +7,7 @@ import {
     getSummaryLiabilityTotal,
 } from '../DetailedFlow/wealthDetailSync';
 
-export const calculateNetWorth = (assetCategories, liabilityCategories) => {
+export const calculateNetWorth = (assetCategories = {}, liabilityCategories = {}) => {
     const assetBreakdown = [];
 
     // Helper to process categories safely
@@ -61,8 +61,8 @@ export const calculateNetWorth = (assetCategories, liabilityCategories) => {
         totalAssets += getSummaryAssetTotal(assetCategories);
     }
     if (!hasLiabilityDetailEntered(liabilityCategories)) {
-        const includeLoans = getAssetAmount(liabilityCategories.summaryOutstandingLoans) > 0;
-        totalLiabilities += getSummaryLiabilityTotal(liabilityCategories, includeLoans);
+        const includeLoans = getAssetAmount(liabilityCategories?.summaryOutstandingLoans) > 0;
+        totalLiabilities += getSummaryLiabilityTotal(liabilityCategories || {}, includeLoans);
     }
 
     const netWorth = totalAssets - totalLiabilities;

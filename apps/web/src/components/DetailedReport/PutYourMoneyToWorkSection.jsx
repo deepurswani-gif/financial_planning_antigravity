@@ -188,6 +188,7 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
         hasHealthInsurance,
         inflationRates,
         policies,
+        liabilityCategories,
     } = useFinancialPlan();
 
     const moneyFlowReport = useMemo(
@@ -255,6 +256,9 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
             selectedMonthIndex: effectiveMonth,
             reportScope,
             policies,
+            liabilityCategories,
+            income,
+            inflationRates,
         }),
         [
             moneyFlowReport,
@@ -272,6 +276,9 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
             effectiveMonth,
             reportScope,
             policies,
+            liabilityCategories,
+            income,
+            inflationRates,
         ],
     );
 

@@ -35,10 +35,10 @@ describe('safetyNetAdapter', () => {
     const selfRec = resolved.find((r) => r.id === 'protection.lifeGap');
     const spouseRec = resolved.find((r) => r.id === 'protection.lifeGapSpouse');
     expect(selfRec.summary).toBe(
-      "Buy term cover of ₹25.00 L on Alex. Life cover pays only on that person's death — underinsurance here leaves the household exposed.",
+      "Buy term cover to close this gap on Alex.",
     );
     expect(spouseRec.summary).toBe(
-      'Buy term cover of ₹30.00 L on Sam. If they pass away, only their sum insured supports household expenses — not cover held on other members.',
+      "Buy term cover to close this gap on Sam.",
     );
   });
 
@@ -48,7 +48,7 @@ describe('safetyNetAdapter', () => {
     });
     const [rec] = resolveRecommendations(signals, { report: 'safety_net' });
     expect(rec.id).toBe('protection.lifeGap');
-    expect(rec.summary).toContain('₹25.00 L');
+    expect(rec.summary).toBe("Buy term cover to close this gap on you.");
   });
 });
 

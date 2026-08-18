@@ -32,7 +32,7 @@ describe('Recommendation Resolver', () => {
     };
     const [rec] = resolveRecommendations(signals, { report: 'safety_net' });
     expect(rec.summary).toBe(
-      "Buy term cover of ₹25.00 L on Alex. Life cover pays only on that person's death — underinsurance here leaves the household exposed.",
+      "Buy term cover to close this gap on Alex.",
     );
   });
 

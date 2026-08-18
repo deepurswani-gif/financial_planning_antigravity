@@ -332,9 +332,22 @@ export const buildExecutiveSummaryReport = ({
     hasSpouseIncome,
     policies = [],
     hasHealthInsurance = null,
+    liabilityCategories = {},
+    calculatorInputs = {}
 }) => {
     const cashFlow = calculateCashFlow(income, expenseCategories, familyMembers, hasSpouseIncome);
-    const protectionData = calculateProtectionData(expenseCategories, summaryLifeCover, familyMembers, policies);
+    const protectionData = calculateProtectionData(
+        expenseCategories,
+        summaryLifeCover,
+        familyMembers,
+        policies,
+        income,
+        inflationRates,
+        calculatorInputs,
+        goals,
+        assetCategories,
+        liabilityCategories
+    );
     const emergencyCash = getEmergencyFundAmount(assetCategories, contingencyFund);
     const contingencyData = calculateContingencyData(expenseCategories, emergencyCash, familyMembers);
     const healthData = calculateHealthInsuranceData(

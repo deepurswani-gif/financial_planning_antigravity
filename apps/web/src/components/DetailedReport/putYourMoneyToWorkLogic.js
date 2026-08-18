@@ -1193,9 +1193,11 @@ export function buildAllocationStudioContext({
     goalMappings = {},
     goals = [],
     selectedMonthIndex,
-    /** 'gaps' | 'pymtw' | null (all categories) */
     reportScope = null,
     policies = [],
+    liabilityCategories = {},
+    income = {},
+    inflationRates = {}
 }) {
     if (!moneyFlowReport?.meta) {
         return { meta: { hasData: false } };
@@ -1231,7 +1233,18 @@ export function buildAllocationStudioContext({
         })
         : { deployableSurplus: 0, carriedForward: 0 };
 
-    const protectionData = calculateProtectionData(expenseCategories, summaryLifeCover, familyMembers, policies);
+    const protectionData = calculateProtectionData(
+        expenseCategories,
+        summaryLifeCover,
+        familyMembers,
+        policies,
+        income,
+        inflationRates,
+        calculatorInputs,
+        goals,
+        assetCategories,
+        liabilityCategories
+    );
     const contingencyData = calculateContingencyData(
         expenseCategories,
         getEmergencyFundAmount(assetCategories, contingencyFund),
