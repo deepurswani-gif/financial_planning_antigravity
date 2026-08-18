@@ -11,6 +11,23 @@ export const HORIZON_YEARS = 5;
 export const DEFAULT_INVESTMENT_CAGR = 12;
 export const DEFAULT_GOAL_INFLATION = 6;
 
+const GOAL_ACCENT_MAP = [
+    { match: (n) => n.includes('educat'), color: '#7C3AED', bgTint: 'rgba(124, 58, 237, 0.12)' },
+    { match: (n) => n.includes('retire'), color: '#D97706', bgTint: 'rgba(217, 119, 6, 0.12)' },
+    { match: (n) => n.includes('car') || n.includes('vehic') || n.includes('bike'), color: '#4F46E5', bgTint: 'rgba(79, 70, 229, 0.12)' },
+    { match: (n) => n.includes('vacat') || n.includes('tour') || n.includes('trip'), color: '#0EA5E9', bgTint: 'rgba(14, 165, 233, 0.12)' },
+    { match: (n) => n.includes('home') || n.includes('flat') || n.includes('house'), color: '#0D9488', bgTint: 'rgba(13, 148, 136, 0.12)' },
+    { match: (n) => n.includes('marriage') || n.includes('wed'), color: '#E11D48', bgTint: 'rgba(225, 29, 72, 0.12)' },
+];
+
+const DEFAULT_ACCENT = { color: '#00A9F2', bgTint: 'rgba(0, 169, 242, 0.12)' };
+
+export const getGoalAccent = (goal) => {
+    const lower = (goal?.name || '').toLowerCase();
+    const entry = GOAL_ACCENT_MAP.find(({ match }) => match(lower));
+    return entry ? { color: entry.color, bgTint: entry.bgTint } : DEFAULT_ACCENT;
+};
+
 /**
  * Monthly SIP required to reach target corpus (annuity-due, beginning of month).
  * Inverse of computeSIPProjection FV formula.
@@ -100,8 +117,7 @@ export const enrichGoal = (goal, currentYear = new Date().getFullYear()) => {
         futureCost,
         inflationDelta,
         inflationRate,
-        monthlySipNeeded,
-        isNearTerm: yearsToGoal <= HORIZON_YEARS
+        monthlySipNeeded
     };
 };
 
@@ -221,6 +237,25 @@ export const buildIncomeJourney = (cashSnapshot, inflationRates, currentYear = n
     };
 };
 
+export const buildReadinessAssumptionsNote = (cashSnapshot, inflationRates) => {
+    const incomeGrowthPct = parseFloat(inflationRates?.incomeIncrement) || 10;
+    const householdInflationPct = parseFloat(inflationRates?.householdInflation) || 6;
+    let note =
+        `As your income grows over time, the amount available for future savings and investments is also expected to increase. ` +
+        `Thoughtful allocation of this growing surplus can significantly improve your ability to achieve important life goals. ` +
+        `Projections assume income growth at ${incomeGrowthPct}% p.a., household inflation at ${householdInflationPct}%, ` +
+        `and investment returns at ${DEFAULT_INVESTMENT_CAGR}% on monthly investments and surplus allocations.`;
+
+    if (cashSnapshot.investmentProjectionSource === 'summary_consolidated') {
+        note =
+            `Your monthly investment total from the summary flow (SIPs, mutual funds, stocks, retirement contributions, etc.) ` +
+            `is assumed to be invested monthly at ${DEFAULT_INVESTMENT_CAGR}% CAGR until each goal year. ` +
+            `Safer savings such as FDs and RDs are excluded from this projection. ${note}`;
+    }
+
+    return note;
+};
+
 export const formatCompactFS = (amount) => {
     const abs = Math.abs(amount || 0);
     if (abs >= 10000000) return `₹${(abs / 10000000).toFixed(2)} Cr`;
@@ -242,21 +277,16 @@ export const buildFutureSelfReport = ({
     const cashSnapshot = buildCashFlowSnapshot(cashFlowResults, expenseCategories);
     const validGoals = getValidGoals(goals);
     const enrichedGoals = validGoals.map((g) => enrichGoal(g, currentYear));
-    const nearTermGoals = enrichedGoals
-        .filter((g) => g.isNearTerm)
+    const goalReadiness = enrichedGoals
         .map((g) => buildGoalReadiness(g, cashSnapshot, inflationRates))
         .sort((a, b) => a.targetYear - b.targetYear || a.yearsToGoal - b.yearsToGoal);
-    const longTermGoals = enrichedGoals
-        .filter((g) => !g.isNearTerm)
-        .sort((a, b) => a.targetYear - b.targetYear);
 
     return {
         cashSnapshot,
         enrichedGoals,
         dreamsHeadline: buildDreamsHeadline(enrichedGoals),
         incomeJourney: buildIncomeJourney(cashSnapshot, inflationRates, currentYear),
-        nearTermGoals,
-        longTermGoals,
+        goalReadiness,
         hasIncomeData: cashSnapshot.monthlyIncome > 0,
         hasGoals: enrichedGoals.length > 0
     };

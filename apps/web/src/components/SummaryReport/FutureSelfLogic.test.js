@@ -8,7 +8,8 @@ import {
     projectFutureSurplusFV,
     buildFutureSelfReport,
     getValidGoals,
-    getMonthlyInvestmentForProjection
+    getMonthlyInvestmentForProjection,
+    getGoalAccent
 } from './FutureSelfLogic';
 
 describe('FutureSelfLogic', () => {
@@ -39,7 +40,7 @@ describe('FutureSelfLogic', () => {
         expect(journey.points[5].monthlyIncome).toBe(161051);
     });
 
-    it('splits goals into near and long term', () => {
+    it('builds goalReadiness for all goals regardless of horizon', () => {
         const report = buildFutureSelfReport({
             goals: [
                 { name: 'Car', presentValue: 800000, yearsToGoal: 3, inflationRate: 6 },
@@ -53,13 +54,12 @@ describe('FutureSelfLogic', () => {
             expenseCategories: { savings: { sip: 15000 } },
             inflationRates: { incomeIncrement: 10, householdInflation: 6 }
         });
-        expect(report.nearTermGoals).toHaveLength(1);
-        expect(report.longTermGoals).toHaveLength(1);
-        expect(report.nearTermGoals[0].name).toBe('Car');
+        expect(report.goalReadiness).toHaveLength(2);
+        expect(report.goalReadiness.map((g) => g.name)).toEqual(['Car', 'Retirement']);
     });
 
     it('marks goal achievable when projected exceeds future cost', () => {
-        const readiness = buildFutureSelfReport({
+        const report = buildFutureSelfReport({
             goals: [{ name: 'Small', presentValue: 10000, yearsToGoal: 10, inflationRate: 6 }],
             cashFlowResults: {
                 totalIncome: 500000,
@@ -68,8 +68,9 @@ describe('FutureSelfLogic', () => {
             },
             expenseCategories: { savings: { sip: 100000 } },
             inflationRates: { incomeIncrement: 10, householdInflation: 6 }
-        }).nearTermGoals;
-        expect(readiness.length).toBe(0);
+        });
+        expect(report.goalReadiness).toHaveLength(1);
+        expect(report.goalReadiness[0].isAchievable).toBe(true);
     });
 
     it('filters valid goals', () => {
@@ -130,7 +131,7 @@ describe('FutureSelfLogic', () => {
         expect(result).toEqual({ amount: 6000, source: 'detailed_growth' });
     });
 
-    it('projects current investments for summary-flow near-term goals', () => {
+    it('projects current investments for summary-flow goals', () => {
         const report = buildFutureSelfReport({
             goals: [{ name: 'Car', presentValue: 800000, yearsToGoal: 3, inflationRate: 6 }],
             cashFlowResults: {
@@ -145,18 +146,19 @@ describe('FutureSelfLogic', () => {
             inflationRates: { incomeIncrement: 10, householdInflation: 6 },
         });
 
-        expect(report.nearTermGoals).toHaveLength(1);
-        expect(report.nearTermGoals[0].projectedCurrentSips).toBeGreaterThan(0);
-        expect(report.nearTermGoals[0].investmentProjectionSource).toBe('summary_consolidated');
+        expect(report.goalReadiness).toHaveLength(1);
+        expect(report.goalReadiness[0].projectedCurrentSips).toBeGreaterThan(0);
+        expect(report.goalReadiness[0].investmentProjectionSource).toBe('summary_consolidated');
         expect(report.cashSnapshot.currentMonthlyInvestment).toBe(15000);
     });
 
-    it('sorts near-term readiness goals by target year ascending', () => {
+    it('sorts goalReadiness by target year ascending', () => {
         const report = buildFutureSelfReport({
             goals: [
                 { name: 'Vacation', presentValue: 500000, yearsToGoal: 5, inflationRate: 6 },
                 { name: 'Car', presentValue: 800000, yearsToGoal: 2, inflationRate: 6 },
                 { name: 'Bike', presentValue: 200000, yearsToGoal: 1, inflationRate: 6 },
+                { name: 'Retirement', presentValue: 10000000, yearsToGoal: 15, inflationRate: 6 },
             ],
             cashFlowResults: {
                 totalIncome: 100000,
@@ -167,7 +169,12 @@ describe('FutureSelfLogic', () => {
             inflationRates: { incomeIncrement: 10, householdInflation: 6 },
         }, 2026);
 
-        expect(report.nearTermGoals.map((g) => g.name)).toEqual(['Bike', 'Car', 'Vacation']);
-        expect(report.nearTermGoals.map((g) => g.targetYear)).toEqual([2027, 2028, 2031]);
+        expect(report.goalReadiness.map((g) => g.name)).toEqual(['Bike', 'Car', 'Vacation', 'Retirement']);
+        expect(report.goalReadiness.map((g) => g.targetYear)).toEqual([2027, 2028, 2031, 2041]);
+    });
+
+    it('getGoalAccent returns teal for house and brand default for unknown', () => {
+        expect(getGoalAccent({ name: 'Constructing new house' }).color).toBe('#0D9488');
+        expect(getGoalAccent({ name: 'Misc Goal' }).color).toBe('#00A9F2');
     });
 });
