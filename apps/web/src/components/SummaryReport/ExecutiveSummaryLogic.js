@@ -19,6 +19,25 @@ const SCORE_BANDS = {
     ]
 };
 
+export const GRADE_SCALE = {
+    overall: [
+        { min: 81, grade: 'Grade A', label: 'Financially Resilient (Honors)' },
+        { min: 61, grade: 'Grade B+', label: 'Strong Merit' },
+        { min: 41, grade: 'Grade C', label: 'Passing Grade' },
+        { min: 21, grade: 'Grade D', label: 'Needs Improvement' },
+        { min: 0, grade: 'Grade F', label: 'Critical Attention Required' }
+    ],
+    pillar: [
+        { min: 16, grade: 'Grade A', label: 'Strong' },
+        { min: 11, grade: 'Grade B', label: 'Progressing' },
+        { min: 6, grade: 'Grade C', label: 'Needs Attention' },
+        { min: 0, grade: 'Grade F', label: 'Critical' }
+    ]
+};
+
+export const pickOverallGrade = (score) => GRADE_SCALE.overall.find((g) => score >= g.min) || GRADE_SCALE.overall.at(-1);
+export const pickPillarGrade = (score) => GRADE_SCALE.pillar.find((g) => score >= g.min) || GRADE_SCALE.pillar.at(-1);
+
 const toNum = (value) => parseFloat(value) || 0;
 const toLakh = (amount) => toNum(amount) / 100000;
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -217,9 +236,7 @@ const buildUpliftOpportunities = ({
         opportunities.push({
             key: 'emergency-6m',
             label: 'Build emergency fund to 6 months',
-            uplift: improvedEmergency - emergencyScore,
-            targetValue: `${targetEmergencyMonths} months`,
-            currentValue: `${(Math.round(emergencyCoverageMonths * 10) / 10).toFixed(1)} months`
+            uplift: improvedEmergency - emergencyScore
         });
     }
 
@@ -229,9 +246,7 @@ const buildUpliftOpportunities = ({
         opportunities.push({
             key: 'wealth-15',
             label: 'Increase investment ratio to 15%',
-            uplift: improvedWealth - wealthScore,
-            targetValue: '15%',
-            currentValue: `${Math.round(wealthRatio * 100)}%`
+            uplift: improvedWealth - wealthScore
         });
     }
 
@@ -241,9 +256,7 @@ const buildUpliftOpportunities = ({
         opportunities.push({
             key: 'daily-20',
             label: 'Improve surplus ratio to 20%',
-            uplift: improvedDaily - dailyScore,
-            targetValue: '20%',
-            currentValue: `${Math.round(surplusRatio * 100)}%`
+            uplift: improvedDaily - dailyScore
         });
     }
 
@@ -254,9 +267,7 @@ const buildUpliftOpportunities = ({
         opportunities.push({
             key: 'family-coverage',
             label: 'Lift life coverage to 75% and health cover to 10L',
-            uplift: improvedFamily - familyScore,
-            targetValue: 'Life 75%, Health 10L',
-            currentValue: `Life ${Math.round(lifeCoverageRatio * 100)}%, Health ${Math.round(healthCoverLakh)}L`
+            uplift: improvedFamily - familyScore
         });
     }
 
@@ -265,9 +276,7 @@ const buildUpliftOpportunities = ({
         opportunities.push({
             key: 'goals-75',
             label: 'Raise average goal readiness to 75%',
-            uplift: improvedGoal - goalScore,
-            targetValue: '75%',
-            currentValue: `${Math.round(goalsAvgCoveragePct)}%`
+            uplift: improvedGoal - goalScore
         });
     }
 
@@ -332,9 +341,22 @@ export const buildExecutiveSummaryReport = ({
     hasSpouseIncome,
     policies = [],
     hasHealthInsurance = null,
+    liabilityCategories = {},
+    calculatorInputs = {}
 }) => {
     const cashFlow = calculateCashFlow(income, expenseCategories, familyMembers, hasSpouseIncome);
-    const protectionData = calculateProtectionData(expenseCategories, summaryLifeCover, familyMembers, policies);
+    const protectionData = calculateProtectionData(
+        expenseCategories,
+        summaryLifeCover,
+        familyMembers,
+        policies,
+        income,
+        inflationRates,
+        calculatorInputs,
+        goals,
+        assetCategories,
+        liabilityCategories
+    );
     const emergencyCash = getEmergencyFundAmount(assetCategories, contingencyFund);
     const contingencyData = calculateContingencyData(expenseCategories, emergencyCash, familyMembers);
     const healthData = calculateHealthInsuranceData(
@@ -439,10 +461,15 @@ export const buildExecutiveSummaryReport = ({
             interpretation: buildGoalsInterpretation(goalScore),
             dataNote: goalReadinessRows.length === 0 ? 'Scored conservatively because goal data is unavailable.' : ''
         }
-    ].map((pillar) => ({ ...pillar, band: pickPillarBand(pillar.score).label }));
+    ].map((pillar) => ({
+        ...pillar,
+        band: pickPillarBand(pillar.score).label,
+        grade: pickPillarGrade(pillar.score).grade
+    }));
 
     const totalScore = pillars.reduce((sum, pillar) => sum + pillar.score, 0);
     const overallBand = pickOverallBand(totalScore);
+    const overallGradeInfo = pickOverallGrade(totalScore);
     const ranked = [...pillars].sort((a, b) => b.score - a.score);
     const topPillars = ranked.slice(0, 2);
     const bottomPillars = [...ranked].reverse().slice(0, 3);
@@ -493,7 +520,11 @@ export const buildExecutiveSummaryReport = ({
     return {
         totalScore,
         overallCategory: overallBand.label,
+        overallGrade: overallGradeInfo.grade,
+        overallGradeLabel: overallGradeInfo.label,
         pillars,
+        topPillars,
+        bottomPillars,
         actionPriorities,
         confidence,
         roadmap,

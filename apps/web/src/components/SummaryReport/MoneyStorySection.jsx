@@ -122,6 +122,9 @@ const MoneyStorySection = () => {
         summaryLifeCover,
         hasSpouseIncome,
         policies,
+        inflationRates,
+        calculatorInputs,
+        goals,
     } = useFinancialPlan();
 
     // ── Derived Calculations ──
@@ -152,8 +155,30 @@ const MoneyStorySection = () => {
     }, [surplusData.unallocated, yearsToRetirement]);
 
     const protectionData = useMemo(
-        () => calculateProtectionData(expenseCategories, summaryLifeCover, familyMembers, policies),
-        [expenseCategories, summaryLifeCover, familyMembers, policies]
+        () => calculateProtectionData(
+            expenseCategories,
+            summaryLifeCover,
+            familyMembers,
+            policies,
+            income,
+            inflationRates,
+            calculatorInputs,
+            goals,
+            assetCategories,
+            liabilityCategories
+        ),
+        [
+            expenseCategories,
+            summaryLifeCover,
+            familyMembers,
+            policies,
+            income,
+            inflationRates,
+            calculatorInputs,
+            goals,
+            assetCategories,
+            liabilityCategories
+        ]
     );
 
     const contingencyData = useMemo(

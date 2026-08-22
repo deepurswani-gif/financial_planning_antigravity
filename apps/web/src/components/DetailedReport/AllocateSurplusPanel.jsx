@@ -68,6 +68,14 @@ export const InstrumentAmountSlider = ({
         setInputValue(String(clamped));
     };
 
+    const currentVal = Math.min(draftAmount || 0, Math.max(0, maxAmount));
+    const pct = maxAmount > 0 ? Math.min(100, Math.max(0, (currentVal / maxAmount) * 100)) : 0;
+
+    const addQuickChip = (val) => {
+        const next = Math.max(0, Math.min(maxAmount, (draftAmount || 0) + val));
+        onDraftChange(instrumentType, next);
+    };
+
     const priorMonths = (monthHistory || []).filter(
         (h) => h.planKey !== currentPlanKey && Math.round(h.monthlyAmount || 0) > 0,
     );
@@ -75,7 +83,7 @@ export const InstrumentAmountSlider = ({
     return (
         <div className="pymtw-sip-slider-block">
             <div className="pymtw-sip-slider-head">
-                <span>Allocate this month</span>
+                <span>Set monthly allocation</span>
                 <div className="pymtw-amount-input-wrap">
                     <CurrencyInput
                         className="pymtw-amount-input"
@@ -101,24 +109,49 @@ export const InstrumentAmountSlider = ({
                     {amountSuffix && <span className="pymtw-amount-suffix">{amountSuffix}</span>}
                 </div>
             </div>
-            <input
-                type="range"
-                className="pymtw-sip-slider"
-                min={0}
-                max={Math.max(0, maxAmount)}
-                step={def?.step || 500}
-                value={Math.min(draftAmount || 0, Math.max(0, maxAmount))}
-                onChange={(e) => {
-                    const next = parseInt(e.target.value, 10) || 0;
-                    if (next === Math.round(draftAmount || 0)) return;
-                    onDraftChange(instrumentType, next);
-                }}
-                aria-label={`${displayName || instrumentType} allocation slider`}
-            />
-            <div className="pymtw-sip-slider-labels">
+
+            <div className="pymtw-slider-track-container" style={{ position: 'relative', marginTop: '1.25rem', marginBottom: '0.5rem' }}>
+                <div
+                    className="pymtw-slider-floating-badge"
+                    style={{
+                        position: 'absolute',
+                        top: '-1.4rem',
+                        left: `clamp(1rem, ${pct}%, calc(100% - 2.5rem))`,
+                        transform: 'translateX(-50%)',
+                        background: 'var(--primary, #0f766e)',
+                        color: '#fff',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        padding: '0.15rem 0.45rem',
+                        borderRadius: '999px',
+                        pointerEvents: 'none',
+                        whiteSpace: 'nowrap',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                    }}
+                >
+                    {formatCurrency(currentVal)}
+                </div>
+                <input
+                    type="range"
+                    className="pymtw-sip-slider"
+                    min={0}
+                    max={Math.max(0, maxAmount)}
+                    step={def?.step || 500}
+                    value={currentVal}
+                    onChange={(e) => {
+                        const next = parseInt(e.target.value, 10) || 0;
+                        if (next === Math.round(draftAmount || 0)) return;
+                        onDraftChange(instrumentType, next);
+                    }}
+                    aria-label={`${displayName || instrumentType} allocation slider`}
+                />
+            </div>
+
+            <div className="pymtw-sip-slider-labels" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                 <span>₹0</span>
                 <span>{formatCurrency(maxAmount)}</span>
             </div>
+
             {priorMonths.length > 0 && (
                 <div className="pymtw-instrument-stats pymtw-month-history">
                     {priorMonths.map((h) => (
@@ -138,15 +171,18 @@ export const InstrumentAmountSlider = ({
     );
 };
 
-const LifeInsuranceSavingForm = ({
+export const LifeInsuranceSavingForm = ({
     draft,
     maxMonthly = 0,
     familyMembers = [],
     onChange,
     monthHistory = [],
     currentPlanKey = null,
+    instrumentType = LISP_INSTRUMENT_TYPE,
+    validationErrors = {},
+    onDone,
 }) => {
-    const value = isLispDraft(draft) ? draft : createEmptyLispDraft();
+    const value = isLispDraft(draft) ? draft : createEmptyLispDraft(instrumentType);
     const monthly = getLispDraftMonthly(value);
     const priorMonths = (monthHistory || []).filter(
         (h) => h.planKey !== currentPlanKey && Math.round(h.monthlyAmount || 0) > 0,
@@ -164,15 +200,85 @@ const LifeInsuranceSavingForm = ({
         return Math.round(maxMonthly);
     })();
 
+    const typeKey = instrumentType.toLowerCase().replace(/[^a-z0-9]/g, '-');
+    const currentVal = Math.min(value.premium || 0, Math.max(0, maxPremium));
+    const pct = maxPremium > 0 ? Math.min(100, Math.max(0, (currentVal / maxPremium) * 100)) : 0;
+
     return (
         <div className="pymtw-lisp-form">
-            <div className="pymtw-lisp-grid">
+            <p className="pymtw-lisp-question" style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.75rem', color: 'var(--text-main)' }}>
+                How much would you like to set aside for {instrumentType.toLowerCase()} this month?
+            </p>
+
+            <div className="pymtw-sip-slider-block">
+                <div className="pymtw-sip-slider-head">
+                    <span>Monthly premium</span>
+                    <div className="pymtw-amount-input-wrap">
+                        <CurrencyInput
+                            id={`pymtw-${typeKey}-premium`}
+                            className="pymtw-amount-input"
+                            min={0}
+                            max={Math.max(0, maxPremium)}
+                            value={value.premium === 0 || value.premium === '0' ? 0 : (value.premium ?? '')}
+                            onValueChange={(v) => patch('premium', v)}
+                        />
+                        <span className="pymtw-amount-suffix">/mo</span>
+                    </div>
+                </div>
+
+                <div className="pymtw-slider-track-container" style={{ position: 'relative', marginTop: '1.25rem', marginBottom: '0.5rem' }}>
+                    <div
+                        className="pymtw-slider-floating-badge"
+                        style={{
+                            position: 'absolute',
+                            top: '-1.4rem',
+                            left: `clamp(1rem, ${pct}%, calc(100% - 2.5rem))`,
+                            transform: 'translateX(-50%)',
+                            background: 'var(--primary, #0f766e)',
+                            color: '#fff',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            padding: '0.15rem 0.45rem',
+                            borderRadius: '999px',
+                            pointerEvents: 'none',
+                            whiteSpace: 'nowrap',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                        }}
+                    >
+                        {formatCurrency(currentVal)}
+                    </div>
+                    <input
+                        type="range"
+                        className="pymtw-sip-slider"
+                        min={0}
+                        max={Math.max(0, maxPremium)}
+                        step={500}
+                        value={currentVal}
+                        onChange={(e) => {
+                            const next = parseInt(e.target.value, 10) || 0;
+                            patch('premium', next);
+                        }}
+                        aria-label={`${instrumentType} allocation slider`}
+                    />
+                </div>
+
+                <div className="pymtw-sip-slider-labels" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    <span>₹0</span>
+                    <span>{formatCurrency(maxPremium)}</span>
+                </div>
+            </div>
+
+            {/* Mandatory policy fields always visible */}
+            <div className="pymtw-lisp-grid" style={{ marginTop: '1rem', paddingTop: '0.85rem', borderTop: '1px dashed var(--border)' }}>
                 <div className="input-group pymtw-lisp-field">
-                    <label htmlFor="pymtw-lisp-member">Insured Member</label>
+                    <label htmlFor={`pymtw-${typeKey}-member`} style={{ fontWeight: 600 }}>
+                        Insured Member <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
                     <select
-                        id="pymtw-lisp-member"
+                        id={`pymtw-${typeKey}-member`}
                         value={value.insuredMember || ''}
                         onChange={(e) => patch('insuredMember', e.target.value)}
+                        style={validationErrors?.memberError ? { borderColor: '#ef4444' } : {}}
                     >
                         <option value="">Select Member</option>
                         {(familyMembers || []).map((m) => {
@@ -182,25 +288,18 @@ const LifeInsuranceSavingForm = ({
                             );
                         })}
                     </select>
+                    {validationErrors?.memberError && (
+                        <span style={{ color: '#ef4444', fontSize: '0.78rem', marginTop: '0.25rem', display: 'block' }}>
+                            {validationErrors.memberError}
+                        </span>
+                    )}
                 </div>
                 <div className="input-group pymtw-lisp-field">
-                    <label htmlFor="pymtw-lisp-premium">Premium Amount</label>
-                    <CurrencyInput
-                        id="pymtw-lisp-premium"
-                        className="pymtw-amount-input"
-                        min={0}
-                        max={Math.max(0, maxPremium)}
-                        value={value.premium === 0 || value.premium === '0' ? 0 : (value.premium ?? '')}
-                        onValueChange={(v) => patch('premium', v)}
-                    />
-                    <small className="pymtw-lisp-hint">
-                        ≈ {formatCurrency(Math.round(monthly))}/mo · Mode: {value.frequency || 'Monthly'}
-                    </small>
-                </div>
-                <div className="input-group pymtw-lisp-field">
-                    <label htmlFor="pymtw-lisp-freq">Frequency</label>
+                    <label htmlFor={`pymtw-${typeKey}-freq`} style={{ fontWeight: 600 }}>
+                        Frequency <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
                     <select
-                        id="pymtw-lisp-freq"
+                        id={`pymtw-${typeKey}-freq`}
                         value={value.frequency || 'Monthly'}
                         onChange={(e) => patch('frequency', e.target.value)}
                     >
@@ -210,18 +309,40 @@ const LifeInsuranceSavingForm = ({
                     </select>
                 </div>
                 <div className="input-group pymtw-lisp-field">
-                    <label htmlFor="pymtw-lisp-ppt">Premium Payment Term (Years)</label>
+                    <label htmlFor={`pymtw-${typeKey}-ppt`} style={{ fontWeight: 600 }}>
+                        Premium Payment Term (Years) <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
                     <YearsInput
-                        id="pymtw-lisp-ppt"
+                        id={`pymtw-${typeKey}-ppt`}
                         min={1}
                         max={50}
                         value={value.duration ?? ''}
                         onValueChange={(v) => patch('duration', v)}
+                        style={validationErrors?.durationError ? { borderColor: '#ef4444' } : {}}
                     />
+                    {validationErrors?.durationError && (
+                        <span style={{ color: '#ef4444', fontSize: '0.78rem', marginTop: '0.25rem', display: 'block' }}>
+                            {validationErrors.durationError}
+                        </span>
+                    )}
                 </div>
             </div>
+
+            {onDone && (
+                <div style={{ textAlign: 'right', marginTop: '1rem' }}>
+                    <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={onDone}
+                        style={{ padding: '0.45rem 1.1rem', fontSize: '0.85rem', fontWeight: 600, borderRadius: '8px' }}
+                    >
+                        Done ✓
+                    </button>
+                </div>
+            )}
+
             {priorMonths.length > 0 && (
-                <div className="pymtw-instrument-stats pymtw-month-history">
+                <div className="pymtw-instrument-stats pymtw-month-history" style={{ marginTop: '0.75rem' }}>
                     {priorMonths.map((h) => (
                         <div key={h.planKey} className="pymtw-month-history-row">
                             <span>Already planned</span>
@@ -398,12 +519,13 @@ const AllocateSurplusPanel = ({
                                         {avenue.note && (
                                             <p className="pymtw-avenue-chip-note">{avenue.note}</p>
                                         )}
-                                        {avenue.type === LISP_INSTRUMENT_TYPE ? (
+                                        {avenue.type === LISP_INSTRUMENT_TYPE || avenue.type === 'Term Insurance' ? (
                                             <LifeInsuranceSavingForm
+                                                instrumentType={avenue.type}
                                                 draft={draftAllocations[avenue.type]}
                                                 maxMonthly={maxAmount}
                                                 familyMembers={familyMembers}
-                                                onChange={(next) => onLispDraftChange?.(next)}
+                                                onChange={(next) => onLispDraftChange?.(next, avenue.type)}
                                                 monthHistory={avenue.monthHistory}
                                                 currentPlanKey={currentPlanKey}
                                             />

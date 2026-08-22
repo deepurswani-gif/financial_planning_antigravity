@@ -1,16 +1,18 @@
 import React, { useMemo, useEffect, useState, useRef } from 'react';
 import {
-    LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid
+    LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LabelList
 } from 'recharts';
 import {
     Target, TrendingUp, Calendar, Wallet, CheckCircle2, AlertTriangle,
-    Info, Car, Home, Plane, GraduationCap, Heart, Award, Sparkles, ArrowRight
+    Info, Car, Home, Plane, GraduationCap, Heart, Award, Sparkles
 } from 'lucide-react';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 import { calculateCashFlow, formatCurrency } from '../CashFlowModule/CashFlowLogic';
 import {
     buildFutureSelfReport,
+    buildReadinessAssumptionsNote,
     formatCompactFS,
+    getGoalAccent,
     HORIZON_YEARS,
     DEFAULT_INVESTMENT_CAGR
 } from './FutureSelfLogic';
@@ -62,6 +64,41 @@ const IncomeTooltip = ({ active, payload }) => {
     );
 };
 
+const GoalCostGrowthBar = ({ goal }) => {
+    const accent = getGoalAccent(goal);
+    const futureCost = goal.futureCost || 1;
+    const todayPct = Math.min(100, Math.max(0, (goal.presentValueNum / futureCost) * 100));
+    const inflationPct = Math.max(0, 100 - todayPct);
+
+    return (
+        <div className="fs-cost-bar-wrap">
+            <div className="fs-cost-bar-labels">
+                <span>Today {formatCompactFS(goal.presentValueNum)}</span>
+                <span>{goal.targetYear} {formatCompactFS(goal.futureCost)}</span>
+            </div>
+            <div className="fs-cost-bar-track">
+                <div
+                    className="fs-cost-bar-today"
+                    style={{ width: `${todayPct}%`, background: accent.color }}
+                />
+                <div
+                    className="fs-cost-bar-inflation"
+                    style={{
+                        width: `${inflationPct}%`,
+                        background: accent.bgTint,
+                        borderColor: accent.color
+                    }}
+                />
+            </div>
+            {goal.inflationDelta > 0 && (
+                <p className="fs-cost-bar-inflation-label">
+                    +{formatCompactFS(goal.inflationDelta)} from inflation
+                </p>
+            )}
+        </div>
+    );
+};
+
 const FutureSelfSection = () => {
     const { goals, income, expenseCategories, inflationRates, familyMembers, hasSpouseIncome } = useFinancialPlan();
 
@@ -79,6 +116,11 @@ const FutureSelfSection = () => {
         if (!report.enrichedGoals.length) return new Date().getFullYear() + 10;
         return Math.max(...report.enrichedGoals.map((g) => g.targetYear));
     }, [report.enrichedGoals]);
+
+    const readinessAssumptionsNote = useMemo(
+        () => buildReadinessAssumptionsNote(report.cashSnapshot, inflationRates),
+        [report.cashSnapshot, inflationRates]
+    );
 
     if (!report.hasGoals) {
         return (
@@ -110,7 +152,13 @@ const FutureSelfSection = () => {
         );
     }
 
-    const { dreamsHeadline, enrichedGoals, incomeJourney, nearTermGoals, longTermGoals, cashSnapshot } = report;
+    const {
+        dreamsHeadline,
+        enrichedGoals,
+        incomeJourney,
+        goalReadiness,
+        cashSnapshot
+    } = report;
     const currentYear = new Date().getFullYear();
 
     return (
@@ -145,15 +193,28 @@ const FutureSelfSection = () => {
                                     ? ((goal.targetYear - currentYear) / (timelineMaxYear - currentYear)) * 100
                                     : 50;
                                 const Icon = getGoalIcon(goal.name);
+                                const accent = getGoalAccent(goal);
+                                const showYearLabel = goal.targetYear !== timelineMaxYear && goal.targetYear !== currentYear;
                                 return (
                                     <div
                                         key={goal.id}
-                                        className={`fs-timeline-node ${goal.isNearTerm ? 'fs-near' : 'fs-far'}`}
+                                        className="fs-timeline-node"
                                         style={{ left: `${Math.min(96, Math.max(2, pct))}%` }}
                                         title={`${goal.name} (${goal.targetYear})`}
                                     >
-                                        <div className="fs-timeline-dot"><Icon size={14} /></div>
-                                        <span className="fs-timeline-year">{goal.targetYear}</span>
+                                        <div
+                                            className="fs-timeline-dot"
+                                            style={{
+                                                borderColor: accent.color,
+                                                color: accent.color,
+                                                boxShadow: `0 4px 12px ${accent.color}33`
+                                            }}
+                                        >
+                                            <Icon size={14} />
+                                        </div>
+                                        {showYearLabel && (
+                                            <span className="fs-timeline-year">{goal.targetYear}</span>
+                                        )}
                                     </div>
                                 );
                             })}
@@ -171,10 +232,20 @@ const FutureSelfSection = () => {
                     .sort((a, b) => a.targetYear - b.targetYear)
                     .map((goal) => {
                         const Icon = getGoalIcon(goal.name);
+                        const accent = getGoalAccent(goal);
                         return (
-                            <div key={goal.id} className={`fs-goal-card ${goal.isNearTerm ? '' : 'fs-goal-card-muted'}`}>
+                            <div
+                                key={goal.id}
+                                className="fs-goal-card"
+                                style={{ borderTopColor: accent.color }}
+                            >
                                 <div className="fs-goal-card-header">
-                                    <div className="fs-goal-icon"><Icon size={22} /></div>
+                                    <div
+                                        className="fs-goal-icon"
+                                        style={{ background: accent.bgTint, color: accent.color }}
+                                    >
+                                        <Icon size={22} />
+                                    </div>
                                     <div>
                                         <h3 className="fs-goal-name">{goal.name}</h3>
                                         <p className="fs-goal-meta">
@@ -182,20 +253,7 @@ const FutureSelfSection = () => {
                                         </p>
                                     </div>
                                 </div>
-                                <div className="fs-goal-flow">
-                                    <span>Today: {formatCompactFS(goal.presentValueNum)}</span>
-                                    <ArrowRight size={16} className="fs-goal-arrow" />
-                                    <span className="fs-goal-future">
-                                        Future cost: {formatCompactFS(goal.futureCost)}
-                                    </span>
-                                </div>
-                                <p className="fs-goal-inflation-note">
-                                    (inflation: +{formatCompactFS(goal.inflationDelta)})
-                                </p>
-                                <p className="fs-goal-footnote">
-                                    <Info size={13} />
-                                    Inflation assumed at {goal.inflationRate}%
-                                </p>
+                                <GoalCostGrowthBar goal={goal} />
                                 <div className="fs-goal-sip-block">
                                     <span className="fs-goal-sip-label">Monthly SIP needed</span>
                                     <span className="fs-goal-sip-value">{formatCurrency(goal.monthlySipNeeded)}</span>
@@ -246,7 +304,7 @@ const FutureSelfSection = () => {
                 </h3>
                 <div className="fs-income-chart">
                     <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={incomeJourney.points} margin={{ top: 16, right: 24, left: 8, bottom: 8 }}>
+                        <LineChart data={incomeJourney.points} margin={{ top: 28, right: 24, left: 8, bottom: 8 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                             <XAxis dataKey="label" tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }} axisLine={false} tickLine={false} />
                             <YAxis
@@ -263,17 +321,16 @@ const FutureSelfSection = () => {
                                 strokeWidth={3}
                                 dot={{ fill: '#00A9F2', r: 5, strokeWidth: 2, stroke: '#fff' }}
                                 activeDot={{ r: 7 }}
-                            />
+                            >
+                                <LabelList
+                                    dataKey="monthlyIncome"
+                                    position="top"
+                                    formatter={(v) => formatCompactFS(v)}
+                                    style={{ fontSize: 11, fontWeight: 700, fill: '#64748b' }}
+                                />
+                            </Line>
                         </LineChart>
                     </ResponsiveContainer>
-                </div>
-                <div className="fs-income-ladder">
-                    {incomeJourney.points.map((pt) => (
-                        <div key={pt.label} className="fs-income-step">
-                            <span className="fs-income-step-year">{pt.label}</span>
-                            <span className="fs-income-step-amt">{formatCurrency(pt.monthlyIncome)}/month</span>
-                        </div>
-                    ))}
                 </div>
             </RevealSection>
 
@@ -295,27 +352,34 @@ const FutureSelfSection = () => {
                 <div className="fs-divider-line" />
             </div>
 
-            {nearTermGoals.length === 0 ? (
-                <RevealSection className="fs-no-near-msg">
-                    <p>
-                        None of your goals fall within the next {HORIZON_YEARS} years. See your long-term goals below,
-                        or add nearer-term goals in the summary flow for a detailed readiness check.
-                    </p>
-                </RevealSection>
-            ) : (
-                nearTermGoals.map((goal, idx) => (
+            <RevealSection className="fs-readiness-scope" delay={50}>
+                <p>
+                    Readiness check for each of your planned goals, based on your current investments and projected future surplus.
+                </p>
+            </RevealSection>
+
+            <RevealSection className="fs-readiness-assumptions-wrap" delay={80}>
+                <p className="fs-readiness-note fs-readiness-assumptions-global">
+                    <Info size={14} />
+                    <span>{readinessAssumptionsNote}</span>
+                </p>
+            </RevealSection>
+
+            {goalReadiness.map((goal, idx) => {
+                const Icon = getGoalIcon(goal.name);
+                const accent = getGoalAccent(goal);
+                return (
                     <RevealSection key={goal.id} className="fs-readiness-card-wrap" delay={100 + idx * 80}>
                         <div className="fs-readiness-card">
                             <div className="fs-readiness-header">
-                                {(() => {
-                                    const Icon = getGoalIcon(goal.name);
-                                    return <div className="fs-goal-icon"><Icon size={24} /></div>;
-                                })()}
+                                <div
+                                    className="fs-goal-icon"
+                                    style={{ background: accent.bgTint, color: accent.color }}
+                                >
+                                    <Icon size={24} />
+                                </div>
                                 <div>
                                     <h3 className="fs-readiness-title">{goal.name}</h3>
-                                    <p className="fs-readiness-meta">
-                                        Target Year: <strong>{goal.targetYear}</strong> ({goal.yearsRounded} Years Away)
-                                    </p>
                                 </div>
                             </div>
 
@@ -337,10 +401,6 @@ const FutureSelfSection = () => {
 
                             <div className="fs-readiness-metrics">
                                 <div className="fs-readiness-metric">
-                                    <span className="fs-metric-label">Estimated Future Cost</span>
-                                    <span className="fs-metric-value">{formatCurrency(goal.futureCost)}</span>
-                                </div>
-                                <div className="fs-readiness-metric">
                                     <span className="fs-metric-label">Projected value of current monthly investments by {goal.targetYear}</span>
                                     <span className="fs-metric-value">{formatCurrency(goal.projectedCurrentSips)}</span>
                                 </div>
@@ -349,19 +409,6 @@ const FutureSelfSection = () => {
                                     <span className="fs-metric-value">{formatCurrency(goal.projectedFutureSurplus)}</span>
                                 </div>
                             </div>
-
-                            <p className="fs-readiness-note">
-                                <Info size={14} />
-                                <span>
-                                    As your income grows over time, the amount available for future savings and investments is also expected to increase.
-                                    Thoughtful allocation of this growing surplus can significantly improve your ability to achieve important life goals.
-                                    {goal.investmentProjectionSource === 'summary_consolidated' && (
-                                        <> Your monthly investment total from the summary flow (SIPs, mutual funds, stocks, retirement contributions, etc.) is assumed to be invested monthly at {DEFAULT_INVESTMENT_CAGR}% CAGR until your goal year. Safer savings such as FDs and RDs are excluded from this projection.</>
-                                    )}
-                                    {' '}Projections assume income growth at {goal.incomeGrowthPct}% p.a., household inflation at {goal.householdInflationPct}%,
-                                    and investment returns at {DEFAULT_INVESTMENT_CAGR}% on monthly investments and surplus allocations.
-                                </span>
-                            </p>
 
                             <div className={`fs-verdict ${goal.isAchievable ? 'fs-verdict-ok' : 'fs-verdict-gap'}`}>
                                 {goal.isAchievable ? (
@@ -373,38 +420,8 @@ const FutureSelfSection = () => {
                             </div>
                         </div>
                     </RevealSection>
-                ))
-            )}
-
-            {longTermGoals.length > 0 && (
-                <>
-                    <div className="fs-section-divider" style={{ marginTop: '3rem' }}>
-                        <div className="fs-divider-line" />
-                        <span className="fs-divider-label">LOOKING BEYOND THE NEXT FIVE YEARS</span>
-                        <div className="fs-divider-line" />
-                    </div>
-
-                    <RevealSection className="fs-longterm-intro" delay={100}>
-                        <p>
-                            Some of your goals have a longer time horizon and require a more detailed planning approach
-                            involving inflation, investment returns, income growth, and competing priorities.
-                        </p>
-                    </RevealSection>
-
-                    <RevealSection className="fs-longterm-list" delay={200}>
-                        {longTermGoals.map((goal) => {
-                            const Icon = getGoalIcon(goal.name);
-                            return (
-                                <div key={goal.id} className="fs-longterm-item">
-                                    <div className="fs-longterm-icon"><Icon size={20} /></div>
-                                    <span className="fs-longterm-name">{goal.name}</span>
-                                    <span className="fs-longterm-year">{goal.targetYear}</span>
-                                </div>
-                            );
-                        })}
-                    </RevealSection>
-                </>
-            )}
+                );
+            })}
 
             <style>{`
                 .fs-container { width: 100%; max-width: 100%; background: #fff; padding: 0; margin: 0; }
@@ -428,23 +445,35 @@ const FutureSelfSection = () => {
                 .fs-timeline-strip { position: relative; padding: 2.5rem 0 1rem; }
                 .fs-timeline-track { position: relative; height: 4px; background: linear-gradient(90deg, var(--color-2), #e2e8f0); border-radius: 2px; margin: 0 1rem; }
                 .fs-timeline-node { position: absolute; top: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
-                .fs-timeline-dot { width: 36px; height: 36px; border-radius: 50%; background: #fff; border: 2px solid var(--color-2); display: flex; align-items: center; justify-content: center; color: var(--color-2); box-shadow: 0 4px 12px rgba(0,169,242,0.2); }
-                .fs-timeline-node.fs-far .fs-timeline-dot { border-color: #94a3b8; color: #64748b; box-shadow: none; }
+                .fs-timeline-dot { width: 36px; height: 36px; border-radius: 50%; background: #fff; border: 2px solid var(--color-2); display: flex; align-items: center; justify-content: center; color: var(--color-2); }
                 .fs-timeline-year { font-size: 0.72rem; font-weight: 700; color: var(--text-muted); }
                 .fs-timeline-axis { display: flex; justify-content: space-between; margin-top: 1.25rem; padding: 0 1rem; font-size: 0.75rem; color: var(--text-muted); font-weight: 600; }
 
                 .fs-goals-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem; max-width: 1100px; margin: 0 auto 2rem; padding: 0 2rem; }
-                .fs-goal-card { padding: 1.75rem; border: 1px solid #f1f5f9; border-radius: 16px; background: #fff; transition: box-shadow 0.3s, transform 0.3s; border-left: 4px solid var(--color-2); }
+                .fs-goal-card { padding: 1.75rem; border: 1px solid #f1f5f9; border-radius: 16px; background: #fff; transition: box-shadow 0.3s, transform 0.3s; border-top: 4px solid var(--color-2); }
                 .fs-goal-card:hover { box-shadow: 0 8px 30px rgba(0,0,0,0.06); transform: translateY(-3px); }
-                .fs-goal-card-muted { border-left-color: #94a3b8; opacity: 0.92; }
                 .fs-goal-card-header { display: flex; gap: 1rem; align-items: flex-start; margin-bottom: 1rem; }
                 .fs-goal-icon { width: 44px; height: 44px; border-radius: 12px; background: rgba(0,169,242,0.1); color: var(--color-2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
                 .fs-goal-name { font-size: 1.1rem; font-weight: 700; margin: 0 0 0.25rem; }
                 .fs-goal-meta { font-size: 0.85rem; color: var(--text-muted); margin: 0; }
-                .fs-goal-flow { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; font-size: 0.95rem; font-weight: 600; margin-bottom: 0.35rem; }
-                .fs-goal-arrow { color: var(--text-muted); flex-shrink: 0; }
-                .fs-goal-future { color: var(--color-1); }
-                .fs-goal-inflation-note { font-size: 0.82rem; color: var(--text-muted); margin: 0 0 0.75rem; }
+
+                .fs-cost-bar-wrap { margin-bottom: 1rem; }
+                .fs-cost-bar-labels { display: flex; justify-content: space-between; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.4rem; }
+                .fs-cost-bar-track { display: flex; width: 100%; height: 15px; border-radius: 8px; overflow: hidden; background: #f1f5f9; }
+                .fs-cost-bar-today { flex-shrink: 0; min-width: 2px; }
+                .fs-cost-bar-inflation {
+                    flex-shrink: 0;
+                    min-width: 2px;
+                    background-image: repeating-linear-gradient(
+                        -45deg,
+                        transparent,
+                        transparent 3px,
+                        rgba(255,255,255,0.5) 3px,
+                        rgba(255,255,255,0.5) 6px
+                    );
+                }
+                .fs-cost-bar-inflation-label { font-size: 0.78rem; color: var(--text-muted); text-align: center; margin: 0.45rem 0 0; font-weight: 600; }
+
                 .fs-goal-footnote { display: flex; align-items: flex-start; gap: 0.4rem; font-size: 0.75rem; color: var(--text-muted); margin: 0.5rem 0 0; line-height: 1.4; }
                 .fs-goal-footnote svg { flex-shrink: 0; margin-top: 2px; }
                 .fs-goal-sip-block { margin-top: 1rem; padding: 1rem; background: linear-gradient(135deg, #f0f9ff, #f8fafc); border-radius: 12px; text-align: center; }
@@ -461,22 +490,20 @@ const FutureSelfSection = () => {
                 .fs-tooltip { background: var(--text-main); color: #fff; padding: 0.6rem 1rem; border-radius: 8px; font-size: 0.85rem; }
                 .fs-tooltip-label { font-weight: 600; margin-bottom: 0.2rem; }
                 .fs-tooltip-value { font-weight: 700; }
-                .fs-income-ladder { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-top: 1.5rem; }
-                .fs-income-step { padding: 0.75rem; background: #f8fafc; border-radius: 10px; text-align: center; }
-                .fs-income-step-year { display: block; font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem; }
-                .fs-income-step-amt { font-size: 0.88rem; font-weight: 700; color: var(--text-main); }
 
                 .fs-narrative-block { max-width: 760px; margin: 0 auto 2rem; padding: 0 2rem; text-align: center; }
                 .fs-narrative-text { font-size: 1.05rem; color: var(--text-main); line-height: 1.8; }
                 .fs-narrative-accent { color: var(--color-1); font-weight: 800; }
 
-                .fs-no-near-msg { max-width: 640px; margin: 0 auto 2rem; padding: 1.5rem 2rem; text-align: center; color: var(--text-muted); line-height: 1.7; background: #f8fafc; border-radius: 12px; }
+                .fs-readiness-scope { max-width: 760px; margin: 0 auto 1rem; padding: 0 2rem; text-align: center; color: var(--text-muted); line-height: 1.7; font-style: italic; }
+                .fs-readiness-scope p { margin: 0; }
+                .fs-readiness-assumptions-wrap { max-width: 820px; margin: 0 auto 1.5rem; padding: 0 2rem; }
+                .fs-readiness-assumptions-global { margin-bottom: 0; }
 
                 .fs-readiness-card-wrap { max-width: 820px; margin: 0 auto 1.5rem; padding: 0 2rem; }
                 .fs-readiness-card { padding: 2rem; border: 1px solid #f1f5f9; border-radius: 16px; background: #fff; }
                 .fs-readiness-header { display: flex; gap: 1rem; align-items: flex-start; margin-bottom: 1.5rem; }
-                .fs-readiness-title { font-size: 1.2rem; font-weight: 700; margin: 0 0 0.35rem; }
-                .fs-readiness-meta { font-size: 0.9rem; color: var(--text-muted); margin: 0; }
+                .fs-readiness-title { font-size: 1.2rem; font-weight: 700; margin: 0; }
                 .fs-readiness-bar-wrap { margin-bottom: 1.5rem; }
                 .fs-readiness-bar-labels { display: flex; justify-content: space-between; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.5rem; }
                 .fs-readiness-bar-track { height: 12px; background: #f1f5f9; border-radius: 6px; overflow: hidden; }
@@ -497,16 +524,8 @@ const FutureSelfSection = () => {
                 .fs-verdict-gap { background: linear-gradient(135deg, #fffbeb, #fff); border-left: 4px solid #F59E0B; color: #92400e; }
                 .fs-verdict-gap svg { color: #F59E0B; flex-shrink: 0; }
 
-                .fs-longterm-intro { max-width: 700px; margin: 0 auto 1.5rem; padding: 0 2rem; text-align: center; color: var(--text-muted); line-height: 1.7; font-style: italic; }
-                .fs-longterm-list { max-width: 560px; margin: 0 auto 3rem; padding: 0 2rem; display: flex; flex-direction: column; gap: 0.75rem; }
-                .fs-longterm-item { display: flex; align-items: center; gap: 1rem; padding: 1rem 1.25rem; border: 1px solid #f1f5f9; border-radius: 12px; background: #fff; }
-                .fs-longterm-icon { width: 40px; height: 40px; border-radius: 10px; background: #f1f5f9; color: #64748b; display: flex; align-items: center; justify-content: center; }
-                .fs-longterm-name { flex: 1; font-weight: 600; color: var(--text-main); }
-                .fs-longterm-year { font-weight: 800; color: var(--color-2); font-size: 0.95rem; }
-
                 @media (max-width: 768px) {
                     .fs-stat-strip-4 { grid-template-columns: repeat(2, 1fr); }
-                    .fs-income-ladder { grid-template-columns: repeat(2, 1fr); }
                     .fs-goals-grid { grid-template-columns: 1fr; }
                     .fs-hook-section { padding: 3rem 1.5rem 2rem; }
                     .fs-section-divider { padding: 2rem 1.5rem; }

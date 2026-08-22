@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
+import { formatCurrency } from '../CashFlowModule/CashFlowLogic';
 import { resolveEmploymentType } from '../DetailedFlow/employmentTypeSync';
 import { buildYourMoneyFlowReport } from './moneyFlowLedgerLogic';
 import {
@@ -126,8 +127,8 @@ const draftFromPlanItems = (items) => {
     const draft = createEmptyDraftAllocations();
     items?.forEach((item) => {
         if (!item.instrumentType) return;
-        if (item.instrumentType === LISP_INSTRUMENT_TYPE) {
-            draft[LISP_INSTRUMENT_TYPE] = {
+        if (item.instrumentType === LISP_INSTRUMENT_TYPE || item.instrumentType === 'Term Insurance') {
+            draft[item.instrumentType] = {
                 premium: Math.round(parseAmount(item.premium ?? item.amount)),
                 frequency: item.frequency || 'Monthly',
                 duration: parseInt(item.duration, 10) || 10,
@@ -148,7 +149,7 @@ const draftFromStudioAllocations = (investmentAllocations = [], studioPlanKey) =
             const type = normalizeAllocType(alloc.type) || alloc.type;
             const def = INSTRUMENT_REGISTRY[type];
             if (!def || !(type in draft)) return;
-            if (type === LISP_INSTRUMENT_TYPE) {
+            if (type === LISP_INSTRUMENT_TYPE || type === 'Term Insurance') {
                 draft[type] = lispDraftFromAllocation(alloc);
                 return;
             }
@@ -164,6 +165,7 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
     const reportScope = isGaps ? 'gaps' : 'pymtw';
     const replaceTypes = isGaps ? GAPS_REPLACE_TYPES : PYMTW_REPLACE_TYPES;
     const navigateToDetailReport = useNavigateToDetailReport();
+    const [wizardStep, setWizardStep] = useState(1);
     const {
         currentYearLedger,
         planStartMonth,
@@ -188,6 +190,7 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
         hasHealthInsurance,
         inflationRates,
         policies,
+        liabilityCategories,
     } = useFinancialPlan();
 
     const moneyFlowReport = useMemo(
@@ -255,6 +258,9 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
             selectedMonthIndex: effectiveMonth,
             reportScope,
             policies,
+            liabilityCategories,
+            income,
+            inflationRates,
         }),
         [
             moneyFlowReport,
@@ -272,6 +278,9 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
             effectiveMonth,
             reportScope,
             policies,
+            liabilityCategories,
+            income,
+            inflationRates,
         ],
     );
 
@@ -713,11 +722,11 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
         isGaps,
     ]);
 
-    const handleLispDraftChange = useCallback((lispDraft) => {
+    const handleLispDraftChange = useCallback((lispDraft, targetType = LISP_INSTRUMENT_TYPE) => {
         const leavingAppliedView = avenuesMode !== 'manual_edit' && hasAppliedMonthPlan;
         const base = leavingAppliedView ? appliedBaseline : draftAllocations;
-        const nextLisp = isLispDraft(lispDraft) ? { ...createEmptyLispDraft(), ...lispDraft } : createEmptyLispDraft();
-        const next = { ...base, [LISP_INSTRUMENT_TYPE]: nextLisp };
+        const nextLisp = isLispDraft(lispDraft) ? { ...createEmptyLispDraft(targetType), ...lispDraft } : createEmptyLispDraft(targetType);
+        const next = { ...base, [targetType]: nextLisp };
         setDraftAllocations(next);
         setActiveBundleId(null);
         setAppliedPlanKey(null);
@@ -1364,135 +1373,307 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
         ? draftAllocations
         : (hasAppliedMonthPlan ? appliedBaseline : draftAllocations);
 
+    const currentMonthLedgerUnallocated = studio.hero.threeMonthOutlook?.find(
+        (o) => o.monthIndex === effectiveMonth,
+    )?.ledgerUnallocated || studio.hero.threeMonthOutlook?.[0]?.ledgerUnallocated || 0;
+
     return (
         <div className={`pymtw-section ${isGaps ? 'fyfg-section' : ''}`}>
             {isGaps ? (
-                <>
-                    <div className="card fyfg-hero">
-                        <h2 className="fyfg-hero-title">Secure your financial foundation before you invest.</h2>
-                        <p className="fyfg-hero-message">
-                            Fill gaps in your Life Insurance, Health Insurance, and Emergency Fund, and add any
-                            planned expenses or loans for the next 3 months. I&apos;ll automatically recalculate
-                            the surplus available for your long-term goals.
-                        </p>
+                <div className="fyfg-wizard-container" style={{ background: '#ffffff', minHeight: '100%', padding: '1rem 0' }}>
+                    {/* Persistent Segmented Connected Progress Tracker */}
+                    <div className="fyfg-progress-tracker-wrap" style={{ position: 'relative', marginBottom: '2rem', padding: 0, background: 'transparent' }}>
+                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            {/* Horizontal connecting background track */}
+                            <div style={{ position: 'absolute', top: '18px', left: '10%', right: '10%', height: '2px', background: '#E5E7EB', zIndex: 1 }} />
+                            {/* Horizontal progress filled line */}
+                            <div style={{ position: 'absolute', top: '18px', left: '10%', width: `${((wizardStep - 1) / 3) * 80}%`, height: '2px', background: '#0f766e', transition: 'width 0.3s ease', zIndex: 1 }} />
+
+                            {[
+                                { id: 1, label: 'Pick a month' },
+                                { id: 2, label: 'Cover your gaps' },
+                                { id: 3, label: 'Plan ahead' },
+                                { id: 4, label: 'See your surplus' },
+                            ].map((s) => {
+                                const isActive = wizardStep === s.id;
+                                const isDone = wizardStep > s.id;
+                                return (
+                                    <button
+                                        key={s.id}
+                                        type="button"
+                                        onClick={() => setWizardStep(s.id)}
+                                        style={{
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            gap: '0.4rem',
+                                            background: 'none',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            padding: 0,
+                                            position: 'relative',
+                                            zIndex: 2,
+                                        }}
+                                    >
+                                        <div style={{
+                                            width: '36px',
+                                            height: '36px',
+                                            borderRadius: '50%',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontWeight: 700,
+                                            fontSize: '0.85rem',
+                                            transition: 'all 0.2s ease',
+                                            background: isDone
+                                                ? '#10b981'
+                                                : isActive
+                                                    ? '#0f766e'
+                                                    : '#ffffff',
+                                            color: isDone || isActive ? '#ffffff' : '#64748b',
+                                            border: isDone
+                                                ? '2px solid #10b981'
+                                                : isActive
+                                                    ? '3px solid #0f766e'
+                                                    : '2px solid #cbd5e1',
+                                            boxShadow: isActive ? '0 0 0 4px rgba(15, 118, 110, 0.12)' : 'none',
+                                        }}>
+                                            {isDone ? '✓' : s.id}
+                                        </div>
+                                        <span style={{
+                                            fontSize: '0.82rem',
+                                            fontWeight: isActive ? 700 : isDone ? 600 : 500,
+                                            color: isActive
+                                                ? '#0f766e'
+                                                : isDone
+                                                    ? '#0f172a'
+                                                    : '#64748b',
+                                        }}>
+                                            {s.id}. {s.label}
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
 
-                    <div className="card fyfg-month-select">
-                        <h3 className="pymtw-zone-title">Select Month</h3>
-                        <p className="pymtw-zone-sub">Unallocated surplus available this month (before Protection and adjustments).</p>
-                        <SurplusMonthChips
-                            months={studio.selectableMonths}
-                            outlook={studio.hero.threeMonthOutlook}
-                            selectedMonthIndex={effectiveMonth}
-                            onSelect={handleMonthChange}
-                            amountKey="ledger"
-                        />
-                        {monthSwitchConfirm}
-                        {replaceConfirm}
+                    {/* One-Line Context Sentence Strip */}
+                    <div className="fyfg-context-strip" style={{ marginBottom: '1.75rem', color: '#0f766e', fontWeight: 600, fontSize: '0.9rem', background: 'transparent', padding: 0 }}>
+                        {wizardStep === 1 && 'Step 1 of 4 · Pick a month to analyze your financial foundation'}
+                        {wizardStep === 2 && 'Step 2 of 4 · Cover your protection gaps before investing surplus'}
+                        {wizardStep === 3 && 'Step 3 of 4 · Plan ahead for upcoming expenses & loans over the next 3 months'}
+                        {wizardStep === 4 && 'Step 4 of 4 · Review your recalculated surplus & AI recommendations'}
                     </div>
 
-                    <InstrumentCardGrid
-                        instrumentCategories={studio.instrumentCategories}
-                        draftAllocations={
-                            isEditingMonth
-                                ? draftAllocations
-                                : (hasAppliedMonthPlan ? appliedBaseline : draftAllocations)
-                        }
-                        headerAllocations={headerAllocations}
-                        baselineAllocations={appliedBaseline}
-                        remainingSurplus={remaining}
-                        getMaxAmountForInstrument={maxForInstrument}
-                        currentPlanKey={planKey}
-                        onDraftChange={(type, amount) => {
-                            const current = Math.round(
-                                getDraftTypeAmount(
-                                    isEditingMonth
-                                        ? draftAllocations
-                                        : (hasAppliedMonthPlan ? appliedBaseline : draftAllocations),
-                                    type,
-                                ),
-                            );
-                            if (Math.round(amount || 0) === current) return;
-                            handleDraftChange(type, amount);
-                        }}
-                        onApplyManualAllocations={handleApplyManualAllocations}
-                        canApplyManual={validation.canApply}
-                        applyError={applyError}
-                        selectableMonths={studio.selectableMonths}
-                        selectedMonthIndex={effectiveMonth}
-                        onMonthChange={handleMonthChange}
-                        calendarYear={studio.meta.calendarYear}
-                        isDirty={isDirty}
-                        showStickyBar
-                        showMonthPicker={false}
-                        editingMonthLabel={editingMonthLabel}
-                        totalMonthlyAllocation={stickyTotalAllocation}
-                        saveLabel={saveLabel}
-                        statusHint={statusHint}
-                        saveSuccessMessage={saveSuccessMessage}
-                        onDiscardChanges={handleDiscardChanges}
-                        showUnsavedBanner={isDirty}
-                        monthSwitchConfirm={null}
-                        replaceConfirm={null}
-                    />
+                    {/* STEP 1: PICK A MONTH */}
+                    {wizardStep === 1 && (
+                        <div className="fyfg-step-1-canvas" style={{ padding: 0 }}>
+                            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.5rem', color: 'var(--text-main)' }}>
+                                Let&apos;s plan for {editingMonthLabel} — you have <span style={{ color: '#0f766e' }}>{formatCurrency(Math.max(0, currentMonthLedgerUnallocated))}</span> free this month.
+                            </h2>
+                            <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', margin: '0 0 1.5rem' }}>
+                                Based on your current recurring income and expenses.
+                            </p>
 
-                    <PlannedInvestmentAllocationsPanel
-                        allocationsSummary={allocationsSummary}
-                        onRemove={handleRemoveAllocation}
-                        onEditMonthPlan={handleEditMonthPlan}
-                        onClearMonthPlan={handleClearMonthPlan}
-                        clearDisabled={isDirty}
-                        clearDisabledReason="Save or discard changes before clearing this month plan."
-                        title="Planned Protection allocations"
-                        editLabel="Edit – Show Protection avenues"
-                        monthChipsAriaLabel="Protection allocation months"
-                    />
+                            <div style={{ marginBottom: '2rem' }}>
+                                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+                                    Want to plan a different month?
+                                </label>
+                                <SurplusMonthChips
+                                    months={studio.selectableMonths}
+                                    outlook={studio.hero.threeMonthOutlook}
+                                    selectedMonthIndex={effectiveMonth}
+                                    onSelect={handleMonthChange}
+                                    amountKey="ledger"
+                                />
+                            </div>
 
-                    <JourneyConstraintsRail
-                        journeyConstraints={studio.journeyConstraints}
-                        journeyAdjustments={journeyAdjustments}
-                        setJourneyAdjustments={handleJourneyAdjustmentsChange}
-                        defaultStartMonthIndex={studio.selectableMonths?.[0]?.monthIndex
-                            ?? studio.meta.currentMonth
-                            ?? 0}
-                        defaultCalendarYear={studio.meta.calendarYear}
-                        selectableMonths={studio.selectableMonths}
-                        unallocatedSurplusByMonth={moneyFlowReport?.ledger?.unallocatedSurplus || []}
-                        investmentAllocations={investmentAllocations}
-                        planStartMonth={studio.meta.planStartMonth ?? 0}
-                        onSaveAdjustments={handleSaveAdjustments}
-                        onSkipAdjustments={handleSkipAdjustments}
-                        adjustmentsSaved={adjustmentsSaved}
-                        saveMessage={adjustmentSaveMessage}
-                    />
+                            {monthSwitchConfirm}
+                            {replaceConfirm}
 
-                    {adjustmentsSaved && (
-                        <RecalculatedSurplusPanel
-                            outlook={studio.hero.journeyAdjustedOutlook}
-                            onProceed={handleProceedToInvestmentAvenues}
-                            proceedLabel="Show recommended surplus allocation"
-                        />
-                    )}
-
-                    {!adjustmentsSaved && (
-                        <div className="pymtw-proceed-hint">
-                            Save adjustments or choose No Future Adjustments to unlock recommendations.
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2.5rem', paddingTop: '1.5rem', borderTop: '1px solid #E5E7EB' }}>
+                                <button
+                                    type="button"
+                                    className="btn btn-primary"
+                                    onClick={() => setWizardStep(2)}
+                                    style={{ padding: '0.75rem 1.5rem', fontWeight: 700, borderRadius: '12px', fontSize: '0.95rem' }}
+                                >
+                                    Continue to Cover Your Gaps →
+                                </button>
+                            </div>
                         </div>
                     )}
 
-                    {showInvestmentAvenues && (
-                        <RecommendedBundles
-                            bundles={recommendedBundles}
-                            deployableSurplus={studio.hero.deployableSurplus}
-                            engineResult={engineResult}
-                            avenuesMode={avenuesMode === 'manual_edit' ? 'choose' : avenuesMode}
-                            onApplyAiRecommendations={handleApplyAiRecommendations}
-                            onStartManualAllocation={handleStartManualAllocation}
-                            onBackToAiRecommendations={handleBackToAiRecommendations}
-                            canApplyAi={Boolean(recommendedBundles[0]) && studio.hero.deployableSurplus > 0}
-                        />
+                    {/* STEP 2: COVER YOUR GAPS */}
+                    {wizardStep === 2 && (
+                        <>
+                            <InstrumentCardGrid
+                                instrumentCategories={studio.instrumentCategories}
+                                draftAllocations={
+                                    isEditingMonth
+                                        ? draftAllocations
+                                        : (hasAppliedMonthPlan ? appliedBaseline : draftAllocations)
+                                }
+                                headerAllocations={headerAllocations}
+                                baselineAllocations={appliedBaseline}
+                                remainingSurplus={remaining}
+                                getMaxAmountForInstrument={maxForInstrument}
+                                currentPlanKey={planKey}
+                                familyMembers={familyMembers}
+                                onLispDraftChange={handleLispDraftChange}
+                                onDraftChange={(type, amount) => {
+                                    const current = Math.round(
+                                        getDraftTypeAmount(
+                                            isEditingMonth
+                                                ? draftAllocations
+                                                : (hasAppliedMonthPlan ? appliedBaseline : draftAllocations),
+                                            type,
+                                        ),
+                                    );
+                                    if (Math.round(amount || 0) === current) return;
+                                    handleDraftChange(type, amount);
+                                }}
+                                onApplyManualAllocations={handleApplyManualAllocations}
+                                canApplyManual={validation.canApply}
+                                applyError={applyError}
+                                selectableMonths={studio.selectableMonths}
+                                selectedMonthIndex={effectiveMonth}
+                                onMonthChange={handleMonthChange}
+                                calendarYear={studio.meta.calendarYear}
+                                isDirty={isDirty}
+                                showStickyBar
+                                showMonthPicker={false}
+                                editingMonthLabel={editingMonthLabel}
+                                totalMonthlyAllocation={stickyTotalAllocation}
+                                saveLabel={saveLabel}
+                                statusHint={statusHint}
+                                saveSuccessMessage={saveSuccessMessage}
+                                onDiscardChanges={handleDiscardChanges}
+                                showUnsavedBanner={isDirty}
+                                monthSwitchConfirm={null}
+                                replaceConfirm={null}
+                            />
+
+                            <div style={{ marginTop: '2.5rem', paddingTop: '1.5rem', borderTop: '1px solid #E5E7EB' }}>
+                                <PlannedInvestmentAllocationsPanel
+                                    allocationsSummary={allocationsSummary}
+                                    onRemove={handleRemoveAllocation}
+                                    onEditMonthPlan={handleEditMonthPlan}
+                                    onClearMonthPlan={handleClearMonthPlan}
+                                    clearDisabled={isDirty}
+                                    clearDisabledReason="Save or discard changes before clearing this month plan."
+                                    title="Planned Protection allocations"
+                                    editLabel="Edit – Show Protection avenues"
+                                    monthChipsAriaLabel="Protection allocation months"
+                                    plainSummary={true}
+                                />
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2.5rem', paddingTop: '1.5rem', borderTop: '1px solid #E5E7EB' }}>
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    onClick={() => setWizardStep(1)}
+                                >
+                                    ← Back to Month
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn btn-primary"
+                                    onClick={() => setWizardStep(3)}
+                                    style={{ padding: '0.75rem 1.5rem', fontWeight: 700, borderRadius: '12px' }}
+                                >
+                                    Continue to Plan Ahead →
+                                </button>
+                            </div>
+                        </>
                     )}
-                </>
+
+                    {/* STEP 3: PLAN AHEAD */}
+                    {wizardStep === 3 && (
+                        <>
+                            <JourneyConstraintsRail
+                                journeyConstraints={studio.journeyConstraints}
+                                journeyAdjustments={journeyAdjustments}
+                                setJourneyAdjustments={handleJourneyAdjustmentsChange}
+                                defaultStartMonthIndex={studio.selectableMonths?.[0]?.monthIndex
+                                    ?? studio.meta.currentMonth
+                                    ?? 0}
+                                defaultCalendarYear={studio.meta.calendarYear}
+                                selectableMonths={studio.selectableMonths}
+                                unallocatedSurplusByMonth={moneyFlowReport?.ledger?.unallocatedSurplus || []}
+                                investmentAllocations={investmentAllocations}
+                                planStartMonth={studio.meta.planStartMonth ?? 0}
+                                onSaveAdjustments={handleSaveAdjustments}
+                                onSkipAdjustments={() => {
+                                    handleSkipAdjustments();
+                                    setWizardStep(4);
+                                }}
+                                adjustmentsSaved={adjustmentsSaved}
+                                saveMessage={adjustmentSaveMessage}
+                            />
+
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem' }}>
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    onClick={() => setWizardStep(2)}
+                                >
+                                    ← Back to Gaps
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn btn-primary"
+                                    onClick={() => setWizardStep(4)}
+                                    style={{ padding: '0.75rem 1.5rem', fontWeight: 700, borderRadius: '12px' }}
+                                >
+                                    See Your Surplus →
+                                </button>
+                            </div>
+                        </>
+                    )}
+
+                    {/* STEP 4: SEE YOUR SURPLUS */}
+                    {wizardStep === 4 && (
+                        <>
+                            <div style={{ marginBottom: '1rem', padding: '0.85rem 1.25rem', background: '#fff', borderRadius: '14px', border: '1px solid var(--border)', fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-main)' }}>
+                                Great — here&apos;s what that means for your money this month 👇
+                            </div>
+
+                            <RecalculatedSurplusPanel
+                                outlook={studio.hero.journeyAdjustedOutlook}
+                                onProceed={handleProceedToInvestmentAvenues}
+                                proceedLabel="Show recommended surplus allocation"
+                                showProceed={false}
+                            />
+
+                            {showInvestmentAvenues && (
+                                <div style={{ marginTop: '1.25rem' }}>
+                                    <RecommendedBundles
+                                        bundles={recommendedBundles}
+                                        deployableSurplus={studio.hero.deployableSurplus}
+                                        engineResult={engineResult}
+                                        avenuesMode={avenuesMode === 'manual_edit' ? 'choose' : avenuesMode}
+                                        onApplyAiRecommendations={handleApplyAiRecommendations}
+                                        onStartManualAllocation={handleStartManualAllocation}
+                                        onBackToAiRecommendations={handleBackToAiRecommendations}
+                                        canApplyAi={Boolean(recommendedBundles[0]) && studio.hero.deployableSurplus > 0}
+                                    />
+                                </div>
+                            )}
+
+                            <div style={{ textAlign: 'left', marginTop: '1.5rem' }}>
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    onClick={() => setWizardStep(3)}
+                                >
+                                    ← Back to Plan Ahead
+                                </button>
+                            </div>
+                        </>
+                    )}
+                </div>
             ) : (
                 <>
                     <AllocateSurplusPanel
@@ -1661,11 +1842,12 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
                 .pymtw-avenue-grid {
                     display: grid;
                     grid-template-columns: 1fr;
-                    gap: 0.75rem;
+                    gap: 0.85rem;
                     margin-top: 0.85rem;
+                    width: 100%;
                 }
                 @media (min-width: 640px) {
-                    .pymtw-avenue-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+                    .pymtw-avenue-grid { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
                 }
                 .pymtw-avenue-chip-card {
                     border: 1px solid var(--border-color, #e2e8f0);
@@ -2735,8 +2917,9 @@ const PutYourMoneyToWorkSection = ({ mode = 'pymtw' }) => {
                 }
                 .pymtw-instrument-grid {
                     display: grid;
-                    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-                    gap: 0.85rem;
+                    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+                    gap: 1rem;
+                    width: 100%;
                 }
                 .pymtw-instrument-card {
                     padding: 1rem;

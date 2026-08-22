@@ -285,6 +285,13 @@ export const LIABILITY_FIELDS = [
     itemFieldIds: ['liabilities.custom.value'],
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.LIABILITIES,
+        questionId: 'current-liabilities',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.WEALTH_SNAPSHOT,
         questionId: 'custom-liabilities',
@@ -292,7 +299,7 @@ export const LIABILITY_FIELDS = [
         role: 'primary',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     impacts: ['engine.netWorth'],
   }),
 
@@ -313,6 +320,13 @@ export const LIABILITY_FIELDS = [
     state: { path: 'value' },
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.LIABILITIES,
+        questionId: 'current-liabilities',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.WEALTH_SNAPSHOT,
         questionId: 'custom-liabilities',
@@ -320,7 +334,7 @@ export const LIABILITY_FIELDS = [
         role: 'primary',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     impacts: ['engine.netWorth'],
   }),
 ];

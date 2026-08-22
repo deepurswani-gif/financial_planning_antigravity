@@ -253,36 +253,7 @@ export function initializeWealthSnapshots(assetCategories = {}, liabilityCategor
  * Summary snapshot fields are excluded — only detailed breakdown counts.
  */
 export function classifyWealthSnapshot(assetCategories = {}) {
-    const legacy = [
-        getAssetAmount(assetCategories.realEstate?.residential),
-        getAssetAmount(assetCategories.realEstate?.secondProperty),
-        getAssetAmount(assetCategories.vehicles?.idv),
-        getAssetAmount(assetCategories.valuables?.gold),
-        getAssetAmount(assetCategories.valuables?.art),
-        ...(Array.isArray(assetCategories.custom)
-            ? assetCategories.custom.map((c) => getAssetAmount(c?.value))
-            : []),
-    ].reduce((s, v) => s + v, 0);
-
-    const income = [
-        getAssetAmount(assetCategories.realEstate?.landPlot),
-        getAssetAmount(assetCategories.cash?.savings),
-        getAssetAmount(assetCategories.cash?.cashInHand),
-        getAssetAmount(assetCategories.investments?.equity),
-        getAssetAmount(assetCategories.investments?.mutualFunds),
-        sumFixedDeposits(assetCategories.investments?.fixedDeposit),
-        getAssetAmount(assetCategories.insurance?.ulip),
-    ].reduce((s, v) => s + v, 0);
-
-    const retirement = [
-        getAssetAmount(assetCategories.retirement?.epf),
-        getAssetAmount(assetCategories.retirement?.ppf),
-        getAssetAmount(assetCategories.retirement?.nps),
-    ].reduce((s, v) => s + v, 0);
-
-    const grandTotal = legacy + income + retirement;
-
-    if (grandTotal === 0 && !hasWealthDetailEntered(assetCategories)) {
+    if (!hasWealthDetailEntered(assetCategories)) {
         const portfolio = getAssetAmount(assetCategories.summaryPortfolioValue);
         const liquid = getAssetAmount(assetCategories.summaryLiquidCash);
         const realEstate = getAssetAmount(assetCategories.summaryRealEstateAssets);
@@ -299,6 +270,43 @@ export function classifyWealthSnapshot(assetCategories = {}) {
             };
         }
     }
+
+    let legacy = [
+        getAssetAmount(assetCategories.realEstate?.residential),
+        getAssetAmount(assetCategories.realEstate?.secondProperty),
+        getAssetAmount(assetCategories.vehicles?.idv),
+        getAssetAmount(assetCategories.valuables?.gold),
+        getAssetAmount(assetCategories.valuables?.art),
+        ...(Array.isArray(assetCategories.custom)
+            ? assetCategories.custom.map((c) => getAssetAmount(c?.value))
+            : []),
+    ].reduce((s, v) => s + v, 0);
+
+    let income = [
+        getAssetAmount(assetCategories.realEstate?.landPlot),
+        getAssetAmount(assetCategories.cash?.savings),
+        getAssetAmount(assetCategories.cash?.cashInHand),
+        getAssetAmount(assetCategories.investments?.equity),
+        getAssetAmount(assetCategories.investments?.mutualFunds),
+        sumFixedDeposits(assetCategories.investments?.fixedDeposit),
+        getAssetAmount(assetCategories.insurance?.ulip),
+    ].reduce((s, v) => s + v, 0);
+
+    let retirement = [
+        getAssetAmount(assetCategories.retirement?.epf),
+        getAssetAmount(assetCategories.retirement?.ppf),
+        getAssetAmount(assetCategories.retirement?.nps),
+    ].reduce((s, v) => s + v, 0);
+
+    // Fallback to summary snapshot fields for any bucket that has no detailed values
+    if (legacy === 0) {
+        legacy = getAssetAmount(assetCategories.summaryRealEstateAssets);
+    }
+    if (income === 0) {
+        income = getAssetAmount(assetCategories.summaryPortfolioValue) + getAssetAmount(assetCategories.summaryLiquidCash);
+    }
+
+    const grandTotal = legacy + income + retirement;
 
     return {
         legacyTotal: legacy,

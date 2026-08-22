@@ -41,6 +41,7 @@ const InsightIcon = ({ tone }) => {
 const LifeJourneySection = () => {
     const navigate = useNavigate();
     const [isGrowthModalOpen, setIsGrowthModalOpen] = useState(false);
+    const [showYearlyTable, setShowYearlyTable] = useState(false);
     const { familyMembers, journeyProjections, goals, inflationRates } = useFinancialPlan();
 
     const report = useMemo(
@@ -121,20 +122,33 @@ const LifeJourneySection = () => {
             <LifeJourneyVisuals report={report} />
 
             <div className="lj-table-card card">
-                <div className="lj-table-header">
-                    <h3 style={{ margin: 0 }}>Yearly Money Flow till Retirement</h3>
-                    <p className="lj-legend">
-                        {meta.hasProfile && meta.retirementYear
-                            ? `Projections from ${meta.currentYear + 1} to ${meta.retirementYear} — current year shown in Your Money Flow above.`
-                            : 'Complete your profile to see projections through retirement.'}
-                    </p>
+                <div className="lj-table-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+                    <div>
+                        <h3 style={{ margin: 0 }}>Yearly Money Flow till Retirement</h3>
+                        <p className="lj-legend">
+                            {meta.hasProfile && meta.retirementYear
+                                ? `Projections from ${meta.currentYear + 1} to ${meta.retirementYear} — current year shown in Your Money Flow above.`
+                                : 'Complete your profile to see projections through retirement.'}
+                        </p>
+                    </div>
+                    {meta.hasProfile && projections.length > 0 && (
+                        <button
+                            type="button"
+                            className="lj-toggle-table-btn"
+                            onClick={() => setShowYearlyTable((v) => !v)}
+                        >
+                            {showYearlyTable ? 'Hide year-by-year breakdown' : `View year-by-year breakdown (${projections.length} years)`}
+                        </button>
+                    )}
                 </div>
 
-                <TransposedJourneyTable
-                    projections={projections}
-                    goalsByYear={goalsByYear}
-                    hasGoals={hasGoals}
-                />
+                {showYearlyTable && (
+                    <TransposedJourneyTable
+                        projections={projections}
+                        goalsByYear={goalsByYear}
+                        hasGoals={hasGoals}
+                    />
+                )}
             </div>
 
             {insights.length > 0 && (
@@ -174,6 +188,15 @@ const LifeJourneySection = () => {
                     white-space: nowrap;
                 }
                 .lj-edit-rates-btn:hover { border-color: var(--primary); color: var(--primary); }
+                .lj-toggle-table-btn {
+                    display: inline-flex; align-items: center; gap: 0.4rem;
+                    padding: 0.5rem 0.85rem; border-radius: 8px;
+                    border: 1px solid var(--border); background: var(--bg-card);
+                    color: var(--primary); font-size: 0.82rem; font-weight: 600;
+                    cursor: pointer; transition: border-color 0.2s, background 0.2s;
+                    white-space: nowrap;
+                }
+                .lj-toggle-table-btn:hover { border-color: var(--primary); background: rgba(37,99,235,0.04); }
                 .lj-kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }
                 .lj-kpi-pill { display: flex; gap: 0.75rem; align-items: center; padding: 1rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; }
                 .lj-kpi-label { display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.2rem; }
@@ -202,12 +225,11 @@ const LifeJourneySection = () => {
                 .lj-sign { color: var(--text-muted); font-weight: 600; font-size: 0.78rem; margin-right: 0.35rem; flex-shrink: 0; }
                 .lj-row-label { font-weight: 500; color: var(--text-main); display: flex; align-items: center; padding-left: 0.75rem !important; overflow: hidden; text-overflow: ellipsis; }
                 .lj-row-subtotal { background: rgba(37,99,235,0.04); }
-                .lj-row-subtotal .lj-sticky-col { background: rgba(37,99,235,0.04) !important; }
+                .lj-row-subtotal .lj-sticky-col { background: linear-gradient(rgba(37,99,235,0.04), rgba(37,99,235,0.04)), var(--bg-card, #ffffff) !important; }
                 .lj-row-result { background: rgba(16,185,129,0.06); }
-                .lj-row-result .lj-sticky-col { background: rgba(16,185,129,0.06) !important; }
-                .lj-row-result .lj-cell { font-weight: 700; }
+                .lj-row-result .lj-sticky-col { background: linear-gradient(rgba(16,185,129,0.06), rgba(16,185,129,0.06)), var(--bg-card, #ffffff) !important; }
                 .lj-row-goals { background: rgba(124,58,237,0.04); }
-                .lj-row-goals .lj-sticky-col { background: rgba(124,58,237,0.04) !important; }
+                .lj-row-goals .lj-sticky-col { background: linear-gradient(rgba(124,58,237,0.04), rgba(124,58,237,0.04)), var(--bg-card, #ffffff) !important; }
                 .lj-cell-goals { text-align: center !important; }
 
                 .lj-cell { position: relative; }

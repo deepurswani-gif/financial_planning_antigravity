@@ -29,7 +29,7 @@ const ReportView = ({ onBack }) => {
     const policyColumns = getPolicyColumns(policies);
     const insuredNames = getInsuredNamesList(policies);
 
-    const protectionGapResults = calculateProtectionGap(expenseCategories, policies, familyMembers);
+    const protectionGapResults = calculateProtectionGap(expenseCategories, policies, familyMembers, income, inflationRates, calculatorInputs, validGoals, assetCategories, liabilityCategories);
     const proposedSIPs = allocations.filter(a => a.type === 'SIP');
     const proposedEquities = allocations.filter(a => a.type === 'Direct Equity & ETFs');
 

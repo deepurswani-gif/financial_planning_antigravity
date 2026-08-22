@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from 'recharts';
-import { Wallet, Shield, Heart, TrendingUp, Target, Download, CalendarClock, BadgeInfo } from 'lucide-react';
+import { Wallet, Shield, Heart, TrendingUp, Target, Download, CalendarClock, BadgeInfo, ChevronDown } from 'lucide-react';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { buildExecutiveSummaryReport, buildWhatIfScenario } from './ExecutiveSummaryLogic';
@@ -8,6 +8,7 @@ import { getReadinessSnapshotsByPlan, upsertMonthlyReadinessSnapshot } from '../
 import { buildExecutiveSummarySignals, PILLAR_TO_RECOMMENDATION_ID } from '../../recommendationRegistry/adapters/executiveSummaryAdapter';
 import { useRecommendationStore } from '../../recommendationOrchestration';
 import { RecommendationList } from '../../recommendationPresentation';
+import { toPresentationModel } from '../../recommendationPresentation/toPresentationModel';
 import { useLaunchRecommendationAction } from '../FinancialWorkspace/FinancialWorkspaceContext';
 
 const ICON_MAP = {
@@ -48,6 +49,8 @@ const ExecutiveSummarySection = () => {
         hasSpouseIncome,
         policies,
         hasHealthInsurance,
+        liabilityCategories,
+        calculatorInputs,
     } = useFinancialPlan();
 
     const report = useMemo(
@@ -65,8 +68,10 @@ const ExecutiveSummarySection = () => {
                 hasSpouseIncome,
                 policies,
                 hasHealthInsurance,
+                liabilityCategories,
+                calculatorInputs,
             }),
-        [income, expenseCategories, assetCategories, summaryLifeCover, summaryHealthCover, contingencyFund, goals, inflationRates, familyMembers, hasSpouseIncome, policies, hasHealthInsurance]
+        [income, expenseCategories, assetCategories, summaryLifeCover, summaryHealthCover, contingencyFund, goals, inflationRates, familyMembers, hasSpouseIncome, policies, hasHealthInsurance, liabilityCategories, calculatorInputs]
     );
 
     // Priority Next Steps: report selects/orders by weakest pillars; presentation
@@ -89,6 +94,26 @@ const ExecutiveSummarySection = () => {
 
     const [scenario, setScenario] = useState(report.baseMetrics);
     const [trendRows, setTrendRows] = useState([]);
+    const [expandedAccordionId, setExpandedAccordionId] = useState(null);
+    const [activeTab, setActiveTab] = useState('30-day');
+
+    const getPriorityColor = (severity) => {
+        switch (severity) {
+            case 'high':
+                return '#f97316';
+            case 'medium':
+                return '#f59e0b';
+            case 'low':
+                return '#6b7280';
+            default:
+                return '#6b7280';
+        }
+    };
+    const formatDate = (dateString) => {
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        return date.toLocaleString('en-IN', { month: 'short', year: 'numeric' });
+    };
 
     useEffect(() => {
         if (!planId) return;
@@ -169,101 +194,70 @@ const ExecutiveSummarySection = () => {
 
     return (
         <div className="es-container">
-            <section className="es-hero">
-                <p className="es-eyebrow">USEFUL INSIGHTS</p>
-                <h1 className="es-title">Financial Readiness Score</h1>
-                <div className="es-score-wrap">
-                    <div className="es-score-ring" style={{ '--es-score': `${scorePercent}` }}>
-                        <div className="es-score-core">
-                            <span className="es-score-value">{report.totalScore}</span>
-                            <span className="es-score-max">/100</span>
-                        </div>
-                    </div>
-                    <div className="es-score-info">
-                        <span className="es-score-band">{report.overallCategory}</span>
-                        <p className="es-score-note">
-                            This score reflects your current financial readiness across daily stability, emergency safety,
-                            family protection, wealth creation, and goal preparedness.
-                        </p>
-                    </div>
-                </div>
-                <p className="es-narrative">{report.narrative}</p>
-            </section>
-
-            <section className="es-confidence">
-                <h3>Confidence Indicator (Weighted Data Completeness)</h3>
-                <div className="es-confidence-grid">
-                    <div className="es-confidence-meter">
-                        <div className="es-confidence-ring" style={{ '--es-confidence': `${confidencePercent}` }}>
-                            <div className="es-confidence-core">
-                                <span>{confidencePercent}%</span>
+<section className="es-hero">
+                    <p className="es-eyebrow">USEFUL INSIGHTS</p>
+                    <h1 className="es-title">Financial Readiness Score</h1>
+                    <div className="es-score-wrap">
+                        <div className="es-score-ring" style={{ '--es-score': `${scorePercent}` }}>
+                            <div className="es-score-core">
+                                <span className="es-score-value">{report.totalScore}</span>
+                                <span className="es-score-max">/100</span>
                             </div>
                         </div>
-                        <p className="es-confidence-band">{report.confidence.confidenceBand}</p>
+                        <div className="es-score-info">
+                            <span className="es-score-band">{report.overallGrade} {report.overallCategory}</span>
+                            {/* Inline confidence badge */}
+                            <span className="es-confidence-badge" title="100% data completeness">
+                                ● 100% data completeness
+                            </span>
+                        </div>
+                        <div className="es-chip-row">
+                            <span className="es-chip es-chip-strength">Strengths: {report.topPillars.map(p => p.shortName).join(', ')}</span>
+                            <span className="es-chip es-chip-focus">Focus areas: {report.bottomPillars.map(p => p.shortName).join(', ')}</span>
+                        </div>
                     </div>
-                    <div className="es-confidence-pillars">
+                    <button className="es-export-btn" onClick={printOnePager}>
+                        <Download size={16} /> Export PDF One-Pager
+                    </button>
+                </section>
+
+
+
+            <section className="es-factor-list">
+                    <h3>Factor Breakdown</h3>
+                    <div className="es-factor-grid">
                         {report.pillars.map((pillar) => {
-                            const completeness = Math.round((report.confidence.pillarCompleteness[pillar.id] || 0) * 100);
+                            const Icon = ICON_MAP[pillar.icon] || Wallet;
                             return (
-                                <div key={pillar.id} className="es-confidence-row">
-                                    <span>{pillar.name}</span>
-                                    <span>{completeness}%</span>
-                                </div>
+                                <article key={pillar.id} className="es-factor-card">
+                                    <div className="es-factor-row">
+                                        <div className="es-factor-icon">
+                                            <Icon size={18} />
+                                        </div>
+                                        <div className="es-factor-info">
+                                            <h3>{pillar.name}</h3>
+                                            <span className={`es-factor-pill es-factor-pill-${pillar.grade.split(' ')[1].toLowerCase()}`}>
+                                                {pillar.band}
+                                            </span>
+                                        </div>
+                                        <div className="es-factor-score">
+                                            <div className="es-factor-score-bar">
+                                                <div className="es-factor-score-fill" style={{ width: `${(pillar.score / 20) * 100}%` }} />
+                                            </div>
+                                            <span className="es-factor-score-value">{pillar.score}/20</span>
+                                        </div>
+                                    </div>
+                                    <div className="es-factor-metric">
+                                        {pillar.metricLabel}: <strong>{pillar.metricValue}</strong>
+                                    </div>
+                                    <p className="es-factor-text">{pillar.interpretation}</p>
+                                </article>
                             );
                         })}
                     </div>
-                </div>
-            </section>
+                </section>
 
-            <section className="es-pillars">
-                {report.pillars.map((pillar) => {
-                    const Icon = ICON_MAP[pillar.icon] || Wallet;
-                    const filledPct = (pillar.score / 20) * 100;
-                    return (
-                        <article key={pillar.id} className="es-pillar-card">
-                            <div className="es-pillar-head">
-                                <div className="es-pillar-icon">
-                                    <Icon size={18} />
-                                </div>
-                                <div>
-                                    <h3>{pillar.name}</h3>
-                                    <span className={`es-pill-band es-band-${pillar.band.toLowerCase().replace(' ', '-')}`}>
-                                        {pillar.band}
-                                    </span>
-                                </div>
-                                <div className="es-pillar-score">{pillar.score}/20</div>
-                            </div>
-                            <div className="es-pillar-meter">
-                                <div className="es-pillar-fill" style={{ width: `${filledPct}%` }} />
-                            </div>
-                            <p className="es-pillar-metric">
-                                {pillar.metricLabel}: <strong>{pillar.metricValue}</strong>
-                            </p>
-                            <p className="es-pillar-text">{pillar.interpretation}</p>
-                            {pillar.dataNote ? <p className="es-pillar-note">{pillar.dataNote}</p> : null}
-                        </article>
-                    );
-                })}
-            </section>
 
-            <section className="es-chart-panel">
-                <h3>Pillar Score Snapshot</h3>
-                <div className="es-chart-wrap">
-                    <ResponsiveContainer width="100%" height={280}>
-                        <BarChart data={chartData} margin={{ top: 12, right: 12, left: 8, bottom: 24 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                            <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 12 }} interval={0} angle={-8} textAnchor="end" />
-                            <YAxis domain={[0, 20]} tick={{ fill: '#64748b', fontSize: 12 }} />
-                            <Tooltip formatter={(v) => [`${v}/20`, 'Score']} />
-                            <Bar dataKey="score" radius={[8, 8, 0, 0]}>
-                                {chartData.map((entry, index) => (
-                                    <Cell key={`${entry.name}-${index}`} fill={SCORE_COLORS[index % SCORE_COLORS.length]} />
-                                ))}
-                            </Bar>
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-            </section>
 
             <section className="es-simulator">
                 <h3>If You Improve X, Score Can Become Y</h3>
@@ -320,85 +314,144 @@ const ExecutiveSummarySection = () => {
                 </div>
             </section>
 
-            <section className="es-uplift">
-                <h3>Score Uplift Opportunities</h3>
-                <div className="es-uplift-grid">
-                    {report.upliftOpportunities.map((item) => (
-                        <div key={item.key} className="es-uplift-card">
-                            <p>{item.label}</p>
-                            <div className="es-uplift-meta">
-                                <span>Current: {item.currentValue}</span>
-                                <span>Target: {item.targetValue}</span>
+<section className="es-uplift">
+                    <h3>Score Uplift Opportunities</h3>
+                    <div className="es-uplift-grid">
+                        {report.upliftOpportunities.map((op) => (
+                            <div key={op.key} className="es-uplift-card">
+                                <p>{op.label}</p>
+                                <strong>+{op.uplift} points</strong>
                             </div>
-                            <strong>+{item.uplift} points</strong>
-                        </div>
-                    ))}
-                </div>
-            </section>
-
-            <section className="es-trend">
-                <h3>Monthly Trend Tracking</h3>
-                <p className="es-trend-note"><CalendarClock size={14} /> Snapshot is stored once per month from now onward.</p>
-                <div className="es-chart-wrap">
-                    <ResponsiveContainer width="100%" height={240}>
-                        <BarChart data={trendRows} margin={{ top: 12, right: 12, left: 8, bottom: 10 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                            <XAxis dataKey="label" tick={{ fill: '#64748b', fontSize: 12 }} />
-                            <YAxis domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 12 }} />
-                            <Tooltip formatter={(v) => [`${v}/100`, 'Score']} />
-                            <Bar dataKey="score" fill="#00a9f2" radius={[8, 8, 0, 0]} />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-            </section>
-
-            <section className="es-actions">
-                <h3>Your Priority Next Steps</h3>
-                <RecommendationList
-                    recommendations={priorityRecommendations}
-                    onPrimaryAction={launchRecommendationAction}
-                    ctaContext={{
-                        familyMembers,
-                        user,
-                        moduleName: 'Useful Insights — Priority Next Steps',
-                    }}
-                    density="summary"
-                    emptySurface="useful_insights"
-                    className="es-rec-list"
-                />
-            </section>
-
-            <section className="es-roadmap">
-                <h3>Dynamic Action Roadmap</h3>
-                <div className="es-roadmap-grid">
-                    {Object.entries(report.roadmap).map(([horizon, steps]) => (
-                        <div key={horizon} className="es-roadmap-card">
-                            <h4>{horizon}</h4>
-                            <ul>
-                                {steps.map((step) => <li key={step}>{step}</li>)}
-                            </ul>
-                        </div>
-                    ))}
-                </div>
-            </section>
-
-            <section className="es-benchmark">
-                <h3>Benchmark View</h3>
-                <div className="es-benchmark-card">
-                    <BadgeInfo size={18} />
-                    <div>
-                        <strong>Peer benchmark coming soon</strong>
-                        <p>An anonymized percentile benchmark will be shown here once benchmark datasets are activated.</p>
+                        ))}
                     </div>
-                </div>
-            </section>
+                </section>
 
-            <section className="es-export">
-                <h3>Downloadable Useful Insights One-Pager</h3>
-                <button className="es-export-btn" onClick={printOnePager}>
-                    <Download size={16} /> Export PDF One-Pager
-                </button>
-            </section>
+<section className="es-trend">
+                    <h3>Monthly Trend Tracking</h3>
+                    {trendRows.length < 2 ? (
+                        <div className="es-trend-stat">
+                            <p>Your first snapshot: {report.totalScore}/100 ({formatDate(trendRows[0]?.label)}).</p>
+                            <p>Check back next month to see your trend.</p>
+                        </div>
+                    ) : (
+                        <div className="es-chart-wrap">
+                            <ResponsiveContainer width="100%" height={240}>
+                                <BarChart data={trendRows} margin={{ top: 12, right: 12, left: 8, bottom: 10 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                                    <XAxis dataKey="label" tick={{ fill: '#64748b', fontSize: 12 }} />
+                                    <YAxis domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 12 }} />
+                                    <Tooltip formatter={(v) => [`${v}/100`, 'Score']} />
+                                    <Bar dataKey="score" radius={[8, 8, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    )}
+                </section>
+
+<section className="es-actions">
+                    <h3>Your Priority Next Steps</h3>
+                    <div className="es-accordion">
+                        {priorityRecommendations.map((rec) => {
+                            const model = toPresentationModel(rec);
+                            return (
+                                <div key={model.id} className="es-accordion-item">
+                                    <div className="es-accordion-header" onClick={() => setExpandedAccordionId(id => id === model.id ? null : model.id)}>
+                                        <span className="es-accordion-dot" style={{ background: getPriorityColor(model.severity) }}></span>
+                                        <div className="es-accordion-content">
+                                            <h4 className="es-accordion-title">{model.title}</h4>
+                                            <p className="es-accordion-summary">{model.summary}</p>
+                                        </div>
+                                        <ChevronDown size={16} className={`es-accordion-chevron ${expandedAccordionId === model.id ? 'es-rotated' : ''}`} />
+                                    </div>
+                                    {expandedAccordionId === model.id && (
+                                        <div className="es-accordion-panel">
+                                            <div className="es-accordion-body">
+                                                {model.businessMeaning && <p className="es-accordion-business">{model.businessMeaning}</p>}
+                                                {model.primaryMetric && (
+                                                    <div className="es-accordion-metric">
+                                                        <span>{model.primaryMetric.label}</span>
+                                                        <strong>{model.primaryMetric.value}</strong>
+                                                    </div>
+                                                )}
+                                                {model.supportingMetrics.length > 0 && (
+                                                    <div className="es-accordion-metrics">
+                                                        {model.supportingMetrics.map((m) => (
+                                                            <div key={m.key} className="es-accordion-metric">
+                                                                <span>{m.label}</span>
+                                                                <strong>{m.value}</strong>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                {model.description && <p className="es-accordion-description">{model.description}</p>}
+                                                <div className="es-accordion-actions">
+                                                    {model.primaryActions.map((action) => (
+                                                        <button
+                                                            key={action.id}
+                                                            className="es-accordion-btn es-accordion-btn-primary"
+                                                            onClick={() => {
+                                                                launchRecommendationAction(action, rec, ctaContext);
+                                                            }}
+                                                        >
+                                                            {action.label}
+                                                        </button>
+                                                    ))}
+                                                    {model.secondaryActions.map((action) => (
+                                                        <a
+                                                            key={action.id}
+                                                            href={action.cta?.url ?? '#'}
+                                                            className="es-accordion-btn es-accordion-btn-secondary"
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                        >
+                                                            {action.label}
+                                                        </a>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </section>
+
+<section className="es-roadmap">
+                    <h3>Dynamic Action Roadmap</h3>
+                    <div className="es-roadmap-tabs">
+                        <button
+                            className={`es-roadmap-tab ${activeTab === '30-day' ? 'es-active' : ''}`}
+                            onClick={() => setActiveTab('30-day')}
+                        >
+                            30-Day
+                        </button>
+                        <button
+                            className={`es-roadmap-tab ${activeTab === '90-day' ? 'es-active' : ''}`}
+                            onClick={() => setActiveTab('90-day')}
+                        >
+                            90-Day
+                        </button>
+                        <button
+                            className={`es-roadmap-tab ${activeTab === '1-year' ? 'es-active' : ''}`}
+                            onClick={() => setActiveTab('1-year')}
+                        >
+                            1-Year
+                        </button>
+                    </div>
+                    <div className="es-roadmap-panel">
+                        {(report.roadmap?.[activeTab] || []).map((step, index) => (
+                            <div key={index} className="es-roadmap-step">
+                                <span className="es-roadmap-dot"></span>
+                                <p>{step}</p>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+
+
+
+
 
             <section className="es-print-sheet">
                 <div className="es-print-header">
@@ -578,7 +631,336 @@ const ExecutiveSummarySection = () => {
                     .es-print-footer p { margin: 0 0 4px; font-size: 10px; color: #334155; line-height: 1.45; }
                     .es-footer-bar { margin-top: 8px; border-top: 1px solid #e2e8f0; padding-top: 6px; display: flex; justify-content: space-between; font-size: 10px; color: #64748b; }
                 }
-            `}</style>
+            /* New styles for the redesigned components */
+                .es-chip-row {
+                    display: flex;
+                    gap: 1rem;
+                    margin-top: 0.5rem;
+                    flex-wrap: wrap;
+                }
+                .es-chip {
+                    display: inline-block;
+                    padding: 0.25rem 0.5rem;
+                    border-radius: 999px;
+                    font-size: 0.875rem;
+                    font-weight: 600;
+                }
+                .es-chip-strength {
+                    background: #dcfce7;
+                    color: #166534;
+                }
+                .es-chip-focus {
+                    background: #fef3c7;
+                    color: #92400e;
+                }
+                .es-confidence-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.25rem;
+                    background: #ecfdf5;
+                    color: #065f46;
+                    border-radius: 999px;
+                    padding: 0.25rem 0.5rem;
+                    font-size: 0.875rem;
+                    cursor: help;
+                    margin-left: 0.5rem;
+                }
+                .es-factor-list {
+                    margin: 2rem 0;
+                }
+                .es-factor-list h3 {
+                    margin: 0 0 1rem;
+                }
+                .es-factor-grid {
+                    display: grid;
+                    gap: 1.5rem;
+                }
+                .es-factor-card {
+                    border: 1px solid #e2e8f0;
+                    border-radius: 14px;
+                    padding: 1.5rem;
+                    background: #fff;
+                }
+                .es-factor-row {
+                    display: flex;
+                    align-items: center;
+                    gap: 1rem;
+                    margin-bottom: 1rem;
+                }
+                .es-factor-icon {
+                    width: 34px;
+                    height: 34px;
+                    border-radius: 10px;
+                    display: grid;
+                    place-items: center;
+                    background: #f0f9ff;
+                    color: #0369a1;
+                }
+                .es-factor-info h3 {
+                    margin: 0;
+                    font-size: 0.95rem;
+                }
+                .es-factor-pill {
+                    display: inline-block;
+                    padding: 0.25rem 0.5rem;
+                    border-radius: 999px;
+                    font-size: 0.72rem;
+                    font-weight: 700;
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                }
+                .es-factor-pill-a {
+                    background: #dcfce7;
+                    color: #166534;
+                }
+                .es-factor-pill-b {
+                    background: #dbeafe;
+                    color: #1e40af;
+                }
+                .es-factor-pill-c {
+                    background: #fef3c7;
+                    color: #92400e;
+                }
+                .es-factor-pill-f {
+                    background: #fecaca;
+                    color: #b91c1c;
+                }
+                .es-factor-score {
+                    margin-left: auto;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                }
+                .es-factor-score-bar {
+                    flex: 1;
+                    height: 8px;
+                    background: #f1f5f9;
+                    border-radius: 999px;
+                    overflow: hidden;
+                }
+                .es-factor-score-fill {
+                    height: 100%;
+                    background: linear-gradient(90deg, #38bdf8, #0ea5e9);
+                }
+                .es-factor-score-value {
+                    font-size: 1.1rem;
+                    font-weight: 800;
+                }
+                .es-factor-metric {
+                    margin: 0 0 0.5rem;
+                    color: var(--text-muted);
+                    font-size: 0.875rem;
+                }
+                .es-factor-text {
+                    margin: 0;
+                    color: var(--text-main);
+                    line-height: 1.6;
+                    font-size: 0.9rem;
+                }
+                /* Update uplift card styles (remove meta) */
+                .es-uplift-card {
+                    border: 1px solid #e2e8f0;
+                    border-radius: 12px;
+                    padding: 1rem;
+                    background: #fff;
+                    text-align: center;
+                }
+                .es-uplift-card p {
+                    margin: 0 0 0.5rem;
+                    color: var(--text-main);
+                    font-size: 0.9rem;
+                }
+                .es-uplift-card strong {
+                    display: block;
+                    font-size: 1.15rem;
+                    color: #16a34a;
+                }
+                /* Accordion styles */
+                .es-accordion {
+                    border: 1px solid #e2e8f0;
+                    border-radius: 12px;
+                    overflow: hidden;
+                }
+                .es-accordion-item {
+                    border-bottom: 1px solid #e2e8f0;
+                }
+                .es-accordion-item:last-child {
+                    border-bottom: none;
+                }
+                .es-accordion-header {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    padding: 1rem;
+                    cursor: pointer;
+                    background: #f8fafc;
+                }
+                .es-accordion-header:hover {
+                    background: #f1f5f9;
+                }
+                .es-accordion-dot {
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 50%;
+                    margin-right: 0.5rem;
+                }
+                .es-accordion-content {
+                    flex: 1;
+                }
+                .es-accordion-title {
+                    margin: 0 0 0.25rem;
+                    font-size: 0.95rem;
+                    color: var(--text-main);
+                }
+                .es-accordion-summary {
+                    margin: 0;
+                    color: var(--text-muted);
+                    font-size: 0.875rem;
+                }
+                .es-accordion-chevron {
+                    transition: transform 0.2s ease;
+                }
+                .es-accordion-chevron.es-rotated {
+                    transform: rotate(180deg);
+                }
+                .es-accordion-panel {
+                    background: #fff;
+                }
+                .es-accordion-body {
+                    padding: 1rem;
+                }
+                .es-accordion-business {
+                    margin: 0 0 1rem;
+                    font-size: 0.875rem;
+                    color: var(--text-muted);
+                }
+                .es-accordion-metric {
+                    display: flex;
+                    justify-content: space-between;
+                    margin: 0 0 0.5rem;
+                    font-size: 0.875rem;
+                }
+                .es-accordion-metric span {
+                    color: var(--text-muted);
+                }
+                .es-accordion-metric strong {
+                    color: var(--text-main);
+                }
+                .es-accordion-description {
+                    margin: 0 0 1rem;
+                    color: var(--text-main);
+                    line-height: 1.6;
+                }
+                .es-accordion-actions {
+                    display: flex;
+                    gap: 0.75rem;
+                    flex-wrap: wrap;
+                }
+                .es-accordion-btn {
+                    border-radius: 8px;
+                    padding: 0.5rem 1rem;
+                    font-weight: 600;
+                    cursor: pointer;
+                    border: none;
+                    font-size: 0.875rem;
+                }
+                .es-accordion-btn-primary {
+                    background: var(--primary);
+                    color: #fff;
+                }
+                .es-accordion-btn-primary:hover {
+                    opacity: 0.9;
+                }
+                .es-accordion-btn-secondary {
+                    color: var(--text-main);
+                    text-decoration: underline;
+                    background: transparent;
+                }
+                .es-accordion-btn-secondary:hover {
+                    opacity: 0.8;
+                }
+                /* Roadmap tabs styles */
+                .es-roadmap-tabs {
+                    display: flex;
+                    gap: 0.5rem;
+                    margin-bottom: 1rem;
+                }
+                .es-roadmap-tab {
+                    padding: 0.5rem 1rem;
+                    border: 1px solid #e2e8f0;
+                    background: #f8fafc;
+                    color: var(--text-muted);
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-size: 0.875rem;
+                }
+                .es-roadmap-tab.es-active {
+                    background: var(--primary);
+                    color: #fff;
+                    border-color: var(--primary);
+                }
+                .es-roadmap-panel {
+                    border: 1px solid #e2e8f0;
+                    border-radius: 12px;
+                    padding: 1.5rem;
+                }
+                .es-roadmap-step {
+                    display: flex;
+                    align-items: flex-start;
+                    margin: 0 0 1rem;
+                }
+                .es-roadmap-dot {
+                    width: 6px;
+                    height: 6px;
+                    background: var(--primary);
+                    border-radius: 50%;
+                    margin-right: 0.75rem;
+                    flex-shrink: 0;
+                }
+                .es-roadmap-step p {
+                    margin: 0;
+                    color: var(--text-main);
+                    line-height: 1.6;
+                }
+                /* Trend stat styles */
+                .es-trend-stat {
+                    background: #f8fafc;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 14px;
+                    padding: 1.5rem;
+                    text-align: center;
+                }
+                .es-trend-stat p {
+                    margin: 0 0 0.75rem;
+                    color: var(--text-muted);
+                    font-size: 0.875rem;
+                    line-height: 1.6;
+                }
+                .es-trend-stat p:last-child {
+                    margin-bottom: 0;
+                }
+                /* Export button in hero */
+                .es-hero {
+                    position: relative;
+                }
+                .es-export-btn {
+                    position: absolute;
+                    top: 1.5rem;
+                    right: 1.5rem;
+                    background: var(--primary);
+                    color: #fff;
+                    border-radius: 10px;
+                    padding: 0.7rem 1rem;
+                    font-weight: 700;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    cursor: pointer;
+                }
+                .es-export-btn:hover {
+                    opacity: 0.9;
+                }
+             `}</style>
         </div>
     );
 };

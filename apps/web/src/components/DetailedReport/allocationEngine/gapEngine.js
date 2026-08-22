@@ -46,10 +46,26 @@ export function buildLifeObjectiveGaps({
     summaryHealthCover = '',
     hasHealthInsurance = null,
     policies = [],
+    liabilityCategories = {},
+    income = {},
+    inflationRates = {},
+    calculatorInputs = {},
+    goals = []
 } = {}) {
     const emergencyHave = getEmergencyFundAmount(assetCategories, contingencyFund);
     const contingencyData = calculateContingencyData(expenseCategories, emergencyHave, familyMembers);
-    const protectionData = calculateProtectionData(expenseCategories, summaryLifeCover, familyMembers, policies);
+    const protectionData = calculateProtectionData(
+        expenseCategories,
+        summaryLifeCover,
+        familyMembers,
+        policies,
+        income,
+        inflationRates,
+        calculatorInputs,
+        goals,
+        assetCategories,
+        liabilityCategories
+    );
     const healthData = calculateHealthInsuranceData(summaryHealthCover, hasHealthInsurance, familyMembers, policies);
     const existingMonthly = getExistingMonthlyByInstrument(expenseCategories);
 

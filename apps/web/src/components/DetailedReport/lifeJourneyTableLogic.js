@@ -101,7 +101,7 @@ export function buildLifeJourneyReport({
 }
 
 export function computeLifeJourneyInsights(report) {
-    const { meta, hero, projections, goalsByYear } = report;
+    const { meta, projections, goalsByYear } = report;
     const insights = [];
 
     if (!meta.hasProfile) {
@@ -121,12 +121,6 @@ export function computeLifeJourneyInsights(report) {
         });
         return insights;
     }
-
-    insights.push({
-        id: 'golden-period',
-        text: `${hero.yearsToGoldenPeriod} years remain until your Golden Period at age ${hero.retirementAge}.`,
-        tone: 'neutral',
-    });
 
     const deficitYears = projections.filter(
         (p) => p.yearHasDeficit || p.netInvestibleSurplus < 0,
@@ -172,13 +166,6 @@ export function computeLifeJourneyInsights(report) {
             tone: 'accent',
         });
     }
-
-    const ir = meta.inflationRates || {};
-    insights.push({
-        id: 'growth-assumptions',
-        text: `Projections assume ${ir.incomeIncrement ?? 10}% income growth, ${ir.householdInflation ?? 6}% household expense growth, and ${ir.educationInflation ?? 8}% education cost growth.`,
-        tone: 'neutral',
-    });
 
     return insights;
 }

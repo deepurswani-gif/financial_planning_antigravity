@@ -108,6 +108,15 @@ export function validateDraftPlan({
         });
     }
 
+    const termDraft = draftAllocations['Term Insurance'];
+    if (isLispDraft(termDraft) && parseAmount(termDraft.premium) > 0 && !termDraft.insuredMember) {
+        issues.push({
+            id: 'term-member-required',
+            severity: 'error',
+            message: 'Select an insured member for Term Insurance before saving.',
+        });
+    }
+
     const draftPpfMonthly = draftAllocations.PPF || 0;
     if (draftPpfMonthly > 0) {
         const existingPpfAnnual = parseAmount(expenseCategories?.savings?.ppf?.amount) * 12

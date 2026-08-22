@@ -161,6 +161,13 @@ export const ASSET_FIELDS = [
     },
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.ASSETS,
+        questionId: 'current-assets',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.WEALTH_SNAPSHOT,
         questionId: 'assets-breakdown',
@@ -168,7 +175,7 @@ export const ASSET_FIELDS = [
         role: 'breakdown',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     relatedFieldIds: ['assets.realEstateValue'],
     impacts: ['engine.netWorth'],
   }),
@@ -189,6 +196,13 @@ export const ASSET_FIELDS = [
     state: { path: 'assetCategories.investments.equity' },
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.ASSETS,
+        questionId: 'current-assets',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.WEALTH_SNAPSHOT,
         questionId: 'assets-breakdown',
@@ -196,7 +210,7 @@ export const ASSET_FIELDS = [
         role: 'breakdown',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     relatedFieldIds: ['assets.portfolioValue'],
     impacts: ['engine.netWorth', 'report.detail.put_your_money_to_work'],
   }),
@@ -217,6 +231,13 @@ export const ASSET_FIELDS = [
     state: { path: 'assetCategories.investments.mutualFunds' },
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.ASSETS,
+        questionId: 'current-assets',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.WEALTH_SNAPSHOT,
         questionId: 'assets-breakdown',
@@ -224,7 +245,7 @@ export const ASSET_FIELDS = [
         role: 'breakdown',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     relatedFieldIds: ['assets.portfolioValue'],
     impacts: ['engine.netWorth', 'report.detail.put_your_money_to_work'],
   }),
@@ -245,6 +266,13 @@ export const ASSET_FIELDS = [
     state: { path: 'assetCategories.cash.savings' },
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.ASSETS,
+        questionId: 'current-assets',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.WEALTH_SNAPSHOT,
         questionId: 'assets-breakdown',
@@ -252,7 +280,7 @@ export const ASSET_FIELDS = [
         role: 'breakdown',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     relatedFieldIds: ['assets.emergencyFund'],
     impacts: ['report.summary.safety_net', 'engine.contingency', 'engine.netWorth'],
   }),
@@ -277,6 +305,13 @@ export const ASSET_FIELDS = [
     itemFieldIds: ['assets.fixedDeposit.amount'],
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.ASSETS,
+        questionId: 'current-assets',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.WEALTH_SNAPSHOT,
         questionId: 'assets-breakdown',
@@ -284,7 +319,7 @@ export const ASSET_FIELDS = [
         role: 'breakdown',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     impacts: ['engine.netWorth'],
     tags: ['modal'],
   }),
@@ -310,6 +345,13 @@ export const ASSET_FIELDS = [
     state: { path: 'amount' },
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.ASSETS,
+        questionId: 'current-assets',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.WEALTH_SNAPSHOT,
         questionId: 'assets-breakdown',
@@ -317,7 +359,7 @@ export const ASSET_FIELDS = [
         role: 'breakdown',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     impacts: ['engine.netWorth'],
   }),
 
@@ -337,6 +379,13 @@ export const ASSET_FIELDS = [
     state: { path: 'assetCategories.retirement.epf' },
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.ASSETS,
+        questionId: 'current-assets',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.WEALTH_SNAPSHOT,
         questionId: 'assets-breakdown',
@@ -344,7 +393,7 @@ export const ASSET_FIELDS = [
         role: 'breakdown',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     impacts: ['engine.retirementHorizon', 'engine.netWorth'],
   }),
 
@@ -364,6 +413,13 @@ export const ASSET_FIELDS = [
     itemFieldIds: ['assets.custom.value'],
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.ASSETS,
+        questionId: 'current-assets',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.WEALTH_SNAPSHOT,
         questionId: 'custom-assets',
@@ -371,7 +427,7 @@ export const ASSET_FIELDS = [
         role: 'primary',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     impacts: ['engine.netWorth'],
   }),
 
@@ -392,6 +448,13 @@ export const ASSET_FIELDS = [
     state: { path: 'value' },
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.ASSETS,
+        questionId: 'current-assets',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.WEALTH_SNAPSHOT,
         questionId: 'custom-assets',
@@ -399,7 +462,7 @@ export const ASSET_FIELDS = [
         role: 'primary',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     impacts: ['engine.netWorth'],
   }),
 ];

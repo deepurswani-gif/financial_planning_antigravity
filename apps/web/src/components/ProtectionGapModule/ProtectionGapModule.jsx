@@ -6,13 +6,13 @@ import { calculateProtectionGap } from './ProtectionGapLogic';
 import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 
 const ProtectionGapModule = ({ onNext, onBack }) => {
-    const { familyMembers, expenseCategories, policies, assetCategories, calculatorInputs, proposedSIPs, proposedEquities, goals, goalMappings } = useFinancialPlan();
+    const { familyMembers, expenseCategories, policies, assetCategories, liabilityCategories, calculatorInputs, proposedSIPs, proposedEquities, goals, goalMappings, income, inflationRates } = useFinancialPlan();
     const [results, setResults] = useState(null);
 
     useEffect(() => {
-        const calculated = calculateProtectionGap(expenseCategories, policies, familyMembers);
+        const calculated = calculateProtectionGap(expenseCategories, policies, familyMembers, income, inflationRates, calculatorInputs, goals, assetCategories, liabilityCategories);
         setResults(calculated);
-    }, [expenseCategories, policies, familyMembers]);
+    }, [expenseCategories, policies, familyMembers, income, inflationRates, calculatorInputs, goals, assetCategories, liabilityCategories]);
 
     return (
         <div className="fade-in" style={{ marginTop: '2rem' }}>

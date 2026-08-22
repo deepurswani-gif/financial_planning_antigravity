@@ -504,17 +504,50 @@ const JourneyConstraintsRail = ({
         </>
     );
 
+    const [hasUpcomingAdjustments, setHasUpcomingAdjustments] = useState(
+        () => (journeyAdjustments?.length > 0 || draftAdjustments?.length > 0 || false),
+    );
+
+    const handleAnswerNo = () => {
+        setHasUpcomingAdjustments(false);
+        handleNoFutureAdjustments();
+    };
+
+    const handleAnswerYes = () => {
+        setHasUpcomingAdjustments(true);
+        if (!expandedId) setExpandedId('standard_expenses');
+    };
+
     return (
         <ReportReveal className="pymtw-zone-b card">
-            <h3 className="pymtw-zone-title">
+            <h3 className="pymtw-zone-title" style={{ fontSize: '1.1rem', fontWeight: 700 }}>
                 <Banknote size={18} />
                 Future Financial Adjustments
             </h3>
-            <p className="pymtw-zone-sub">
-                Plan one-time expenses and future loans before surplus allocation.
+            <p className="pymtw-zone-sub" style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
+                Any big one-time expenses or new loans coming in the next 3 months?
             </p>
 
-            {setJourneyAdjustments && (
+            <div className="fyfg-gateway-options" style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem' }}>
+                <button
+                    type="button"
+                    className={`btn ${hasUpcomingAdjustments ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={handleAnswerYes}
+                    style={{ padding: '0.6rem 1.25rem', fontWeight: 600, borderRadius: '10px' }}
+                >
+                    Yes, add one
+                </button>
+                <button
+                    type="button"
+                    className={`btn ${!hasUpcomingAdjustments && adjustmentsSaved ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={handleAnswerNo}
+                    style={{ padding: '0.6rem 1.25rem', fontWeight: 600, borderRadius: '10px' }}
+                >
+                    No, skip this
+                </button>
+            </div>
+
+            {hasUpcomingAdjustments && setJourneyAdjustments && (
                 <>
                     {ADJUSTMENT_CATEGORIES.map((category) => {
                         const isOpen = expandedId === category.id;
@@ -554,24 +587,24 @@ const JourneyConstraintsRail = ({
                         );
                     })}
 
-                    <div className="pymtw-adjust-save">
-                        <button
-                            type="button"
-                            className="btn btn-secondary"
-                            onClick={handleNoFutureAdjustments}
-                        >
-                            No Future Adjustments
-                        </button>
+                    <div className="pymtw-adjust-save" style={{ marginTop: '1rem' }}>
                         {adjustmentsSaved && !saveError && (
-                            <div className="pymtw-adjust-saved-msg" role="status">
+                            <div className="pymtw-adjust-saved-msg" role="status" style={{ color: 'var(--primary, #0f766e)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                                 <CheckCircle2 size={16} />
                                 <span>
-                                    {saveMessage || 'Future financial adjustments saved. You can now proceed.'}
+                                    {saveMessage || 'Future financial adjustments saved.'}
                                 </span>
                             </div>
                         )}
                     </div>
                 </>
+            )}
+
+            {!hasUpcomingAdjustments && adjustmentsSaved && (
+                <div style={{ padding: '0.85rem 1rem', background: 'rgba(16, 185, 129, 0.08)', borderRadius: '10px', color: '#047857', fontSize: '0.88rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <CheckCircle2 size={16} />
+                    <span>No future adjustments planned. Your baseline surplus is ready.</span>
+                </div>
             )}
 
             <div className="pymtw-adjust-summary">

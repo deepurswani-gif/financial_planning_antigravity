@@ -48,10 +48,10 @@ export function getRecurringMonthlyAmount(alloc = {}) {
     const type = alloc.type;
     const freq = String(alloc.frequency || 'Monthly').toLowerCase();
 
-    // Legacy Life Insurance OR new LISP installment+member rows: amount is installment premium.
+    // Legacy Life Insurance OR new LISP / Term Insurance installment+member rows: amount is installment premium.
     const isInstallmentLife = (
         (type === 'Life Insurance' && !alloc.studioPlanKey)
-        || (type === 'Life Insurance Saving Plans' && alloc.insuredMember)
+        || ((type === 'Life Insurance Saving Plans' || type === 'Term Insurance') && alloc.insuredMember)
     );
     if (isInstallmentLife) {
         if (freq === 'quarterly') return amount / 3;
@@ -722,7 +722,7 @@ export function buildInstrumentCards(investmentAllocations = [], { reportScope =
             byType[type].monthlyTotal += monthlyAmount;
             const isInstallment = (
                 (alloc.type === 'Life Insurance' && !alloc.studioPlanKey)
-                || (alloc.type === 'Life Insurance Saving Plans' && alloc.insuredMember)
+                || ((alloc.type === 'Life Insurance Saving Plans' || alloc.type === 'Term Insurance') && alloc.insuredMember)
             );
             byType[type].annualTotal += isInstallment
                 ? monthlyAmount * 12
@@ -1193,9 +1193,11 @@ export function buildAllocationStudioContext({
     goalMappings = {},
     goals = [],
     selectedMonthIndex,
-    /** 'gaps' | 'pymtw' | null (all categories) */
     reportScope = null,
     policies = [],
+    liabilityCategories = {},
+    income = {},
+    inflationRates = {}
 }) {
     if (!moneyFlowReport?.meta) {
         return { meta: { hasData: false } };
@@ -1231,7 +1233,18 @@ export function buildAllocationStudioContext({
         })
         : { deployableSurplus: 0, carriedForward: 0 };
 
-    const protectionData = calculateProtectionData(expenseCategories, summaryLifeCover, familyMembers, policies);
+    const protectionData = calculateProtectionData(
+        expenseCategories,
+        summaryLifeCover,
+        familyMembers,
+        policies,
+        income,
+        inflationRates,
+        calculatorInputs,
+        goals,
+        assetCategories,
+        liabilityCategories
+    );
     const contingencyData = calculateContingencyData(
         expenseCategories,
         getEmergencyFundAmount(assetCategories, contingencyFund),

@@ -544,6 +544,13 @@ export const FAMILY_FIELDS = [
     ],
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.PROFILE,
+        questionId: 'personal-details',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.FAMILY_INFORMATION,
         questionId: 'children',
@@ -551,7 +558,7 @@ export const FAMILY_FIELDS = [
         role: 'primary',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     impacts: [
       'report.detail.your_money_flow',
       'engine.education',
@@ -577,6 +584,13 @@ export const FAMILY_FIELDS = [
     state: { path: 'name' },
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.PROFILE,
+        questionId: 'personal-details',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.FAMILY_INFORMATION,
         questionId: 'children',
@@ -584,7 +598,7 @@ export const FAMILY_FIELDS = [
         role: 'primary',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     impacts: [],
   }),
 
@@ -605,6 +619,13 @@ export const FAMILY_FIELDS = [
     state: { path: 'dob' },
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.PROFILE,
+        questionId: 'personal-details',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.FAMILY_INFORMATION,
         questionId: 'children',
@@ -612,7 +633,7 @@ export const FAMILY_FIELDS = [
         role: 'primary',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     impacts: ['engine.education'],
   }),
 
@@ -633,6 +654,13 @@ export const FAMILY_FIELDS = [
     state: { path: 'occupation' },
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.PROFILE,
+        questionId: 'personal-details',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.FAMILY_INFORMATION,
         questionId: 'children',
@@ -640,7 +668,7 @@ export const FAMILY_FIELDS = [
         role: 'primary',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     impacts: ['engine.education'],
   }),
 

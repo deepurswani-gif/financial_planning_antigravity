@@ -42,10 +42,10 @@ export const getProtectionAllocationAnnual = (alloc = {}) => {
     const amount = parseFloat(alloc.amount) || 0;
     const type = alloc.type;
 
-    // New LISP installment+member rows (and legacy Life without studio key)
+    // New LISP / Term Insurance installment+member rows (and legacy Life without studio key)
     const isInstallment = (
         (type === 'Life Insurance' && !alloc.studioPlanKey)
-        || (type === 'Life Insurance Saving Plans' && alloc.insuredMember)
+        || ((type === 'Life Insurance Saving Plans' || type === 'Term Insurance') && alloc.insuredMember)
     );
     if (isInstallment) {
         const interval = getInsuranceFrequencyInterval(alloc.frequency || 'Monthly');
@@ -73,7 +73,7 @@ export const getProtectionAllocationImpactForYear = (alloc = {}, year) => {
     if (year !== allocStartYear) return yearlyAmount;
 
     const isLegacyInstallmentLife = (
-        (alloc.type === 'Life Insurance' || alloc.type === 'Life Insurance Saving Plans')
+        (alloc.type === 'Life Insurance' || alloc.type === 'Life Insurance Saving Plans' || alloc.type === 'Term Insurance')
         && (!alloc.studioPlanKey || alloc.insuredMember)
     );
 

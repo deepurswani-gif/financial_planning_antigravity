@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { CreditCard, CheckCircle2, Ticket, Lock, ArrowLeft } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useFinancialPlan } from '../../contexts/FinancialPlanContext';
 import { signOut } from '../../services/authService';
 import finbrellaLogo from '../../assets/finbrella_logo.png';
 import { clearPendingCouponInvite, getPendingCouponInvite } from '@/lib/couponInviteStorage';
@@ -63,6 +64,7 @@ const activateSubscription = async (userId) => {
  */
 const SubscriptionGate = ({ onActivate, onBack }) => {
   const { user } = useAuth();
+  const { markDetailedPlanningComplete } = useFinancialPlan();
   const [couponCode, setCouponCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [paying, setPaying] = useState(false);
@@ -136,6 +138,7 @@ const SubscriptionGate = ({ onActivate, onBack }) => {
         }
 
         saveWorkspaceCapability(user.id, WORKSPACE_CAPABILITY_FULL);
+        markDetailedPlanningComplete?.();
         clearPendingCouponInvite();
         finishActivation();
       } catch (err) {
@@ -240,6 +243,7 @@ const SubscriptionGate = ({ onActivate, onBack }) => {
             }
 
             saveWorkspaceCapability(user.id, WORKSPACE_CAPABILITY_FULL);
+            markDetailedPlanningComplete?.();
             finishActivation();
           } catch (err) {
             console.error(err);

@@ -8,6 +8,9 @@ const formatAllocLine = (allocations) => Object.entries(allocations || {})
     .filter(([, v]) => v > 0)
     .map(([k, v]) => ({ type: k, amount: v }));
 
+// Set HIDE_RECOMMENDED_SURPLUS_ALLOCATION to true to visually hide the section while preserving full code & logic
+const HIDE_RECOMMENDED_SURPLUS_ALLOCATION = true;
+
 const RecommendedBundles = ({
     bundles,
     deployableSurplus,
@@ -20,7 +23,7 @@ const RecommendedBundles = ({
 }) => {
     const [detailsOpen, setDetailsOpen] = useState(false);
 
-    if (!bundles?.length || deployableSurplus <= 0) return null;
+    if (HIDE_RECOMMENDED_SURPLUS_ALLOCATION || !bundles?.length || deployableSurplus <= 0) return null;
 
     const topBundle = bundles[0];
     const goalCards = engineResult?.goalCards || engineResult?.objectiveCards || topBundle?.goalCards || [];
@@ -42,29 +45,32 @@ const RecommendedBundles = ({
     const hasExpandableContent = avenueItems.length > 0 || goalCards.length > 0;
 
     return (
-        <ReportReveal className="pymtw-bundles card pymtw-surplus-allocation">
-            <div className="pymtw-bundles-header">
-                <h3 className="pymtw-zone-title">
-                    <Sparkles size={18} />
+        <ReportReveal className="pymtw-bundles card pymtw-surplus-allocation" style={{ border: '2px solid var(--primary, #0f766e)', borderRadius: '20px', background: 'linear-gradient(180deg, rgba(15, 118, 110, 0.04) 0%, rgba(255, 255, 255, 1) 100%)', boxShadow: '0 8px 24px rgba(15, 118, 110, 0.08)', padding: '1.75rem' }}>
+            <div className="pymtw-bundles-header" style={{ marginBottom: '1rem' }}>
+                <h3 className="pymtw-zone-title" style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--primary, #0f766e)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Sparkles size={22} />
                     Recommended Surplus Allocation
                 </h3>
+                <p style={{ margin: '0.35rem 0 0', fontSize: '0.88rem', color: 'var(--text-muted)' }}>
+                    Based on your safety net gaps and financial goals, here is our AI-recommended monthly allocation strategy.
+                </p>
             </div>
 
-            <div className="pymtw-surplus-kpi-row">
-                <div className="pymtw-surplus-kpi">
-                    <span className="pymtw-surplus-kpi-label">
-                        <Shield size={14} />
+            <div className="pymtw-surplus-kpi-row" style={{ background: '#fff', borderRadius: '12px', padding: '1rem', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-around', margin: '1rem 0' }}>
+                <div className="pymtw-surplus-kpi" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <span className="pymtw-surplus-kpi-label" style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <Shield size={16} style={{ color: 'var(--primary, #0f766e)' }} />
                         Protection first
                     </span>
-                    <strong className="pymtw-surplus-kpi-value">{formatCurrency(protectionFirst)}</strong>
+                    <strong className="pymtw-surplus-kpi-value" style={{ fontSize: '1.3rem', color: 'var(--text-main)' }}>{formatCurrency(protectionFirst)}</strong>
                 </div>
-                <span className="pymtw-surplus-kpi-divider" aria-hidden="true">|</span>
-                <div className="pymtw-surplus-kpi">
-                    <span className="pymtw-surplus-kpi-label">
-                        <Target size={14} />
+                <span className="pymtw-surplus-kpi-divider" aria-hidden="true" style={{ opacity: 0.3 }}>|</span>
+                <div className="pymtw-surplus-kpi" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <span className="pymtw-surplus-kpi-label" style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <Target size={16} style={{ color: '#0284c7' }} />
                         Nearest Goals
                     </span>
-                    <strong className="pymtw-surplus-kpi-value">{formatCurrency(nearestGoals)}</strong>
+                    <strong className="pymtw-surplus-kpi-value" style={{ fontSize: '1.3rem', color: 'var(--text-main)' }}>{formatCurrency(nearestGoals)}</strong>
                 </div>
             </div>
 
@@ -123,7 +129,7 @@ const RecommendedBundles = ({
             )}
 
             {(showActionButtons || showBackButton) && (
-                <div className="pymtw-surplus-actions">
+                <div className="pymtw-surplus-actions" style={{ marginTop: '1.25rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                     {showActionButtons && (
                         <>
                             <button
@@ -131,6 +137,7 @@ const RecommendedBundles = ({
                                 className="btn btn-primary"
                                 onClick={onApplyAiRecommendations}
                                 disabled={!canApplyAi}
+                                style={{ flex: '1 1 220px', padding: '0.85rem 1.25rem', fontSize: '0.95rem', fontWeight: 700, borderRadius: '12px', boxShadow: '0 4px 12px rgba(15, 118, 110, 0.25)' }}
                             >
                                 Apply the AI recommendations
                             </button>
@@ -138,6 +145,7 @@ const RecommendedBundles = ({
                                 type="button"
                                 className="btn btn-secondary"
                                 onClick={onStartManualAllocation}
+                                style={{ padding: '0.85rem 1.25rem', fontSize: '0.9rem', fontWeight: 600, borderRadius: '12px' }}
                             >
                                 Let me make the allocation myself
                             </button>

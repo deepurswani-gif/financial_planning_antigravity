@@ -161,6 +161,13 @@ export const DEBT_FIELDS = [
     ],
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.CASH_FLOW,
+        questionId: 'monthly-outflows',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.MONEY_IN_MONEY_OUT,
         questionId: 'emi-loans',
@@ -168,7 +175,7 @@ export const DEBT_FIELDS = [
         role: 'breakdown',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     relatedFieldIds: ['debt.emi.monthlyTotal', 'debt.emi.selectedLoanTypes'],
     impacts: [
       'report.detail.your_money_flow',
@@ -196,6 +203,13 @@ export const DEBT_FIELDS = [
     state: { path: 'principal' },
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.CASH_FLOW,
+        questionId: 'monthly-outflows',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.MONEY_IN_MONEY_OUT,
         questionId: 'emi-loans',
@@ -203,7 +217,7 @@ export const DEBT_FIELDS = [
         role: 'breakdown',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     impacts: ['engine.debt'],
   }),
 
@@ -224,6 +238,13 @@ export const DEBT_FIELDS = [
     state: { path: 'rate' },
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.CASH_FLOW,
+        questionId: 'monthly-outflows',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.MONEY_IN_MONEY_OUT,
         questionId: 'emi-loans',
@@ -231,7 +252,7 @@ export const DEBT_FIELDS = [
         role: 'breakdown',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     impacts: ['engine.debt'],
   }),
 
@@ -252,6 +273,13 @@ export const DEBT_FIELDS = [
     state: { path: 'tenure' },
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.CASH_FLOW,
+        questionId: 'monthly-outflows',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.MONEY_IN_MONEY_OUT,
         questionId: 'emi-loans',
@@ -259,7 +287,7 @@ export const DEBT_FIELDS = [
         role: 'breakdown',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     impacts: ['engine.debt'],
   }),
 ];

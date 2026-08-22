@@ -5,13 +5,8 @@
  */
 
 import { getEffectiveMonthlyEmi, getEffectiveMonthlyHousehold } from '../DetailedFlow/expenseDetailSync';
-import {
-    getEffectiveHealthCover,
-    getMemberInsuranceKey,
-    sumMemberLifeCover,
-    sumPolicySumAssured,
-} from '../DetailedFlow/insuranceDetailSync';
-import { shouldAssessSpouseProtection } from '../ProtectionGapModule/ProtectionGapLogic';
+import { getEffectiveHealthCover, sumPolicySumAssured, getMemberInsuranceKey } from '../DetailedFlow/insuranceDetailSync';
+import { calculateProtectionGap } from '../ProtectionGapModule/ProtectionGapLogic';
 
 export const MIN_HEALTH_COVER = 1_000_000;
 
@@ -64,48 +59,103 @@ export const calculateProtectionData = (
     summaryLifeCover,
     familyMembers = [],
     policies = [],
+    income,
+    inflationRates,
+    calculatorInputs,
+    goals,
+    assetCategories,
+    liabilityCategories
 ) => {
     const monthlyNeed = getEffectiveMonthlyNeed(expenseCategories, familyMembers);
     const annualNeed = monthlyNeed * 12;
 
-    const multiplier = 200;
-    const coverageRequired = monthlyNeed * multiplier;
+    const gapData = calculateProtectionGap(
+        expenseCategories, 
+        policies, 
+        familyMembers, 
+        income, 
+        inflationRates, 
+        calculatorInputs, 
+        goals, 
+        assetCategories, 
+        liabilityCategories
+    );
 
-    const selfMember = familyMembers.find((m) => m.relation === 'Self');
-    const spouseMember = familyMembers.find((m) => m.relation === 'Spouse');
-    const selfName = getMemberInsuranceKey(selfMember || { name: 'Self', relation: 'Self' });
     const detailedLifeTotal = sumPolicySumAssured(policies);
 
-    let selfCoverage;
-    if (detailedLifeTotal > 0) {
-        selfCoverage = sumMemberLifeCover(policies, selfName);
-    } else {
-        selfCoverage = parseFloat(summaryLifeCover) || 0;
+    // Reconstruct self and spouse objects in the SafetyNet format
+    let self = null;
+    let spouse = null;
+    
+    if (gapData.self) {
+        let selfCoverage = gapData.self.coverage;
+        if (detailedLifeTotal === 0 && parseFloat(summaryLifeCover) > 0) {
+            selfCoverage = parseFloat(summaryLifeCover);
+        }
+        
+        const liquidAssets = gapData.self.needsBreakdown?.liquidAssets || 0;
+        const gap = Math.max(0, gapData.self.need - selfCoverage - liquidAssets);
+        const coveredPercent = gapData.self.need > 0 ? Math.min(100, Math.round(((selfCoverage + liquidAssets) / gapData.self.need) * 100)) : 0;
+        const yearsCovered = annualNeed > 0 ? selfCoverage / annualNeed : 0;
+
+        const selfMember = familyMembers.find(m => m.relation?.toLowerCase() === 'self');
+        self = {
+            ...gapData.self,
+            role: 'self',
+            name: selfMember?.name || gapData.self.name || 'Self',
+            coverage: selfCoverage,
+            gap,
+            isGap: gap > 0,
+            coveredPercent,
+            yearsCovered: Math.round(yearsCovered * 100) / 100,
+            monthsCovered: Math.round(yearsCovered * 12),
+            needsBreakdown: {
+                ...gapData.self.needsBreakdown,
+                coverage: selfCoverage,
+                deductions: selfCoverage + liquidAssets
+            }
+        };
     }
 
-    const self = buildMemberProtection('self', selfName, selfCoverage, coverageRequired, monthlyNeed);
+    if (gapData.spouse) {
+        const spouseCoverage = gapData.spouse.coverage;
+        const liquidAssets = gapData.spouse.needsBreakdown?.liquidAssets || 0;
+        const gap = Math.max(0, gapData.spouse.need - spouseCoverage - liquidAssets);
+        const coveredPercent = gapData.spouse.need > 0 ? Math.min(100, Math.round(((spouseCoverage + liquidAssets) / gapData.spouse.need) * 100)) : 0;
+        const yearsCovered = annualNeed > 0 ? spouseCoverage / annualNeed : 0;
 
-    let spouse = null;
-    if (shouldAssessSpouseProtection(spouseMember)) {
-        const spouseName = getMemberInsuranceKey(spouseMember);
-        // Spouse cover is always policy-based; summary life cover is treated as self's.
-        const spouseCoverage = sumMemberLifeCover(policies, spouseName);
-        spouse = buildMemberProtection('spouse', spouseName, spouseCoverage, coverageRequired, monthlyNeed);
+        const spouseMember = familyMembers.find(m => m.relation?.toLowerCase() === 'spouse');
+        spouse = {
+            ...gapData.spouse,
+            role: 'spouse',
+            name: spouseMember?.name || gapData.spouse.name || 'Spouse',
+            coverage: spouseCoverage,
+            gap,
+            isGap: gap > 0,
+            coveredPercent,
+            yearsCovered: Math.round(yearsCovered * 100) / 100,
+            monthsCovered: Math.round(yearsCovered * 12),
+            needsBreakdown: {
+                ...gapData.spouse.needsBreakdown,
+                coverage: spouseCoverage,
+                deductions: spouseCoverage + liquidAssets
+            }
+        };
     }
 
     const assessedMembers = [self, spouse].filter(Boolean);
     const weakest = assessedMembers.reduce(
         (worst, member) => (member.coveredPercent < worst.coveredPercent ? member : worst),
-        assessedMembers[0],
+        assessedMembers[0]
     );
+    
     const protectionGap = assessedMembers.reduce((sum, member) => sum + member.gap, 0);
 
     return {
         monthlyNeed,
         annualNeed,
-        multiplier,
-        coverageRequired,
-        // Weakest earning member — payout on their death is what the household receives
+        multiplier: gapData.multiplier,
+        coverageRequired: weakest?.need ?? gapData.protectionNeed,
         coverageHave: weakest?.coverage ?? 0,
         protectionGap,
         coveredPercent: weakest?.coveredPercent ?? 0,
@@ -117,7 +167,7 @@ export const calculateProtectionData = (
         spouse,
         assessedMembers,
         weakestRole: weakest?.role ?? 'self',
-        weakestName: weakest?.name ?? selfName,
+        weakestName: weakest?.name ?? (self?.name || 'Self')
     };
 };
 
@@ -211,9 +261,15 @@ export const calculateHealthInsuranceData = (
  * @param {object} protectionData - From calculateProtectionData
  * @returns {Array} Crisis timeline stages
  */
-export const buildCrisisTimeline = (contingencyData, protectionData) => {
+export const buildCrisisTimeline = (contingencyData, protectionData, memberRole = null) => {
     const emergencyMonths = contingencyData.monthsCoveredByFund;
-    const insuranceYears = protectionData.yearsCovered;
+    let insuranceYears = protectionData.yearsCovered;
+    
+    if (memberRole === 'self' && protectionData.self) {
+        insuranceYears = protectionData.self.yearsCovered;
+    } else if (memberRole === 'spouse' && protectionData.spouse) {
+        insuranceYears = protectionData.spouse.yearsCovered;
+    }
 
     // Format months display
     const fmtMonths = (m) => {
@@ -295,7 +351,7 @@ export const buildRecoverySteps = (protectionData, healthData, contingencyData) 
             step: steps.length + 1,
             urgency: 'Immediate',
             title: `Fill ${self.name}'s Protection Gap`,
-            description: `Buy term cover of ${formatCompactSN(self.gap)} on ${self.name}. Life cover pays only on that person's death — underinsurance here leaves the household exposed.`,
+            description: `Buy term cover of ${formatCompactSN(self.gap)} on ${self.name}. Life cover pays only on that person's absence — underinsurance here leaves the household exposed.`,
             amount: self.gap,
             icon: 'shield',
             color: '#6366F1',
@@ -321,7 +377,7 @@ export const buildRecoverySteps = (protectionData, healthData, contingencyData) 
             step: steps.length + 1,
             urgency: 'Immediate',
             title: `Fill ${spouse.name}'s Protection Gap`,
-            description: `Buy term cover of ${formatCompactSN(spouse.gap)} on ${spouse.name}. If they pass away, only their sum insured supports household expenses — not cover held on other members.`,
+            description: `Buy term cover of ${formatCompactSN(spouse.gap)} on ${spouse.name}. If they are not with us, only their sum insured supports household expenses — not cover held on other members.`,
             amount: spouse.gap,
             icon: 'shield',
             color: '#6366F1',

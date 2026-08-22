@@ -45,7 +45,7 @@ function toDescriptor(recommendation, signals) {
   }
   return Object.freeze({
     id: recommendation.id,
-    title: recommendation.title,
+    title: interpolate(recommendation.title, signals),
     summary: interpolate(recommendation.summary, signals),
     description: interpolate(recommendation.description, signals),
     category: recommendation.category,

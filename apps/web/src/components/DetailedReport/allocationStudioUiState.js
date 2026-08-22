@@ -98,7 +98,7 @@ export function buildDraftSummaryItems({
             pending: true,
             instrumentType: type,
         };
-        if (type === LISP_INSTRUMENT_TYPE && isLispDraft(value)) {
+        if ((type === LISP_INSTRUMENT_TYPE || type === 'Term Insurance') && isLispDraft(value)) {
             item.insuredMember = value.insuredMember || '';
             item.frequency = value.frequency || 'Monthly';
             item.duration = parseInt(value.duration, 10) || 10;

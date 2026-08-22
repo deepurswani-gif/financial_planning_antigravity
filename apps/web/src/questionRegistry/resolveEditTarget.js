@@ -28,8 +28,7 @@ export function resolveEditTarget(field, options = {}) {
       ? field.preferredSurface?.whenCapabilityFull
       : field.preferredSurface?.whenCapabilitySummary;
 
-  let preferredFlow = preferredKey === 'detailed' ? 'detailed' : 'summary';
-  if (intent === 'breakdown') preferredFlow = 'detailed';
+  let preferredFlow = preferredKey ?? (intent === 'breakdown' ? 'detailed' : 'summary');
 
   const byFlow = surfaces.filter((s) => s.flow === preferredFlow);
   const pool = byFlow.length ? byFlow : surfaces;

@@ -1,44 +1,38 @@
 import React, { useMemo } from 'react';
 import {
     Area,
-    AreaChart,
     CartesianGrid,
+    ComposedChart,
     Line,
-    LineChart,
     ResponsiveContainer,
     Tooltip,
     XAxis,
     YAxis,
 } from 'recharts';
-import { Award, Map, TrendingUp, Waves } from 'lucide-react';
+import { Award, TrendingUp } from 'lucide-react';
 import { formatCurrency } from '../CashFlowModule/CashFlowLogic';
 import { getGoalIcon } from '../DetailedFlow/goalIcons';
 import ReportReveal from './ReportReveal';
 import {
-    buildIncomeVsOutflowSeries,
-    buildJourneyArcMeta,
-    buildSurplusRiverSeries,
     flattenGoalsForTimeline,
     formatChartCompact,
 } from './reportVisualLogic';
 
-const ChartTooltip = ({ active, payload, labelKey = 'label' }) => {
+const ComboChartTooltip = ({ active, payload }) => {
     if (!active || !payload?.length) return null;
     const data = payload[0]?.payload;
     return (
         <div className="dr-chart-tooltip">
-            <div className="dr-chart-tooltip-label">{data?.[labelKey]}</div>
-            {payload.map((entry) => (
-                <div key={entry.name}>
-                    {entry.name}: {formatCurrency(entry.value)}
-                </div>
-            ))}
+            <div className="dr-chart-tooltip-label">Year {data?.label}</div>
+            <div>Net Inflow: {formatCurrency(data?.netInflow)}</div>
+            <div>Total Outflow: {formatCurrency(data?.totalOutflow)}</div>
+            <div>Investible Surplus: {formatCurrency(data?.surplus)}</div>
         </div>
     );
 };
 
 const LifeJourneyVisuals = ({ report }) => {
-    const { meta, hero, projections, goalsByYear } = report;
+    const { meta, projections, goalsByYear } = report;
     const hasGoals = Object.keys(goalsByYear).length > 0;
 
     const constellationEndYear = meta.constellationEndYear
@@ -54,49 +48,20 @@ const LifeJourneyVisuals = ({ report }) => {
         [goalsByYear, meta.currentYear, constellationEndYear],
     );
 
-    const arcMeta = useMemo(() => buildJourneyArcMeta(hero, meta), [hero, meta]);
-    const incomeSeries = useMemo(() => buildIncomeVsOutflowSeries(projections), [projections]);
-    const surplusSeries = useMemo(() => buildSurplusRiverSeries(projections), [projections]);
+    const comboSeries = useMemo(() => projections.map((row) => ({
+        year: row.year,
+        label: String(row.year),
+        netInflow: row.netInflowAfterTax,
+        totalOutflow: row.totalOutflow,
+        surplus: row.netInvestibleSurplus,
+    })), [projections]);
 
     if (!meta.hasProfile || !projections.length) return null;
 
     return (
         <div className="lj-visuals">
-            {arcMeta && (
-                <ReportReveal className="lj-visual-card card" delay={60}>
-                    <h3 className="dr-chart-title">
-                        <Map size={18} />
-                        Your journey arc
-                    </h3>
-                    <p className="dr-chart-sub">
-                        From today to your Golden Period at age {hero.retirementAge}.
-                    </p>
-                    <div className="lj-arc-track">
-                        <div
-                            className="lj-arc-fill"
-                            style={{ width: `${arcMeta.progressPct}%` }}
-                        />
-                        <div
-                            className="lj-arc-marker lj-arc-today"
-                            style={{ left: `${Math.min(arcMeta.progressPct, 96)}%` }}
-                        >
-                            <span>Today · {hero.currentAge} yrs</span>
-                            <strong>{arcMeta.currentYear}</strong>
-                        </div>
-                        <div className="lj-arc-marker lj-arc-golden">
-                            <span>Golden Period</span>
-                            <strong>{hero.retirementAge} yrs</strong>
-                        </div>
-                    </div>
-                    <div className="lj-arc-axis">
-                        <span>{arcMeta.birthYear}</span>
-                        <span>{meta.retirementYear}</span>
-                    </div>
-                </ReportReveal>
-            )}
-
             {hasGoals && timelineGoals.length > 0 && (
-                <ReportReveal className="lj-visual-card card" delay={120}>
+                <ReportReveal className="lj-visual-card card" delay={60}>
                     <h3 className="dr-chart-title">
                         <Award size={18} />
                         Goal constellation
@@ -146,91 +111,66 @@ const LifeJourneyVisuals = ({ report }) => {
                 </ReportReveal>
             )}
 
-            <div className="lj-visual-row">
-                <ReportReveal className="lj-visual-card card lj-visual-half" delay={180}>
-                    <h3 className="dr-chart-title">
-                        <TrendingUp size={18} />
-                        Income vs life costs
-                    </h3>
-                    <p className="dr-chart-sub">Net inflow compared with total outflow by year.</p>
-                    <div className="dr-chart-wrap">
-                        <ResponsiveContainer width="100%" height={260}>
-                            <LineChart data={incomeSeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
-                                <XAxis
-                                    dataKey="label"
-                                    tick={{ fontSize: 10, fill: '#64748b' }}
-                                    axisLine={false}
-                                    tickLine={false}
-                                    interval="preserveStartEnd"
-                                />
-                                <YAxis
-                                    tickFormatter={formatChartCompact}
-                                    tick={{ fontSize: 10, fill: '#94a3b8' }}
-                                    axisLine={false}
-                                    tickLine={false}
-                                    width={52}
-                                />
-                                <Tooltip content={<ChartTooltip />} />
-                                <Line
-                                    type="monotone"
-                                    dataKey="netInflow"
-                                    name="Net inflow"
-                                    stroke="#2563EB"
-                                    strokeWidth={2}
-                                    dot={false}
-                                />
-                                <Line
-                                    type="monotone"
-                                    dataKey="totalOutflow"
-                                    name="Total outflow"
-                                    stroke="#EF4444"
-                                    strokeWidth={2}
-                                    dot={false}
-                                />
-                            </LineChart>
-                        </ResponsiveContainer>
-                    </div>
-                </ReportReveal>
-
-                <ReportReveal className="lj-visual-card card lj-visual-half" delay={240}>
-                    <h3 className="dr-chart-title">
-                        <Waves size={18} />
-                        Surplus river
-                    </h3>
-                    <p className="dr-chart-sub">Net investible surplus flowing year by year.</p>
-                    <div className="dr-chart-wrap">
-                        <ResponsiveContainer width="100%" height={260}>
-                            <AreaChart data={surplusSeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
-                                <XAxis
-                                    dataKey="label"
-                                    tick={{ fontSize: 10, fill: '#64748b' }}
-                                    axisLine={false}
-                                    tickLine={false}
-                                    interval="preserveStartEnd"
-                                />
-                                <YAxis
-                                    tickFormatter={formatChartCompact}
-                                    tick={{ fontSize: 10, fill: '#94a3b8' }}
-                                    axisLine={false}
-                                    tickLine={false}
-                                    width={52}
-                                />
-                                <Tooltip content={<ChartTooltip />} />
-                                <Area
-                                    type="monotone"
-                                    dataKey="surplus"
-                                    name="Net investible surplus"
-                                    stroke="#10B981"
-                                    fill="rgba(16,185,129,0.22)"
-                                    strokeWidth={2}
-                                />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </div>
-                </ReportReveal>
-            </div>
+            <ReportReveal className="lj-visual-card card" delay={120}>
+                <h3 className="dr-chart-title">
+                    <TrendingUp size={18} />
+                    Income, life costs &amp; investible surplus
+                </h3>
+                <p className="dr-chart-sub">
+                    Yearly projections of net inflow, total outflow, and resulting investible surplus through retirement.
+                </p>
+                <div className="dr-chart-wrap">
+                    <ResponsiveContainer width="100%" height={280}>
+                        <ComposedChart data={comboSeries} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
+                            <XAxis
+                                dataKey="label"
+                                tick={{ fontSize: 10, fill: '#64748b' }}
+                                axisLine={false}
+                                tickLine={false}
+                                interval="preserveStartEnd"
+                            />
+                            <YAxis
+                                tickFormatter={formatChartCompact}
+                                tick={{ fontSize: 10, fill: '#94a3b8' }}
+                                axisLine={false}
+                                tickLine={false}
+                                width={56}
+                            />
+                            <Tooltip content={<ComboChartTooltip />} />
+                            <Area
+                                type="monotone"
+                                dataKey="surplus"
+                                name="Investible Surplus"
+                                stroke="#10B981"
+                                fill="rgba(16,185,129,0.18)"
+                                strokeWidth={2}
+                            />
+                            <Line
+                                type="monotone"
+                                dataKey="netInflow"
+                                name="Net Inflow"
+                                stroke="#2563EB"
+                                strokeWidth={2.5}
+                                dot={false}
+                            />
+                            <Line
+                                type="monotone"
+                                dataKey="totalOutflow"
+                                name="Total Outflow"
+                                stroke="#EF4444"
+                                strokeWidth={2.5}
+                                dot={false}
+                            />
+                        </ComposedChart>
+                    </ResponsiveContainer>
+                </div>
+                <div className="dr-chart-legend">
+                    <span><i className="dr-dot dr-dot-income" /> Net Inflow</span>
+                    <span><i className="dr-dot dr-dot-outflow" /> Total Outflow</span>
+                    <span><i className="dr-dot" style={{ background: '#10B981' }} /> Investible Surplus (shaded)</span>
+                </div>
+            </ReportReveal>
         </div>
     );
 };
