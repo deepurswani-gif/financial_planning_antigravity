@@ -4,7 +4,7 @@ import { PieChart, Plus, Target, Info, TrendingUp, ChevronLeft, ChevronRight, He
 import InsuranceInput from './InsuranceInput';
 import InsuranceOutput from './InsuranceOutput';
 import { calculateYearlyInsuranceSummary, getInsuredNamesList } from './InsuranceLogic';
-import { convertToAnnual } from '../CashFlowModule/CashFlowLogic';
+import { convertToAnnual } from '../CashFlowModule/CashFlowUtils';
 import SharedDocumentVault from './SharedDocumentVault';
 import ContextualHelpPopup from '../common/ContextualHelpPopup';
 import logo from '../../assets/finbrella_logo.png';

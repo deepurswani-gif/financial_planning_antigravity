@@ -28,6 +28,13 @@ export const GOAL_FIELDS = [
       {
         flow: 'summary',
         sectionId: SECTION_IDS.GOALS,
+        questionId: 'goals-catalog',
+        capability: 'full',
+        role: 'breakdown',
+      },
+      {
+        flow: 'summary',
+        sectionId: SECTION_IDS.GOALS,
         questionId: 'SELECT',
         capability: 'summary',
         role: 'primary',
@@ -56,7 +63,7 @@ export const GOAL_FIELDS = [
     ],
     preferredSurface: {
       whenCapabilitySummary: 'summary',
-      whenCapabilityFull: 'detailed',
+      whenCapabilityFull: 'summary',
     },
     impacts: [
       'report.summary.future_self',
@@ -87,6 +94,13 @@ export const GOAL_FIELDS = [
       {
         flow: 'summary',
         sectionId: SECTION_IDS.GOALS,
+        questionId: 'goals-catalog',
+        capability: 'full',
+        role: 'breakdown',
+      },
+      {
+        flow: 'summary',
+        sectionId: SECTION_IDS.GOALS,
         questionId: 'SELECT',
         capability: 'summary',
         role: 'primary',
@@ -99,6 +113,10 @@ export const GOAL_FIELDS = [
         role: 'primary',
       },
     ],
+    preferredSurface: {
+      whenCapabilitySummary: 'summary',
+      whenCapabilityFull: 'summary',
+    },
     impacts: ['report.summary.future_self', 'engine.goals'],
     tags: ['goals'],
   }),
@@ -124,6 +142,13 @@ export const GOAL_FIELDS = [
       {
         flow: 'summary',
         sectionId: SECTION_IDS.GOALS,
+        questionId: 'goals-years',
+        capability: 'full',
+        role: 'breakdown',
+      },
+      {
+        flow: 'summary',
+        sectionId: SECTION_IDS.GOALS,
         questionId: 'DETAILS',
         capability: 'summary',
         role: 'primary',
@@ -136,6 +161,10 @@ export const GOAL_FIELDS = [
         role: 'primary',
       },
     ],
+    preferredSurface: {
+      whenCapabilitySummary: 'summary',
+      whenCapabilityFull: 'summary',
+    },
     impacts: [
       'report.summary.future_self',
       'report.detail.put_your_money_to_work',
@@ -166,6 +195,13 @@ export const GOAL_FIELDS = [
       {
         flow: 'summary',
         sectionId: SECTION_IDS.GOALS,
+        questionId: 'goals-value',
+        capability: 'full',
+        role: 'breakdown',
+      },
+      {
+        flow: 'summary',
+        sectionId: SECTION_IDS.GOALS,
         questionId: 'DETAILS',
         capability: 'summary',
         role: 'primary',
@@ -178,6 +214,10 @@ export const GOAL_FIELDS = [
         role: 'primary',
       },
     ],
+    preferredSurface: {
+      whenCapabilitySummary: 'summary',
+      whenCapabilityFull: 'summary',
+    },
     impacts: [
       'report.summary.future_self',
       'report.detail.put_your_money_to_work',

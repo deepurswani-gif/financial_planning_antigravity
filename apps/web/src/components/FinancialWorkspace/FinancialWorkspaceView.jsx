@@ -60,6 +60,7 @@ import {
 } from '../../lib/pushNotifications';
 import { flushPendingNotifications, dispatchMonthlyWealthSummary } from '../../notificationDelivery';
 import { ensurePushTokenForUser } from '../../services/ensurePushTokenForUser';
+import { getDetailedHubMapping } from '../DetailedHub/fieldMappings';
 
 /**
  * Scroll to a section id inside the workspace scroll container.
@@ -102,7 +103,10 @@ export default function FinancialWorkspaceView() {
     journeyProjections,
   } = useFinancialPlan();
   useAnalyticsScreenTracking({ planId: planId || null });
-  const effectiveWorkspaceCapability = workspaceCapability ?? loadWorkspaceCapability(user?.id);
+  const effectiveWorkspaceCapability =
+    workspaceCapability === 'full' || loadWorkspaceCapability(user?.id) === 'full'
+      ? 'full'
+      : (workspaceCapability ?? loadWorkspaceCapability(user?.id));
   const {
     state,
     setMode,
@@ -461,6 +465,19 @@ export default function FinancialWorkspaceView() {
     const reportId = summaryMode ? activeSummaryReportId : activeDetailReportId;
     const origin = { workspaceMode: capability, reportId };
     const descriptor = resolveLaunch(experience, { capability });
+
+    const detailedHubSubCard = getDetailedHubMapping(descriptor.fieldId);
+    if (detailedHubSubCard) {
+      if (summaryMode) {
+        openUnlockDialog();
+        return true;
+      }
+      
+      const targetPath = `${FINANCIAL_WORKSPACE_PATH}/full_profile${detailedHubSubCard === 'goals' ? '' : `?openSub=${detailedHubSubCard}`}`;
+      navigate(targetPath);
+      setDrawerOpen(false);
+      return true;
+    }
 
     switch (descriptor.strategy) {
       case 'focused_edit_session':

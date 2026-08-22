@@ -55,6 +55,7 @@ export const SAVINGS_FIELDS = [
         role: 'breakdown',
       },
     ],
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
     impacts: [
       'report.summary.money_story',
       'report.summary.future_self',
@@ -131,6 +132,13 @@ export const SAVINGS_FIELDS = [
     },
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.SAVINGS,
+        questionId: 'savings-investments',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.MONEY_IN_MONEY_OUT,
         questionId: 'savings-breakdown',
@@ -138,7 +146,7 @@ export const SAVINGS_FIELDS = [
         role: 'breakdown',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     relatedFieldIds: ['savings.monthlyInvestments'],
     impacts: [
       'report.detail.put_your_money_to_work',
@@ -171,6 +179,13 @@ export const SAVINGS_FIELDS = [
     },
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.SAVINGS,
+        questionId: 'savings-investments',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.MONEY_IN_MONEY_OUT,
         questionId: 'savings-breakdown',
@@ -178,7 +193,7 @@ export const SAVINGS_FIELDS = [
         role: 'breakdown',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     impacts: ['engine.allocation'],
     tags: ['investments', 'modal'],
   }),
@@ -206,6 +221,13 @@ export const SAVINGS_FIELDS = [
     },
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.SAVINGS,
+        questionId: 'savings-investments',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.MONEY_IN_MONEY_OUT,
         questionId: 'savings-breakdown',
@@ -213,7 +235,7 @@ export const SAVINGS_FIELDS = [
         role: 'breakdown',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     impacts: ['engine.allocation', 'engine.retirementHorizon'],
     tags: ['investments', 'modal'],
   }),
@@ -238,6 +260,13 @@ export const SAVINGS_FIELDS = [
     itemFieldIds: ['savings.rd.amount'],
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.SAVINGS,
+        questionId: 'savings-investments',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.MONEY_IN_MONEY_OUT,
         questionId: 'savings-breakdown',
@@ -245,7 +274,7 @@ export const SAVINGS_FIELDS = [
         role: 'breakdown',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     impacts: ['engine.allocation', 'engine.cashFlow'],
     tags: ['investments', 'modal'],
   }),
@@ -267,6 +296,13 @@ export const SAVINGS_FIELDS = [
     state: { path: 'amount' },
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.SAVINGS,
+        questionId: 'savings-investments',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.MONEY_IN_MONEY_OUT,
         questionId: 'savings-breakdown',
@@ -274,7 +310,7 @@ export const SAVINGS_FIELDS = [
         role: 'breakdown',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     impacts: ['engine.cashFlow'],
   }),
 
@@ -294,6 +330,13 @@ export const SAVINGS_FIELDS = [
     state: { path: 'expenseCategories.savings.otherSaving' },
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.SAVINGS,
+        questionId: 'savings-investments',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.MONEY_IN_MONEY_OUT,
         questionId: 'savings-breakdown',
@@ -301,7 +344,7 @@ export const SAVINGS_FIELDS = [
         role: 'breakdown',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     relatedFieldIds: ['savings.otherMonthlySavings'],
     impacts: ['engine.cashFlow'],
   }),

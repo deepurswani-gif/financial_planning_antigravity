@@ -52,29 +52,29 @@ describe('Landing resolver', () => {
     expect(landing.sectionId).toBeTruthy();
   });
 
-  it('resolves life insurance to the detailed life-insurance question', () => {
+  it('resolves life insurance to the insurance-protection question', () => {
     const life = getExperienceById('protection.lifeInsurance');
     const landing = resolveLanding(life, { capability: 'full' });
     expect(landing.control).toBe('question');
-    expect(landing.questionId).toBe('life-insurance');
+    expect(landing.questionId).toBe('insurance-protection');
     expect(landing.collectionFieldId).toBeNull();
   });
 
-  it('resolves PPF/NPS to the savings-breakdown configure question', () => {
+  it('resolves PPF/NPS to the savings-investments configure question', () => {
     const ppf = resolveLanding(getExperienceById('savings.ppf'), { capability: 'full' });
     expect(ppf.control).toBe('configure');
-    expect(ppf.questionId).toBe('savings-breakdown');
+    expect(ppf.questionId).toBe('savings-investments');
 
     const addRd = resolveLanding(getExperienceById('savings.addRecurringDeposit'), { capability: 'full' });
     expect(addRd.control).toBe('collection');
-    expect(addRd.questionId).toBe('savings-breakdown');
+    expect(addRd.questionId).toBe('savings-investments');
   });
 
-  it('resolves Loans & EMIs to the recap-emi gate (Yes/No)', () => {
+  it('resolves Loans & EMIs to the monthly-outflows question', () => {
     const landing = resolveLanding(getExperienceById('debt.loans'), { capability: 'full' });
     expect(landing.landingTargetId).toBe('loan.emiGate');
     expect(landing.control).toBe('question');
-    expect(landing.questionId).toBe('recap-emi');
+    expect(landing.questionId).toBe('monthly-outflows');
   });
 
   it('resolves vehicle insurance to the vehicle-other-insurance question', () => {
@@ -121,7 +121,7 @@ describe('resolveLaunch — landing descriptor', () => {
     const life = getExperienceById('protection.lifeInsurance');
     const descriptor = resolveLaunch(life, { capability: 'full' });
     expect(descriptor.sectionId).toBeTruthy();
-    expect(descriptor.landingQuestionId).toBe('life-insurance');
+    expect(descriptor.landingQuestionId).toBe('insurance-protection');
     expect(descriptor.landingControl).toBe('question');
   });
 

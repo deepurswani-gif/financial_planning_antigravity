@@ -93,6 +93,34 @@ describe('instrumentAnalysisLogic', () => {
         expect(result.find((r) => r.type === 'Life Insurance Saving Plans')).toBeUndefined();
     });
 
+    it('sums Term Insurance draft by monthly premium equivalent and applies installment fields', () => {
+        const draft = {
+            ...createEmptyDraftAllocations(),
+            'Term Insurance': {
+                premium: 12000,
+                frequency: 'Annual',
+                duration: 20,
+                insuredMember: 'Self',
+            },
+        };
+        // 12000 annual → 1000/mo
+        expect(getTotalDraftAllocated(draft)).toBe(1000);
+
+        const result = applyAllocationPlan({
+            investmentAllocations: [],
+            draftAllocations: draft,
+            calendarYear: 2026,
+            monthIndex: 6,
+        });
+        const term = result.find((r) => r.type === 'Term Insurance');
+        expect(term).toBeTruthy();
+        expect(term.amount).toBe(12000);
+        expect(term.frequency).toBe('Annual');
+        expect(term.duration).toBe(20);
+        expect(term.insuredMember).toBe('Self');
+        expect(term.studioPlanKey).toBe('2026-6');
+    });
+
     it('analyzes SIP scenario with higher headline value', () => {
         const baseline = analyzeInstrument('SIP', baseParams, 0, 6, 2026);
         const scenario = analyzeInstrument('SIP', baseParams, 20000, 6, 2026);

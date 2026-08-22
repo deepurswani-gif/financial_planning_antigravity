@@ -204,12 +204,14 @@ function buildSummaryAssetBreakdownData(assetCategories, totalAssets) {
 export const buildAssetBreakdownData = (assetCategories, totalAssets) => {
     if (totalAssets <= 0) return [];
 
+    if (!hasWealthDetailEntered(assetCategories)) {
+        const summaryData = buildSummaryAssetBreakdownData(assetCategories, totalAssets);
+        if (summaryData.length > 0) return summaryData;
+    }
+
     const detailBreakdown = buildDetailAssetBreakdownData(assetCategories, totalAssets);
     if (detailBreakdown.length > 0) return detailBreakdown;
-    if (!hasWealthDetailEntered(assetCategories)) {
-        return buildSummaryAssetBreakdownData(assetCategories, totalAssets);
-    }
-    return detailBreakdown;
+    return buildSummaryAssetBreakdownData(assetCategories, totalAssets);
 };
 
 /**

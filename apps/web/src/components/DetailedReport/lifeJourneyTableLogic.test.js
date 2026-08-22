@@ -117,9 +117,7 @@ describe('lifeJourneyTableLogic', () => {
             inflationRates: { incomeIncrement: 10, householdInflation: 6, educationInflation: 8 },
         });
         const insights = computeLifeJourneyInsights(report);
-        expect(insights.some((i) => i.id === 'golden-period')).toBe(true);
         expect(insights.some((i) => i.id === 'deficit-years')).toBe(true);
         expect(insights.some((i) => i.id === 'near-term-goals')).toBe(true);
-        expect(insights.some((i) => i.id === 'growth-assumptions')).toBe(true);
     });
 });

@@ -207,6 +207,13 @@ export const PROTECTION_FIELDS = [
     itemFieldIds: ['protection.life.policy.premium', 'protection.life.policy.sumAssured'],
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.SAVINGS,
+        questionId: 'insurance-protection',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.MONEY_IN_MONEY_OUT,
         questionId: 'life-insurance',
@@ -214,7 +221,7 @@ export const PROTECTION_FIELDS = [
         role: 'primary',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     relatedFieldIds: ['protection.life.totalCover', 'protection.life.hasCoverage'],
     impacts: [
       'report.summary.safety_net',
@@ -245,6 +252,13 @@ export const PROTECTION_FIELDS = [
     state: { path: 'premium' },
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.SAVINGS,
+        questionId: 'insurance-protection',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.MONEY_IN_MONEY_OUT,
         questionId: 'life-insurance',
@@ -252,7 +266,7 @@ export const PROTECTION_FIELDS = [
         role: 'primary',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     impacts: ['engine.protection', 'engine.cashFlow'],
   }),
 
@@ -277,6 +291,13 @@ export const PROTECTION_FIELDS = [
     state: { path: 'sumAssured' },
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.SAVINGS,
+        questionId: 'insurance-protection',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.MONEY_IN_MONEY_OUT,
         questionId: 'life-insurance',
@@ -284,7 +305,7 @@ export const PROTECTION_FIELDS = [
         role: 'primary',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     impacts: ['engine.protection'],
   }),
 

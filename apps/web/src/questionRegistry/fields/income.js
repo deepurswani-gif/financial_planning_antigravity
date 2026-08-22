@@ -171,6 +171,13 @@ export const INCOME_FIELDS = [
     state: { path: 'income.selfDetail.needTaxPlanning' },
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.CASH_FLOW,
+        questionId: 'household-income',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.MONEY_IN_MONEY_OUT,
         questionId: 'self-main',
@@ -178,7 +185,7 @@ export const INCOME_FIELDS = [
         role: 'primary',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     impacts: ['engine.tax'],
     tags: ['tax', 'gate'],
   }),
@@ -203,6 +210,13 @@ export const INCOME_FIELDS = [
     },
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.CASH_FLOW,
+        questionId: 'household-income',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.MONEY_IN_MONEY_OUT,
         questionId: 'self-main',
@@ -210,7 +224,7 @@ export const INCOME_FIELDS = [
         role: 'primary',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     relatedFieldIds: ['income.self.monthlyTakeHome'],
     impacts: [
       'report.detail.your_money_flow',
@@ -240,6 +254,13 @@ export const INCOME_FIELDS = [
     },
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.CASH_FLOW,
+        questionId: 'household-income',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.MONEY_IN_MONEY_OUT,
         questionId: 'self-main',
@@ -247,7 +268,7 @@ export const INCOME_FIELDS = [
         role: 'primary',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     impacts: ['report.detail.your_money_flow', 'engine.cashFlow', 'engine.income'],
   }),
 
@@ -267,6 +288,13 @@ export const INCOME_FIELDS = [
     state: { path: 'income.selfDetail.passiveIncome' },
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.CASH_FLOW,
+        questionId: 'household-income',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.MONEY_IN_MONEY_OUT,
         questionId: 'self-main',
@@ -274,7 +302,7 @@ export const INCOME_FIELDS = [
         role: 'primary',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     impacts: ['report.detail.your_money_flow', 'engine.cashFlow'],
   }),
 
@@ -294,6 +322,13 @@ export const INCOME_FIELDS = [
     itemFieldIds: ['income.self.otherIncome.amount'],
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.CASH_FLOW,
+        questionId: 'household-income',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.MONEY_IN_MONEY_OUT,
         questionId: 'self-main',
@@ -301,7 +336,7 @@ export const INCOME_FIELDS = [
         role: 'primary',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     impacts: ['report.detail.your_money_flow', 'engine.cashFlow'],
   }),
 
@@ -322,6 +357,13 @@ export const INCOME_FIELDS = [
     state: { path: 'amount' },
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.CASH_FLOW,
+        questionId: 'household-income',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.MONEY_IN_MONEY_OUT,
         questionId: 'self-main',
@@ -329,7 +371,7 @@ export const INCOME_FIELDS = [
         role: 'primary',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     impacts: ['engine.cashFlow'],
   }),
 
@@ -355,6 +397,13 @@ export const INCOME_FIELDS = [
     },
     editSurfaces: [
       {
+        flow: 'summary',
+        sectionId: SECTION_IDS.CASH_FLOW,
+        questionId: 'household-income',
+        capability: 'summary',
+        role: 'primary',
+      },
+      {
         flow: 'detailed',
         sectionId: SECTION_IDS.MONEY_IN_MONEY_OUT,
         questionId: 'self-main',
@@ -362,7 +411,7 @@ export const INCOME_FIELDS = [
         role: 'breakdown',
       },
     ],
-    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'detailed' },
+    preferredSurface: { whenCapabilitySummary: 'summary', whenCapabilityFull: 'summary' },
     impacts: ['engine.tax', 'engine.income'],
     tags: ['tax'],
   }),

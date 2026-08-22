@@ -16,7 +16,7 @@ import {
 } from '../DetailedFlow/expenseDetailSync';
 import { getEffectiveMonthlyInsurance } from '../DetailedFlow/insuranceDetailSync';
 import { getEffectiveMonthlySavings } from '../DetailedFlow/savingsDetailSync';
-import { convertToMonthly } from '../CashFlowModule/CashFlowLogic';
+import { convertToMonthly } from '../CashFlowModule/CashFlowUtils';
 
 export const MONTH_LABELS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 export const MONTH_LABELS_LONG = [
@@ -436,20 +436,7 @@ export function computeMoneyFlowInsights(report) {
             }
         }
 
-        insights.push({
-            id: 'free-cash-flow',
-            text: `Free cash flow is ${formatInsightCurrency(freeCashFlow)}/month.`,
-            tone: freeCashFlow >= 0 ? 'neutral' : 'warning',
-        });
-
         if (adjustedNow > 0) {
-            const savingsRate = Math.round((baseline.monthlySavings / adjustedNow) * 100);
-            insights.push({
-                id: 'savings-rate',
-                text: `Savings rate is ${savingsRate}%.`,
-                tone: 'neutral',
-            });
-
             const emiBurden = Math.round((baseline.monthlyEmi / adjustedNow) * 100);
             insights.push({
                 id: 'emi-burden',
@@ -463,6 +450,7 @@ export function computeMoneyFlowInsights(report) {
                 id: 'allocate-surplus',
                 text: `Consider allocating unused surplus of ${formatInsightCurrency(freeCashFlow)}.`,
                 tone: 'accent',
+                actionTarget: '#ius-section',
             });
         }
     } else {

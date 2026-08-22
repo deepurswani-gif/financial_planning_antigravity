@@ -61,7 +61,7 @@ export const INVESTMENT_RECOMMENDATIONS = [
     id: 'investments.noAllocations',
     title: 'No Allocations Yet',
     summary:
-      'No investment allocations planned yet — use suggestions below or open the full allocation planner.',
+      'No investment allocations planned yet — open the full allocation planner.',
     category: 'investments',
     type: 'sipOpportunity',
     severity: 'low',

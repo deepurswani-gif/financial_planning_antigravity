@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, HelpCircle } from 'lucide-react';
-import { convertToMonthly } from './CashFlowLogic';
+import { convertToMonthly } from './CashFlowUtils';
 import LoanDetailsModal from './LoanDetailsModal';
 import InvestmentDetailsModal from './InvestmentDetailsModal';
 import DocumentUploadButton from '../common/DocumentUploadButton';

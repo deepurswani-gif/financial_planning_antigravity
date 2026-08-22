@@ -66,6 +66,14 @@ const YourMoneyFlowVisuals = ({ ledger, meta, baseline }) => {
 
     const hasRhythm = rhythmData.some((d) => d.income !== null);
 
+    const activeItems = rhythmData.filter((d) => d.income !== null);
+    const firstActive = activeItems[0];
+    const isFlatRhythm = activeItems.length > 0 && activeItems.every(
+        (d) => d.income === firstActive?.income
+            && d.outflow === firstActive?.outflow
+            && d.freeCashFlow === firstActive?.freeCashFlow,
+    );
+
     if (!hasRhythm) return null;
 
     return (
@@ -76,75 +84,144 @@ const YourMoneyFlowVisuals = ({ ledger, meta, baseline }) => {
                     Monthly money rhythm
                 </h3>
                 <p className="dr-chart-sub">
-                    How income, outflows, and free cash flow move through {meta.calendarYear}.
+                    {isFlatRhythm
+                        ? `Monthly cash rhythm baseline across ${meta.calendarYear} (${meta.currentMonthLabel} highlighted).`
+                        : `Actuals through ${meta.currentMonthLabel}, projected run-rate for upcoming months.`}
                 </p>
-                <div className="dr-chart-wrap">
-                    <ResponsiveContainer width="100%" height={280}>
-                        <AreaChart data={rhythmData} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
-                            <XAxis
-                                dataKey="label"
-                                tick={{ fontSize: 11, fill: '#64748b' }}
-                                axisLine={false}
-                                tickLine={false}
-                            />
-                            <YAxis
-                                tickFormatter={formatChartCompact}
-                                tick={{ fontSize: 11, fill: '#94a3b8' }}
-                                axisLine={false}
-                                tickLine={false}
-                                width={56}
-                            />
-                            <Tooltip content={<RhythmTooltip />} />
-                            <Area
-                                type="monotone"
-                                dataKey="income"
-                                stroke="#2563EB"
-                                fill="rgba(37,99,235,0.12)"
-                                strokeWidth={2}
-                                connectNulls={false}
-                                name="Income"
-                            />
-                            <Area
-                                type="monotone"
-                                dataKey="outflow"
-                                stroke="#EF4444"
-                                fill="rgba(239,68,68,0.08)"
-                                strokeWidth={2}
-                                connectNulls={false}
-                                name="Outflow"
-                            />
-                            <Line
-                                type="monotone"
-                                dataKey="freeCashFlow"
-                                stroke="#7C3AED"
-                                strokeWidth={2.5}
-                                dot={(props) => {
-                                    const { cx, cy, payload } = props;
-                                    if (!payload?.isCurrent) return null;
-                                    return (
-                                        <circle
-                                            key={`dot-${payload.label}`}
-                                            cx={cx}
-                                            cy={cy}
-                                            r={6}
-                                            fill="#7C3AED"
-                                            stroke="#fff"
-                                            strokeWidth={2}
-                                        />
-                                    );
-                                }}
-                                connectNulls={false}
-                                name="Free cash flow"
-                            />
-                        </AreaChart>
-                    </ResponsiveContainer>
-                </div>
-                <div className="dr-chart-legend">
-                    <span><i className="dr-dot dr-dot-income" /> Income</span>
-                    <span><i className="dr-dot dr-dot-outflow" /> Total outflow</span>
-                    <span><i className="dr-dot dr-dot-surplus" /> Free cash flow (current month highlighted)</span>
-                </div>
+
+                {isFlatRhythm ? (
+                    <div className="ymf-rhythm-strip-container">
+                        <div className="ymf-rhythm-strip">
+                            {rhythmData.map((d) => (
+                                <div
+                                    key={d.label}
+                                    className={[
+                                        'ymf-strip-cell',
+                                        d.isCurrent ? 'is-current' : '',
+                                        d.income === null ? 'is-inactive' : '',
+                                    ].filter(Boolean).join(' ')}
+                                >
+                                    <span className="ymf-strip-month">{d.label}</span>
+                                    {d.isCurrent ? (
+                                        <span className="ymf-strip-badge">Now</span>
+                                    ) : d.income !== null ? (
+                                        <span className="ymf-strip-dot" />
+                                    ) : (
+                                        <span className="ymf-strip-dim">—</span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                        <div className="ymf-strip-meta-line">
+                            <span>Income: <strong>{formatCurrency(firstActive?.income || 0)}</strong></span>
+                            <span className="ymf-strip-sep">•</span>
+                            <span>Outflow: <strong>{formatCurrency(firstActive?.outflow || 0)}</strong></span>
+                            <span className="ymf-strip-sep">•</span>
+                            <span>Free cash flow: <strong>{formatCurrency(firstActive?.freeCashFlow || 0)}</strong></span>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="dr-chart-wrap">
+                        <ResponsiveContainer width="100%" height={280}>
+                            <AreaChart data={rhythmData} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
+                                <XAxis
+                                    dataKey="label"
+                                    tick={{ fontSize: 11, fill: '#64748b' }}
+                                    axisLine={false}
+                                    tickLine={false}
+                                />
+                                <YAxis
+                                    tickFormatter={formatChartCompact}
+                                    tick={{ fontSize: 11, fill: '#94a3b8' }}
+                                    axisLine={false}
+                                    tickLine={false}
+                                    width={56}
+                                />
+                                <Tooltip content={<RhythmTooltip />} />
+                                <Area
+                                    type="monotone"
+                                    dataKey="income"
+                                    stroke="#2563EB"
+                                    fill="rgba(37,99,235,0.12)"
+                                    strokeWidth={2}
+                                    connectNulls={false}
+                                    name="Income"
+                                />
+                                <Area
+                                    type="monotone"
+                                    dataKey="outflow"
+                                    stroke="#EF4444"
+                                    fill="rgba(239,68,68,0.08)"
+                                    strokeWidth={2}
+                                    connectNulls={false}
+                                    name="Outflow"
+                                />
+                                <Line
+                                    type="monotone"
+                                    dataKey="freeCashFlow"
+                                    stroke="#7C3AED"
+                                    strokeWidth={2.5}
+                                    dot={(props) => {
+                                        const { cx, cy, payload } = props;
+                                        if (!payload?.isCurrent) return null;
+                                        return (
+                                            <circle
+                                                key={`dot-${payload.label}`}
+                                                cx={cx}
+                                                cy={cy}
+                                                r={6}
+                                                fill="#7C3AED"
+                                                stroke="#fff"
+                                                strokeWidth={2}
+                                            />
+                                        );
+                                    }}
+                                    connectNulls={false}
+                                    name="Free cash flow"
+                                />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                )}
+
+                {!isFlatRhythm && (
+                    <div className="dr-chart-legend">
+                        <span><i className="dr-dot dr-dot-income" /> Income</span>
+                        <span><i className="dr-dot dr-dot-outflow" /> Total outflow</span>
+                        <span><i className="dr-dot dr-dot-surplus" /> Free cash flow (current month highlighted)</span>
+                    </div>
+                )}
+
+                <style>{`
+                    .ymf-rhythm-strip-container { padding: 0.75rem 0 0.25rem; }
+                    .ymf-rhythm-strip { display: grid; grid-template-columns: repeat(12, 1fr); gap: 0.35rem; }
+                    .ymf-strip-cell {
+                        display: flex; flex-direction: column; align-items: center; justify-content: center;
+                        padding: 0.65rem 0.25rem; border-radius: 8px; background: rgba(37,99,235,0.04);
+                        border: 1px solid var(--border); font-size: 0.78rem; text-align: center; gap: 0.25rem;
+                    }
+                    .ymf-strip-cell.is-current {
+                        background: rgba(37,99,235,0.12); border-color: var(--primary); font-weight: 700;
+                        box-shadow: 0 0 0 1px var(--primary);
+                    }
+                    .ymf-strip-cell.is-inactive { opacity: 0.45; background: transparent; }
+                    .ymf-strip-month { font-weight: 600; color: var(--text-main); font-size: 0.78rem; }
+                    .ymf-strip-badge {
+                        font-size: 0.62rem; font-weight: 700; background: var(--primary); color: white;
+                        padding: 0.1rem 0.35rem; border-radius: 4px; text-transform: uppercase;
+                    }
+                    .ymf-strip-dot { width: 6px; height: 6px; border-radius: 50%; background: #10B981; }
+                    .ymf-strip-dim { font-size: 0.75rem; color: var(--text-muted); }
+                    .ymf-strip-meta-line {
+                        display: flex; justify-content: center; align-items: center; gap: 0.75rem;
+                        margin-top: 1rem; font-size: 0.85rem; color: var(--text-muted); flex-wrap: wrap;
+                    }
+                    .ymf-strip-sep { color: var(--border); }
+                    @media (max-width: 640px) {
+                        .ymf-rhythm-strip { grid-template-columns: repeat(6, 1fr); }
+                    }
+                `}</style>
             </ReportReveal>
 
             <div className="ymf-visual-row">

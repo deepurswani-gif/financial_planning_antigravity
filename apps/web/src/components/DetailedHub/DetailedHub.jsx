@@ -1,5 +1,6 @@
 import { Users, ArrowRightLeft, Wallet, Target, Folder } from 'lucide-react';
 import React, { useState, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import FolderCard from './FolderCard';
 import BreakdownModal from './BreakdownModal';
 import BreakdownSheet from './BreakdownSheet';
@@ -24,6 +25,7 @@ import SharedDocumentVault from '../InsuranceModule/SharedDocumentVault';
 import './DetailedHub.css';
 
 const DetailedHub = () => {
+    const location = useLocation();
     const { 
         income, setIncome, 
         expenseCategories, setExpenseCategories, 
@@ -125,12 +127,12 @@ const DetailedHub = () => {
     };
 
     React.useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
+        const params = new URLSearchParams(location.search);
         const openSub = params.get('openSub');
         if (openSub && ['income', 'expenses', 'debt', 'insurance', 'savings', 'family-details', 'assets', 'liabilities'].includes(openSub)) {
             handleOpenSheet(openSub);
         }
-    }, [window.location.search]);
+    }, [location.search]);
 
     const handleOpenVault = () => {
         handleOpenSheet('vault');

@@ -42,6 +42,7 @@ const PlannedInvestmentAllocationsPanel = ({
     title = 'Planned investment allocations',
     editLabel = 'Edit – Show Investment Avenues',
     monthChipsAriaLabel = 'Allocation months',
+    plainSummary = false,
 }) => {
     const monthChips = useMemo(() => {
         const order = [];
@@ -94,8 +95,10 @@ const PlannedInvestmentAllocationsPanel = ({
         item.type === 'Liquid Mutual Fund' ? 'Emergency Fund' : item.type
     );
 
+    const isPlain = plainSummary || title.includes('Protection');
+
     return (
-        <ReportReveal className={`card ius-alloc-card ${className}`.trim()} delay={delay}>
+        <ReportReveal className={`${isPlain ? 'ius-alloc-plain-container' : 'card ius-alloc-card'} ${className}`.trim()} delay={delay} style={isPlain ? { background: 'transparent', border: 'none', boxShadow: 'none', padding: 0, marginTop: '2.5rem' } : {}}>
             <div className="ius-alloc-header">
                 <h3 className="ius-section-title">
                     <PieChart size={18} />
@@ -131,83 +134,141 @@ const PlannedInvestmentAllocationsPanel = ({
                 )}
             </p>
 
-            {selectedChip?.planKey && (onClearMonthPlan || onEditMonthPlan) && (
-                <div className="ius-alloc-clear-row">
-                    {onClearMonthPlan && (
-                        <button
-                            type="button"
-                            className="btn ius-alloc-plan-btn ius-alloc-clear-btn"
-                            onClick={() => onClearMonthPlan(selectedChip.planKey)}
-                            disabled={clearDisabled}
-                            title={clearDisabled ? clearDisabledReason : undefined}
-                        >
-                            <Trash2 size={14} />
-                            Clear {selectedChip.label} plan
-                        </button>
-                    )}
-                    {onEditMonthPlan && (
-                        <button
-                            type="button"
-                            className="btn btn-primary ius-alloc-plan-btn ius-alloc-edit-btn"
-                            onClick={() => onEditMonthPlan(selectedChip.planKey)}
-                        >
-                            <Pencil size={14} />
-                            {editLabel}
-                        </button>
-                    )}
-                </div>
-            )}
-
-            <div className="ius-alloc-table-wrap">
-                <table className="ius-alloc-table">
-                    <thead>
-                        <tr>
-                            <th>Type</th>
-                            <th>Month</th>
-                            <th>Amount</th>
-                            <th>Frequency</th>
-                            {onRemove && <th className="ius-alloc-actions-col">Actions</th>}
-                        </tr>
-                    </thead>
-                    <tbody>
+            {(plainSummary || title.includes('Protection')) ? (
+                <div className="ius-alloc-plain-summary" style={{ marginTop: '0.75rem' }}>
+                    <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                         {filteredItems.map((item) => (
-                            <tr key={item.id} className={item.pending ? 'ius-alloc-row-pending' : undefined}>
-                                <td>
-                                    <span className="ius-alloc-type-cell">
-                                        {displayType(item)}
-                                        {item.pending && (
-                                            <span className="ius-alloc-pending-badge">Pending</span>
-                                        )}
-                                    </span>
-                                </td>
-                                <td>{monthLabelForItem(item)}</td>
-                                <td>{formatCurrency(item.amount)}</td>
-                                <td>{item.isMonthly ? 'Monthly' : 'One-time (annual impact)'}</td>
-                                {onRemove && (
-                                    <td>
+                            <li key={item.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.65rem 0.85rem', background: 'var(--bg-main, #f8fafc)', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, fontSize: '0.88rem' }}>
+                                    <span style={{ color: 'var(--primary, #0f766e)' }}>✅</span>
+                                    <span>{displayType(item)}</span>
+                                    <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>—</span>
+                                    <strong style={{ color: 'var(--text-main)' }}>{formatCurrency(item.amount)}/{item.isMonthly ? 'month' : 'one-time'}</strong>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    {onEditMonthPlan && selectedChip?.planKey && (
+                                        <button
+                                            type="button"
+                                            onClick={() => onEditMonthPlan(selectedChip.planKey)}
+                                            style={{ fontSize: '0.78rem', color: 'var(--primary, #0f766e)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
+                                        >
+                                            Edit
+                                        </button>
+                                    )}
+                                    {onRemove && (
                                         <button
                                             type="button"
                                             className="ius-alloc-remove-btn"
                                             onClick={() => onRemove(item)}
-                                            aria-label={`Remove ${displayType(item)} for ${monthLabelForItem(item)}`}
+                                            style={{ fontSize: '0.78rem', color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
                                         >
-                                            <Trash2 size={14} />
                                             Remove
                                         </button>
-                                    </td>
-                                )}
-                            </tr>
+                                    )}
+                                </div>
+                            </li>
                         ))}
                         {filteredItems.length === 0 && (
-                            <tr>
-                                <td colSpan={onRemove ? 5 : 4} className="ius-alloc-empty">
-                                    No allocations for this month.
-                                </td>
-                            </tr>
+                            <li style={{ padding: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.85rem' }}>
+                                No protection allocations planned for this month yet.
+                            </li>
                         )}
-                    </tbody>
-                </table>
-            </div>
+                    </ul>
+                    {selectedChip?.planKey && onClearMonthPlan && (
+                        <div style={{ textAlign: 'right' }}>
+                            <button
+                                type="button"
+                                className="btn-link"
+                                onClick={() => onClearMonthPlan(selectedChip.planKey)}
+                                disabled={clearDisabled}
+                                style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer' }}
+                            >
+                                Clear {selectedChip.label} plan
+                            </button>
+                        </div>
+                    )}
+                </div>
+            ) : (
+                <>
+                    {selectedChip?.planKey && (onClearMonthPlan || onEditMonthPlan) && (
+                        <div className="ius-alloc-clear-row">
+                            {onClearMonthPlan && (
+                                <button
+                                    type="button"
+                                    className="btn ius-alloc-plan-btn ius-alloc-clear-btn"
+                                    onClick={() => onClearMonthPlan(selectedChip.planKey)}
+                                    disabled={clearDisabled}
+                                    title={clearDisabled ? clearDisabledReason : undefined}
+                                >
+                                    <Trash2 size={14} />
+                                    Clear {selectedChip.label} plan
+                                </button>
+                            )}
+                            {onEditMonthPlan && (
+                                <button
+                                    type="button"
+                                    className="btn btn-primary ius-alloc-plan-btn ius-alloc-edit-btn"
+                                    onClick={() => onEditMonthPlan(selectedChip.planKey)}
+                                >
+                                    <Pencil size={14} />
+                                    {editLabel}
+                                </button>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="ius-alloc-table-wrap">
+                        <table className="ius-alloc-table">
+                            <thead>
+                                <tr>
+                                    <th>Type</th>
+                                    <th>Month</th>
+                                    <th>Amount</th>
+                                    <th>Frequency</th>
+                                    {onRemove && <th className="ius-alloc-actions-col">Actions</th>}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredItems.map((item) => (
+                                    <tr key={item.id} className={item.pending ? 'ius-alloc-row-pending' : undefined}>
+                                        <td>
+                                            <span className="ius-alloc-type-cell">
+                                                {displayType(item)}
+                                                {item.pending && (
+                                                    <span className="ius-alloc-pending-badge">Pending</span>
+                                                )}
+                                            </span>
+                                        </td>
+                                        <td>{monthLabelForItem(item)}</td>
+                                        <td>{formatCurrency(item.amount)}</td>
+                                        <td>{item.isMonthly ? 'Monthly' : 'One-time (annual impact)'}</td>
+                                        {onRemove && (
+                                            <td>
+                                                <button
+                                                    type="button"
+                                                    className="ius-alloc-remove-btn"
+                                                    onClick={() => onRemove(item)}
+                                                    aria-label={`Remove ${displayType(item)} for ${monthLabelForItem(item)}`}
+                                                >
+                                                    <Trash2 size={14} />
+                                                    Remove
+                                                </button>
+                                            </td>
+                                        )}
+                                    </tr>
+                                ))}
+                                {filteredItems.length === 0 && (
+                                    <tr>
+                                        <td colSpan={onRemove ? 5 : 4} className="ius-alloc-empty">
+                                            No allocations for this month.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </>
+            )}
 
             <style>{`
                 .ius-alloc-card { padding: 1.25rem; }

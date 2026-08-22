@@ -1,4 +1,4 @@
-import { convertToMonthly, convertToAnnual } from '../CashFlowModule/CashFlowLogic';
+import { convertToMonthly, convertToAnnual } from '../CashFlowModule/CashFlowUtils';
 import { reconcileAmounts } from './detailReconcile';
 
 export const FREQUENCY_OPTIONS = [

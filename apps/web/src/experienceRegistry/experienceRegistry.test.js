@@ -131,26 +131,26 @@ describe('Experience Registry — launch resolution (reuses existing surfaces)',
     expect(d.sectionId).toBeTruthy();
   });
 
-  it('PPF/NPS land on savings-breakdown (not focused edit)', () => {
+  it('PPF/NPS land on savings-investments (not focused edit)', () => {
     for (const id of ['savings.ppf', 'savings.nps', 'savings.addPpf', 'savings.addNps']) {
       const d = resolveLaunch(getExperienceById(id), { capability: 'full' });
       expect(d.strategy).toBe('configure_screen');
-      expect(d.landingQuestionId).toBe('savings-breakdown');
+      expect(d.landingQuestionId).toBe('savings-investments');
       expect(d.sectionId).toBeTruthy();
     }
   });
 
-  it('Add RD lands on savings-breakdown without requiring activation', () => {
+  it('Add RD lands on savings-investments without requiring activation', () => {
     const d = resolveLaunch(getExperienceById('savings.addRecurringDeposit'), { capability: 'full' });
     expect(d.strategy).toBe('collection_picker');
-    expect(d.landingQuestionId).toBe('savings-breakdown');
+    expect(d.landingQuestionId).toBe('savings-investments');
     expect(getExperienceById('savings.addRecurringDeposit').activation).toBeNull();
   });
 
-  it('Add FD lands on wealth assets-breakdown without requiring activation', () => {
+  it('Add FD lands on current-assets without requiring activation', () => {
     const d = resolveLaunch(getExperienceById('assets.addFixedDeposit'), { capability: 'full' });
     expect(d.strategy).toBe('collection_picker');
-    expect(d.landingQuestionId).toBe('assets-breakdown');
+    expect(d.landingQuestionId).toBe('current-assets');
     expect(getExperienceById('assets.addFixedDeposit').activation).toBeNull();
   });
 

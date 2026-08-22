@@ -45,32 +45,32 @@ const ROW_GROUPS = [
         id: 'income',
         label: 'INCOME',
         rows: [
-            { key: 'income', label: 'Net Income', sign: '(+)', role: 'detail', field: 'income' },
-            { key: 'taxAdjustment', label: 'Tax Adjustment', sign: '(±)', role: 'detail', field: 'taxAdjustment', highlightNonZero: true },
-            { key: 'adjustedIncome', label: 'Adjusted Net Income', sign: '(=)', role: 'subtotal', field: 'adjustedIncome' },
+            { key: 'income', label: 'Net Income', role: 'detail', field: 'income' },
+            { key: 'taxAdjustment', label: 'Tax Adjustment', role: 'detail', field: 'taxAdjustment', highlightNonZero: true },
+            { key: 'adjustedIncome', label: 'Adjusted Net Income', role: 'subtotal', field: 'adjustedIncome' },
         ],
     },
     {
         id: 'expenses',
         label: 'EXPENSES',
         rows: [
-            { key: 'household', label: 'Household & Lifestyle', sign: '(−)', role: 'detail', field: 'household' },
-            { key: 'emi', label: 'EMIs', sign: '(−)', role: 'detail', field: 'emi' },
-            { key: 'insurance', label: 'Insurance Premiums', sign: '(−)', role: 'detail', field: 'insurance' },
+            { key: 'household', label: 'Household & Lifestyle', role: 'detail', field: 'household' },
+            { key: 'emi', label: 'EMIs', role: 'detail', field: 'emi' },
+            { key: 'insurance', label: 'Insurance Premiums', role: 'detail', field: 'insurance' },
         ],
     },
     {
         id: 'savings',
         label: 'SAVINGS',
         rows: [
-            { key: 'savings', label: 'Savings & Investments', sign: '(−)', role: 'detail', field: 'savings' },
+            { key: 'savings', label: 'Savings & Investments', role: 'detail', field: 'savings' },
         ],
     },
     {
         id: 'result',
         label: 'RESULT',
         rows: [
-            { key: 'unallocatedSurplus', label: 'Unallocated Surplus (Free Cash Flow)', sign: '(=)', role: 'result', field: 'unallocatedSurplus' },
+            { key: 'unallocatedSurplus', label: 'Unallocated Surplus (Free Cash Flow)', role: 'result', field: 'unallocatedSurplus' },
         ],
     },
 ];
@@ -95,7 +95,6 @@ const GroupHeaderRow = ({ label, colSpan }) => (
 );
 
 const LedgerRow = ({
-    sign,
     label,
     values,
     ytdValue,
@@ -107,20 +106,19 @@ const LedgerRow = ({
 }) => (
     <tr className={`ymf-data-row ymf-row-${role}`}>
         <td className={`ymf-row-label ymf-sticky-col ymf-row-${role}`}>
-            <span className="ymf-sign">{sign}</span>
             <span>{label}</span>
         </td>
         {values.map((val, idx) => {
             const col = columns[idx];
             const isNow = col?.isCurrent;
-            const isPlanStartCol = viewMode === VIEW_MODES.MONTHLY && idx === planStartMonth;
+            const isPlanStartCol = viewMode === VIEW_MODES.MONTHLY && col?.idx === planStartMonth;
             const isNegative = role === 'result' && val !== null && val < 0;
             const isTaxColored = highlightNonZero && val !== null && val !== 0;
             const taxNegative = isTaxColored && val < 0;
             const taxPositive = isTaxColored && val > 0;
             return (
                 <td
-                    key={`${label}-${idx}`}
+                    key={`${label}-${col?.label ?? idx}`}
                     className={[
                         'ymf-cell',
                         isNow ? 'ymf-cell-now' : '',
@@ -157,6 +155,8 @@ const InsightIcon = ({ tone }) => {
 const YourMoneyFlowSection = () => {
     const scrollRef = useRef(null);
     const [viewMode, setViewMode] = useState(VIEW_MODES.MONTHLY);
+    const [showAllMonthlyCols, setShowAllMonthlyCols] = useState(false);
+    const [ledgerMobileView, setLedgerMobileView] = useState('card'); // 'card' | 'table'
 
     const {
         currentYearLedger,
@@ -193,10 +193,19 @@ const YourMoneyFlowSection = () => {
     const { meta, baseline, ledger } = report;
     const insights = useMemo(() => computeMoneyFlowInsights(report), [report]);
 
-    const columns = useMemo(
+    const rawColumns = useMemo(
         () => getViewColumns(viewMode, meta.currentMonth),
         [viewMode, meta.currentMonth],
     );
+
+    const columns = useMemo(() => {
+        if (viewMode !== VIEW_MODES.MONTHLY || showAllMonthlyCols) {
+            return rawColumns;
+        }
+        return rawColumns.filter(
+            (col) => col.isCurrent || col.idx === meta.planStartMonth,
+        );
+    }, [viewMode, showAllMonthlyCols, rawColumns, meta.planStartMonth]);
 
     const totalDataCols = columns.length + 1;
 
@@ -221,6 +230,14 @@ const YourMoneyFlowSection = () => {
         }
     }, [viewMode, meta.currentMonth]);
 
+    const handleInsightClick = (target) => {
+        if (!target) return;
+        const elem = document.querySelector(target);
+        if (elem) {
+            elem.scrollIntoView({ behavior: 'smooth' });
+        }
+    };
+
     return (
         <div className="ymf-section">
             <div className="ymf-hero card">
@@ -230,15 +247,6 @@ const YourMoneyFlowSection = () => {
                         <p style={{ margin: '0.5rem 0 0', color: 'var(--text-muted)', lineHeight: 1.55 }}>
                             Let&apos;s understand how money supports your family&apos;s life throughout this year.
                         </p>
-                    </div>
-                    <div className="ymf-badges">
-                        <span className="ymf-badge ymf-badge-plan">
-                            <Calendar size={14} />
-                            Plan Start: {meta.planStartMonthLabel.slice(0, 3)}
-                        </span>
-                        <span className="ymf-badge ymf-badge-now">
-                            Now: {meta.currentMonthLabel.slice(0, 3)}
-                        </span>
                     </div>
                 </div>
 
@@ -257,27 +265,107 @@ const YourMoneyFlowSection = () => {
                         <div>
                             <h3 style={{ margin: 0 }}>Current Year Tracking Ledger</h3>
                             <p className="ymf-legend">
-                                <span className="ymf-legend-item"><span className="ymf-sign">(+)</span> inflow</span>
-                                <span className="ymf-legend-item"><span className="ymf-sign">(−)</span> outflow</span>
-                                <span className="ymf-legend-item"><span className="ymf-sign">(=)</span> subtotal / result</span>
+                                Comprehensive accounting detail for your annual cash flow.
                             </p>
                         </div>
-                        <div className="ymf-view-toggle" role="group" aria-label="Ledger view">
-                            {VIEW_OPTIONS.map((opt) => (
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                            <div className="ymf-mobile-toggle-btn">
                                 <button
-                                    key={opt.id}
                                     type="button"
-                                    className={`ymf-view-btn ${viewMode === opt.id ? 'active' : ''}`}
-                                    onClick={() => setViewMode(opt.id)}
+                                    className={`ymf-view-btn ${ledgerMobileView === 'card' ? 'active' : ''}`}
+                                    onClick={() => setLedgerMobileView('card')}
                                 >
-                                    {opt.label}
+                                    Cards
                                 </button>
-                            ))}
+                                <button
+                                    type="button"
+                                    className={`ymf-view-btn ${ledgerMobileView === 'table' ? 'active' : ''}`}
+                                    onClick={() => setLedgerMobileView('table')}
+                                >
+                                    Table
+                                </button>
+                            </div>
+                            {viewMode === VIEW_MODES.MONTHLY && ledgerMobileView === 'table' && (
+                                <button
+                                    type="button"
+                                    className="ymf-view-btn"
+                                    style={{ border: '1px solid var(--border)', background: showAllMonthlyCols ? 'var(--bg-card)' : 'transparent' }}
+                                    onClick={() => setShowAllMonthlyCols((v) => !v)}
+                                >
+                                    {showAllMonthlyCols ? 'Focus current month' : 'Show all 12 months'}
+                                </button>
+                            )}
+                            <div className="ymf-view-toggle" role="group" aria-label="Ledger view">
+                                {VIEW_OPTIONS.map((opt) => (
+                                    <button
+                                        key={opt.id}
+                                        type="button"
+                                        className={`ymf-view-btn ${viewMode === opt.id ? 'active' : ''}`}
+                                        onClick={() => setViewMode(opt.id)}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="ymf-table-scroll" ref={scrollRef}>
+                {ledgerMobileView === 'card' && (
+                    <div className="ymf-mobile-card-grid">
+                        {ROW_GROUPS.map((group) => (
+                            <div key={group.id} className="ymf-mob-group-card">
+                                <div className="ymf-mob-group-header">
+                                    <span>{group.label}</span>
+                                </div>
+                                <div className="ymf-mob-group-body">
+                                    {group.rows.map((row) => {
+                                        const rawValues = ledger[row.field];
+                                        const currentVal = rawValues[meta.currentMonth];
+                                        const ytdValue = computeYtdTotal(
+                                            rawValues,
+                                            meta.planStartMonth,
+                                            meta.currentMonth,
+                                        );
+                                        const isResult = row.role === 'result';
+                                        const isSubtotal = row.role === 'subtotal';
+
+                                        return (
+                                            <div
+                                                key={row.key}
+                                                className={[
+                                                    'ymf-mob-ledger-row',
+                                                    isSubtotal ? 'ymf-mob-subtotal' : '',
+                                                    isResult ? 'ymf-mob-result' : '',
+                                                ].filter(Boolean).join(' ')}
+                                            >
+                                                <div className="ymf-mob-row-title-wrap">
+                                                    <span className="ymf-mob-row-title">{row.label}</span>
+                                                </div>
+                                                <div className="ymf-mob-row-metrics">
+                                                    <div>
+                                                        <span className="ymf-mob-metric-lbl">Now ({meta.currentMonthLabel.slice(0, 3)})</span>
+                                                        <strong className={currentVal < 0 ? 'ymf-cell-negative' : ''}>
+                                                            {formatCell(currentVal)}
+                                                        </strong>
+                                                    </div>
+                                                    <div>
+                                                        <span className="ymf-mob-metric-lbl">YTD ({ytdStartLabel}–{ytdEndLabel})</span>
+                                                        <strong className={ytdValue < 0 ? 'ymf-cell-negative' : ''}>
+                                                            {formatCell(ytdValue)}
+                                                        </strong>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                <div className={`ymf-table-scroll ${ledgerMobileView === 'card' ? 'ymf-hide-mobile-card' : ''}`} ref={scrollRef}>
                     <table className="ymf-table">
                         <thead>
                             <tr>
@@ -325,6 +413,9 @@ const YourMoneyFlowSection = () => {
                                             viewMode,
                                             meta.planStartMonth,
                                         );
+                                        const filteredDisplayValues = viewMode === VIEW_MODES.MONTHLY && !showAllMonthlyCols
+                                            ? columns.map((c) => displayValues[c.idx])
+                                            : displayValues;
                                         const ytdValue = computeYtdTotal(
                                             rawValues,
                                             meta.planStartMonth,
@@ -333,9 +424,8 @@ const YourMoneyFlowSection = () => {
                                         return (
                                             <LedgerRow
                                                 key={row.key}
-                                                sign={row.sign}
                                                 label={row.label}
-                                                values={displayValues}
+                                                values={filteredDisplayValues}
                                                 ytdValue={ytdValue}
                                                 role={row.role}
                                                 highlightNonZero={row.highlightNonZero}
@@ -360,23 +450,6 @@ const YourMoneyFlowSection = () => {
                     </p>
                 </div>
             </div>
-
-            {insights.length > 0 && (
-                <div className="card ymf-insights-card">
-                    <h4 className="ymf-insights-title">
-                        <Lightbulb size={18} />
-                        Your Money Flow Insights
-                    </h4>
-                    <ul className="ymf-insights-list">
-                        {insights.map((item) => (
-                            <li key={item.id} className={`ymf-insight ymf-insight-${item.tone}`}>
-                                <InsightIcon tone={item.tone} />
-                                <span>{item.text}</span>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            )}
 
             <div className="ymf-section-divider" aria-hidden="true">
                 <span className="ymf-section-divider-line" />
@@ -434,9 +507,9 @@ const YourMoneyFlowSection = () => {
                 .ymf-row-subtotal .ymf-row-label { font-weight: 700; }
                 .ymf-row-result .ymf-row-label { font-weight: 700; }
                 .ymf-row-subtotal { background: rgba(37,99,235,0.04); }
-                .ymf-row-subtotal .ymf-sticky-col { background: rgba(37,99,235,0.04) !important; }
+                .ymf-row-subtotal .ymf-sticky-col { background: linear-gradient(rgba(37,99,235,0.04), rgba(37,99,235,0.04)), var(--bg-card, #ffffff) !important; }
                 .ymf-row-result { background: rgba(16,185,129,0.06); }
-                .ymf-row-result .ymf-sticky-col { background: rgba(16,185,129,0.06) !important; }
+                .ymf-row-result .ymf-sticky-col { background: linear-gradient(rgba(16,185,129,0.06), rgba(16,185,129,0.06)), var(--bg-card, #ffffff) !important; }
                 .ymf-row-result .ymf-cell { font-weight: 700; }
 
                 .ymf-col-label { display: block; }
@@ -463,6 +536,13 @@ const YourMoneyFlowSection = () => {
                 .ymf-insight-positive .ymf-insight-icon { color: #059669; }
                 .ymf-insight-accent .ymf-insight-icon { color: var(--primary); }
                 .ymf-insight-accent { color: var(--primary); font-weight: 500; }
+                .ymf-insight-action-btn {
+                    display: inline-flex; align-items: center; gap: 0.4rem;
+                    background: transparent; border: none; padding: 0;
+                    color: var(--primary); font-size: inherit; font-weight: 600;
+                    cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
+                }
+                .ymf-insight-action-btn:hover { color: var(--accent, #7c3aed); }
 
                 .dr-reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.65s cubic-bezier(0.16,1,0.3,1), transform 0.65s cubic-bezier(0.16,1,0.3,1); }
                 .dr-reveal.dr-visible { opacity: 1; transform: translateY(0); }
@@ -488,6 +568,24 @@ const YourMoneyFlowSection = () => {
                 .dr-donut-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
                 .dr-donut-center strong { font-size: 1.75rem; color: var(--primary); line-height: 1; }
                 .dr-donut-center span { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem; }
+                .ymf-mobile-toggle-btn { display: none; gap: 0; background: var(--bg-main); padding: 4px; border-radius: 8px; border: 1px solid var(--border); flex-shrink: 0; }
+                .ymf-mobile-card-grid { display: flex; flex-direction: column; gap: 1rem; margin-top: 0.5rem; }
+                .ymf-mob-group-card { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-card); }
+                .ymf-mob-group-header { padding: 0.5rem 0.85rem; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); letter-spacing: 0.05em; background: rgba(0,0,0,0.03); border-bottom: 1px solid var(--border); }
+                .ymf-mob-group-body { display: flex; flex-direction: column; }
+                .ymf-mob-ledger-row { display: flex; flex-direction: column; padding: 0.65rem 0.85rem; border-bottom: 1px solid var(--border); gap: 0.35rem; }
+                .ymf-mob-ledger-row:last-child { border-bottom: none; }
+                .ymf-mob-subtotal { background: rgba(37,99,235,0.04); }
+                .ymf-mob-result { background: rgba(16,185,129,0.06); }
+                .ymf-mob-row-title { font-size: 0.88rem; font-weight: 600; color: var(--text-main); }
+                .ymf-mob-row-metrics { display: flex; justify-content: space-between; gap: 1rem; font-size: 0.82rem; }
+                .ymf-mob-metric-lbl { display: block; font-size: 0.7rem; color: var(--text-muted); }
+
+                @media (max-width: 640px) {
+                    .ymf-mobile-toggle-btn { display: flex; }
+                    .ymf-hide-mobile-card { display: none; }
+                    .ymf-sticky-col, .ymf-th-label { min-width: 140px; max-width: 140px; }
+                }
             `}</style>
         </div>
     );

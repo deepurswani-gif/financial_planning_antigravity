@@ -170,11 +170,11 @@ export function isLifeInsuranceAllocType(type) {
     return type === 'Life Insurance' || type === LISP_INSTRUMENT_TYPE;
 }
 
-export function createEmptyLispDraft() {
+export function createEmptyLispDraft(type = LISP_INSTRUMENT_TYPE) {
     return {
         premium: 0,
         frequency: 'Monthly',
-        duration: INSTRUMENT_REGISTRY[LISP_INSTRUMENT_TYPE]?.defaultDuration || 10,
+        duration: INSTRUMENT_REGISTRY[type]?.defaultDuration || 10,
         insuredMember: '',
     };
 }
@@ -202,20 +202,20 @@ export function getLispDraftMonthly(draft) {
 /** Numeric monthly/lumpsum amount used for surplus totals and max clamps. */
 export function getDraftTypeAmount(draftAllocations = {}, type) {
     const value = draftAllocations?.[type];
-    if (type === LISP_INSTRUMENT_TYPE) return getLispDraftMonthly(value);
+    if (type === LISP_INSTRUMENT_TYPE || type === 'Term Insurance') return getLispDraftMonthly(value);
     return Math.max(0, parseAmount(value));
 }
 
 export function createEmptyDraftAllocations() {
     return Object.fromEntries(STUDIO_INSTRUMENT_TYPES.map((t) => (
-        t === LISP_INSTRUMENT_TYPE ? [t, createEmptyLispDraft()] : [t, 0]
+        (t === LISP_INSTRUMENT_TYPE || t === 'Term Insurance') ? [t, createEmptyLispDraft(t)] : [t, 0]
     )));
 }
 
 export function getDraftMonthlyImpact(instrumentType, amount) {
     const def = INSTRUMENT_REGISTRY[instrumentType];
     if (!def) return 0;
-    if (instrumentType === LISP_INSTRUMENT_TYPE) {
+    if (instrumentType === LISP_INSTRUMENT_TYPE || instrumentType === 'Term Insurance') {
         const monthly = isLispDraft(amount) ? getLispDraftMonthly(amount) : parseAmount(amount);
         return monthly > 0 ? monthly : 0;
     }
@@ -235,7 +235,7 @@ export function draftAllocationsToItems(draftAllocations = {}, source = 'user') 
         .filter((type) => getDraftTypeAmount(draftAllocations, type) > 0)
         .map((type) => {
             const value = draftAllocations[type];
-            if (type === LISP_INSTRUMENT_TYPE && isLispDraft(value)) {
+            if ((type === LISP_INSTRUMENT_TYPE || type === 'Term Insurance') && isLispDraft(value)) {
                 return {
                     instrumentType: type,
                     amount: getLispDraftMonthly(value),
@@ -256,7 +256,8 @@ export function draftAllocationsToItems(draftAllocations = {}, source = 'user') 
 
 /** Hydrate LISP draft from a persisted allocation row. */
 export function lispDraftFromAllocation(alloc = {}) {
-    const empty = createEmptyLispDraft();
+    const type = alloc?.type || LISP_INSTRUMENT_TYPE;
+    const empty = createEmptyLispDraft(type);
     if (!alloc) return empty;
     // New installment+member shape (or any row with insuredMember)
     if (alloc.insuredMember) {
@@ -277,9 +278,9 @@ export function lispDraftFromAllocation(alloc = {}) {
 }
 
 export function areDraftTypeValuesEqual(a, b, type) {
-    if (type === LISP_INSTRUMENT_TYPE) {
-        const left = isLispDraft(a) ? a : createEmptyLispDraft();
-        const right = isLispDraft(b) ? b : createEmptyLispDraft();
+    if (type === LISP_INSTRUMENT_TYPE || type === 'Term Insurance') {
+        const left = isLispDraft(a) ? a : createEmptyLispDraft(type);
+        const right = isLispDraft(b) ? b : createEmptyLispDraft(type);
         return Math.round(parseAmount(left.premium)) === Math.round(parseAmount(right.premium))
             && String(left.frequency || 'Monthly') === String(right.frequency || 'Monthly')
             && (parseInt(left.duration, 10) || 10) === (parseInt(right.duration, 10) || 10)
@@ -631,7 +632,7 @@ export function applyAllocationPlan({
         const def = INSTRUMENT_REGISTRY[instrumentType];
         if (!def) return;
 
-        if (instrumentType === LISP_INSTRUMENT_TYPE) {
+        if (instrumentType === LISP_INSTRUMENT_TYPE || instrumentType === 'Term Insurance') {
             const raw = draftAllocations[instrumentType];
             if (isLispDraft(raw)) {
                 const premium = Math.round(parseAmount(raw.premium));

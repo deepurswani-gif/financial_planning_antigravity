@@ -15,10 +15,10 @@ function getSummaryMonthlyAmount(alloc) {
     const isMonthly = RECURRING_ALLOC_TYPES.includes(alloc.type);
     if (!isMonthly) return 0;
 
-    // Installment premium rows (legacy Life / new LISP with insuredMember)
+    // Installment premium rows (legacy Life / new LISP or Term Insurance with insuredMember)
     const isInstallment = (
         (alloc.type === 'Life Insurance' && !alloc.studioPlanKey)
-        || (alloc.type === 'Life Insurance Saving Plans' && alloc.insuredMember)
+        || ((alloc.type === 'Life Insurance Saving Plans' || alloc.type === 'Term Insurance') && alloc.insuredMember)
     );
     if (isInstallment) {
         const freq = String(alloc.frequency || 'Monthly').toLowerCase();
@@ -257,7 +257,7 @@ export function computeInvestSurplusInsights(report) {
     } else {
         insights.push({
             id: 'no-allocations',
-            text: 'No investment allocations planned yet — use suggestions below or open the full allocation planner.',
+            text: 'No investment allocations planned yet — open the full allocation planner.',
             tone: 'accent',
         });
     }

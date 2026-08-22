@@ -228,7 +228,7 @@ describe('moneyFlowLedgerLogic', () => {
         expect(getDisplayValues(values, VIEW_MODES.MONTHLY, 1)).toEqual([null, 20, 30]);
     });
 
-    it('computeMoneyFlowInsights includes savings rate and surplus allocation', () => {
+    it('computeMoneyFlowInsights includes emi burden and surplus allocation action link', () => {
         const report = buildYourMoneyFlowReport({
             currentYearLedger: {
                 income: Array(12).fill(100000),
@@ -254,7 +254,8 @@ describe('moneyFlowLedgerLogic', () => {
         });
 
         const insights = computeMoneyFlowInsights(report);
-        expect(insights.some((i) => i.id === 'savings-rate')).toBe(true);
-        expect(insights.some((i) => i.id === 'free-cash-flow')).toBe(true);
+        expect(insights.some((i) => i.id === 'emi-burden')).toBe(true);
+        expect(insights.some((i) => i.id === 'allocate-surplus')).toBe(true);
+        expect(insights.find((i) => i.id === 'allocate-surplus')?.actionTarget).toBe('#ius-section');
     });
 });

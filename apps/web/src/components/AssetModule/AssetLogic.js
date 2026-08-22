@@ -58,11 +58,21 @@ export const calculateNetWorth = (assetCategories = {}, liabilityCategories = {}
     let totalLiabilities = processItems(liabilityCategories, false);
 
     if (!hasWealthDetailEntered(assetCategories)) {
-        totalAssets += getSummaryAssetTotal(assetCategories);
+        const summaryTotal = getSummaryAssetTotal(assetCategories);
+        if (summaryTotal > 0) {
+            totalAssets = summaryTotal;
+        } else {
+            totalAssets += summaryTotal;
+        }
     }
     if (!hasLiabilityDetailEntered(liabilityCategories)) {
         const includeLoans = getAssetAmount(liabilityCategories?.summaryOutstandingLoans) > 0;
-        totalLiabilities += getSummaryLiabilityTotal(liabilityCategories || {}, includeLoans);
+        const summaryLiabTotal = getSummaryLiabilityTotal(liabilityCategories || {}, includeLoans);
+        if (summaryLiabTotal > 0) {
+            totalLiabilities = summaryLiabTotal;
+        } else {
+            totalLiabilities += summaryLiabTotal;
+        }
     }
 
     const netWorth = totalAssets - totalLiabilities;

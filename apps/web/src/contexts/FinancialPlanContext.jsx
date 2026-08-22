@@ -557,6 +557,7 @@ export const FinancialPlanProvider = ({ children }) => {
       if (profileResult?.data) {
         if (isSubscriptionCurrentlyValid(profileResult.data)) {
           saveWorkspaceCapability(userId, WORKSPACE_CAPABILITY_FULL);
+          setWorkspaceCapability(WORKSPACE_CAPABILITY_FULL);
         }
       }
 
