@@ -507,7 +507,7 @@ export function analyzeInstrument(
         series = data.map((r) => ({ year: r.year, corpus: (r.endValue || 0) + (r.maturityValue || 0) }));
         headlineValue = Math.round(series.find((r) => r.year === retirementYear)?.corpus || series[series.length - 1]?.corpus || 0);
     } else {
-        const base = proposedLumpsum + scenario;
+        const base = def.isProtection ? 0 : (proposedLumpsum + scenario);
         series = simpleLumpsumSeries(base, rate, currentYear, retirementYear);
         headlineValue = Math.round(series[series.length - 1]?.corpus || 0);
     }

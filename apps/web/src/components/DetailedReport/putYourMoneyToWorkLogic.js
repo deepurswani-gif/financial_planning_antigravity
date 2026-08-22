@@ -1209,11 +1209,15 @@ export function buildAllocationStudioContext({
     const defaultMonth = meta.currentMonth >= planStartMonth ? meta.currentMonth : planStartMonth;
     const monthIndex = selectedMonthIndex ?? defaultMonth;
 
+    const scopedAllocations = reportScope === 'gaps'
+        ? investmentAllocations.filter((a) => isProtectionAllocationType(a.type))
+        : investmentAllocations;
+
     const monthlyFreeCash = monthIndex >= planStartMonth
         ? (ledger.unallocatedSurplus[monthIndex] || 0)
         : 0;
 
-    const allocationsSummary = summarizeInvestmentAllocations(investmentAllocations);
+    const allocationsSummary = summarizeInvestmentAllocations(scopedAllocations);
     const journeyMonthDeduction = computeJourneyAdjustmentImpactForMonth(
         journeyAdjustments,
         calendarYear,
@@ -1225,7 +1229,7 @@ export function buildAllocationStudioContext({
     } = monthIndex >= planStartMonth
         ? computeDeployableSurplusWithCarry({
             unallocatedSurplusByMonth: ledger.unallocatedSurplus || [],
-            investmentAllocations,
+            investmentAllocations: scopedAllocations,
             journeyAdjustments,
             calendarYear,
             planStartMonth,
@@ -1257,7 +1261,7 @@ export function buildAllocationStudioContext({
         calendarYear,
     );
 
-    const instrumentCategories = buildInstrumentCards(investmentAllocations, { reportScope });
+    const instrumentCategories = buildInstrumentCards(scopedAllocations, { reportScope });
     const instrumentCardCount = instrumentCategories.reduce(
         (sum, cat) => sum + cat.instruments.length,
         0,
@@ -1267,7 +1271,7 @@ export function buildAllocationStudioContext({
     const sipAnalysis = analyzeSipBaseline({
         expenseCategories,
         assetCategories,
-        investmentAllocations,
+        investmentAllocations: scopedAllocations,
         calculatorInputs,
         goalMappings,
         goals,
@@ -1307,7 +1311,7 @@ export function buildAllocationStudioContext({
 
     const threeMonthOutlook = buildThreeMonthSurplusOutlook({
         unallocatedSurplusByMonth: ledger.unallocatedSurplus || [],
-        investmentAllocations,
+        investmentAllocations: scopedAllocations,
         journeyAdjustments,
         calendarYear,
         planStartMonth,
@@ -1316,7 +1320,7 @@ export function buildAllocationStudioContext({
 
     const journeyAdjustedOutlook = buildThreeMonthSurplusOutlook({
         unallocatedSurplusByMonth: ledger.unallocatedSurplus || [],
-        investmentAllocations,
+        investmentAllocations: scopedAllocations,
         journeyAdjustments,
         calendarYear,
         planStartMonth,
